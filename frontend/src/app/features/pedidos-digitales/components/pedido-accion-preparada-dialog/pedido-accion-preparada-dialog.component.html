@@ -1,0 +1,176 @@
+<div class="dialog-backdrop" (click)="closed.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-labelledby]="
+    tipo() === 'pago'
+      ? 'accion-pago-title'
+      : tipo() === 'pago-consulta'
+        ? 'accion-pago-consulta-title'
+        : 'accion-cpe-title'
+  "
+  (click)="$event.stopPropagation()"
+>
+  @if (tipo() === 'pago') {
+    <header class="dialog__header">
+      <div>
+        <h2 id="accion-pago-title">Vincular pago</h2>
+        <p>Preparada para conciliar Yape / Izipay en la bandeja de Pagos.</p>
+      </div>
+      <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
+        ×
+      </button>
+    </header>
+    <div class="dialog__body">
+      <p>
+        Registra o asocia un pago
+        <strong>NOTIFICADO</strong> (voucher Yape o Izipay). Al
+        <strong>CONFIRMARLO</strong>, si cubre el total, el pedido pasa a
+        <strong>Pagado</strong> en el Kanban.
+      </p>
+      @if (pedido(); as pedido) {
+        <p>Pedido <code>{{ pedido.codigo }}</code> · {{ pedido.clienteNombre }}.</p>
+      }
+    </div>
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+      @if (pedido(); as pedido) {
+        <a class="primary" routerLink="/app/pagos" [queryParams]="{ pedidoId: pedido.id }">
+          Abrir bandeja de pagos
+        </a>
+      } @else {
+        <a class="primary" routerLink="/app/pagos">Abrir bandeja de pagos</a>
+      }
+    </footer>
+  } @else if (tipo() === 'pago-consulta') {
+    <header class="dialog__header">
+      <div>
+        <h2 id="accion-pago-consulta-title">Pago vinculado</h2>
+        <p>Consulta de cobro. No se puede registrar un pago duplicado desde aquí.</p>
+      </div>
+      <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
+        ×
+      </button>
+    </header>
+    <div class="dialog__body">
+      @if (pedido(); as pedido) {
+        <p>
+          Pedido <code>{{ pedido.codigo }}</code> ·
+          {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        </p>
+      }
+      @if (pagos().length === 0) {
+        <p class="dialog__muted">
+          No hay pagos asociados en el sistema. El pedido puede haberse marcado como pagado por
+          cobro inmediato; revisa la auditoría de estados.
+        </p>
+      } @else {
+        <ul class="pagos-lista">
+          @for (pago of pagos(); track pago.id) {
+            <li>
+              <div class="pagos-lista__top">
+                <strong>{{ etiquetasOrigenPago[pago.origen] }}</strong>
+                <span class="pagos-lista__estado" [attr.data-estado]="pago.estado">
+                  {{ etiquetasEstadoPago[pago.estado] }}
+                </span>
+              </div>
+              <p>
+                Monto
+                <strong>{{ pago.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+              </p>
+              <p>
+                N° operación
+                <code>{{ pago.codigoOperacion || pago.referenciaExterna || '—' }}</code>
+              </p>
+              @if (pago.fechaConfirmacion) {
+                <p class="dialog__muted">
+                  Confirmado {{ pago.fechaConfirmacion | date: 'dd/MM/yyyy HH:mm' }}
+                </p>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </div>
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+    </footer>
+  } @else {
+    <header class="dialog__header">
+      <div>
+        <h2 id="accion-cpe-title">Emitir comprobante</h2>
+        <p>Boleta, factura o nota de venta. La nota de venta no se envía a SUNAT hasta consolidar.</p>
+      </div>
+      <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
+        ×
+      </button>
+    </header>
+    <div class="dialog__body">
+      <p>
+        Elige el documento. La boleta y la factura van a SUNAT Beta. La nota de venta descuenta
+        stock y queda pendiente de boleta consolidada.
+      </p>
+      <label class="dialog__tipo">
+        Tipo de comprobante
+        <select [value]="tipoSeleccionado()" (change)="tipoSeleccionado.set($any($event.target).value)">
+          @for (tipo of tipos; track tipo) {
+            <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+          }
+        </select>
+      </label>
+      @if (pedido()?.codigoVenta; as codigoVenta) {
+        <p>Venta <code>{{ codigoVenta }}</code>.</p>
+      }
+      @if (error()) {
+        <p class="dialog__error">{{ error() }}</p>
+      }
+      @if (emision(); as emision) {
+        <div class="dialog__resultado" [attr.data-estado]="emision.estado">
+          <p>
+            <strong>{{ numeroDe(emision) }}</strong>
+            <span>{{ etiquetasEstado[emision.estado] }}</span>
+          </p>
+          <p>{{ emision.mensaje }}</p>
+        </div>
+      }
+    </div>
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+      @if (emision(); as emision) {
+        <button type="button" class="ghost" [disabled]="!puedeXml(emision)" (click)="descargarXml()">
+          XML
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedeCdr(emision)" (click)="descargarCdr()">
+          CDR
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('a4')">
+          PDF
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('ticket')">
+          Ticket
+        </button>
+        @if (emision.estado !== 'ACEPTADO' && emision.estado !== 'PENDIENTE_CONSOLIDAR' && emision.estado !== 'CONSOLIDADA') {
+          <button
+            type="button"
+            class="primary"
+            [disabled]="!pedido()?.ventaId || enviando()"
+            (click)="emitir()"
+          >
+            {{ enviando() ? 'Emitiendo…' : 'Reintentar' }}
+          </button>
+        }
+      } @else {
+        <button
+          type="button"
+          class="primary"
+          [disabled]="!pedido()?.ventaId || enviando()"
+          (click)="emitir()"
+        >
+          {{ enviando() ? 'Emitiendo…' : 'Emitir ' + etiquetas[tipoSeleccionado()].toLowerCase() }}
+        </button>
+      }
+    </footer>
+  }
+</section>

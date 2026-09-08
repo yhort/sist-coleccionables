@@ -1,0 +1,117 @@
+<div class="cascada">
+  <label>
+    Código / SKU
+    <input
+      type="text"
+      autocomplete="off"
+      [value]="busqueda()"
+      placeholder="Escanea el código o escribe el SKU…"
+      (input)="onBusquedaInput($any($event.target).value)"
+      (keydown.enter)="confirmarScan($event)"
+    />
+  </label>
+
+  @if (coincidencias().length && busqueda().trim().toLowerCase() !== (seleccionado()?.codigoSku.toLowerCase() ?? '')) {
+    <ul class="sugerencias">
+      @for (producto of coincidencias(); track producto.id) {
+        <li>
+          <button type="button" (click)="elegirCoincidencia(producto)">
+            <strong>{{ producto.codigoSku }}</strong>
+            <span>
+              {{ producto.nombre }} · {{ etiquetasTipo[producto.tipoProducto] }}
+              · libre {{ stockLibreFn()(producto.id) }}
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (seleccionado(); as producto) {
+    <p class="seleccion">
+      <strong>{{ producto.codigoSku }}</strong>
+      · {{ producto.nombre }}
+      · {{ etiquetasTipo[producto.tipoProducto] }}
+      · S/ {{ producto.precioVenta }}
+      · libre {{ stockLibreFn()(producto.id) }}
+      <button type="button" class="link-btn" (click)="limpiar()">Cambiar</button>
+    </p>
+  }
+
+  @if (errorScan()) {
+    <p class="error">{{ errorScan() }}</p>
+  }
+
+  <p class="hint">
+    Lector o SKU directo: Enter confirma. Sellados y cartas antiguas entran por código. Catálogo
+    nuevo: Serie → Set → Ficha → variante con stock.
+  </p>
+
+  <div class="cascada__pasos">
+    <label>
+      Serie
+      <select [value]="serieId()" (change)="onSerieChange($any($event.target).value)">
+        <option value="">Serie</option>
+        @for (serie of series(); track serie.id) {
+          <option [value]="serie.id">{{ serie.codigo }} · {{ serie.nombre }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Set
+      <select
+        [value]="setId()"
+        [disabled]="!serieId()"
+        (change)="onSetChange($any($event.target).value)"
+      >
+        <option value="">Set</option>
+        @for (set of sets(); track set.id) {
+          <option [value]="set.id">{{ set.codigo }} · {{ set.nombre }}</option>
+        }
+      </select>
+    </label>
+    <label class="ficha">
+      Ficha
+      <input
+        type="text"
+        autocomplete="off"
+        [disabled]="!setId()"
+        [value]="busquedaFicha()"
+        placeholder="Nº 047, 104 o nombre…"
+        (focus)="abrirListaFichas()"
+        (input)="onFichaInput($any($event.target).value)"
+        (keydown.enter)="confirmarFicha($event)"
+        (keydown.escape)="listaFichasAbierta.set(false)"
+      />
+      @if (listaFichasAbierta() && setId()) {
+        <ul class="sugerencias sugerencias--ficha">
+          @for (ficha of fichasFiltradas(); track ficha.id) {
+            <li>
+              <button type="button" (click)="elegirFicha(ficha)">
+                <strong>#{{ ficha.numero }} · {{ ficha.nombre }}</strong>
+                <span>{{ etiquetasRareza[ficha.rareza] }}</span>
+              </button>
+            </li>
+          } @empty {
+            <li class="vacio">Sin fichas para ese número o nombre.</li>
+          }
+        </ul>
+      }
+    </label>
+    <label>
+      Variante con stock
+      <select
+        [value]="productoId()"
+        [disabled]="!cartaId()"
+        (change)="onVarianteChange($any($event.target).value)"
+      >
+        <option value="">
+          {{ cartaId() && variantesConStock().length === 0 ? 'Sin stock en esta ficha' : 'Variante' }}
+        </option>
+        @for (variante of variantesConStock(); track variante.id) {
+          <option [value]="variante.id">{{ etiquetaVariante(variante) }}</option>
+        }
+      </select>
+    </label>
+  </div>
+</div>

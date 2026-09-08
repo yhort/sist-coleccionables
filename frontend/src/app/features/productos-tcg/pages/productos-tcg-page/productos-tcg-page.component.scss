@@ -1,0 +1,140 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: calc(100dvh - var(--topbar-height) - (2 * var(--spacing-lg)));
+  overflow: hidden;
+}
+
+.productos {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-height: 0;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+
+  &__header {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    p {
+      margin: 0.3rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  &__add {
+    min-height: 40px;
+    padding: 0 1rem;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+
+    &:hover {
+      background: var(--color-primary-hover);
+    }
+  }
+
+  &__error {
+    flex-shrink: 0;
+    margin: 0;
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+}
+
+app-productos-tcg-filters {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: block;
+  flex-shrink: 0;
+}
+
+app-productos-tcg-table {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.view-toggle {
+  display: inline-flex;
+  padding: 0.2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+
+  button {
+    min-height: 36px;
+    padding: 0 0.85rem;
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+
+  &__btn--active {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+}
+
+.tabs {
+  display: inline-flex;
+  padding: 0.2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+
+  button {
+    min-height: 36px;
+    padding: 0 0.9rem;
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+
+  &__tab--active {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+}
+
+app-catalogo-tcg-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@media (max-width: 1024px) {
+  :host {
+    height: calc(100dvh - var(--topbar-height) - (2 * var(--spacing-md)));
+  }
+}

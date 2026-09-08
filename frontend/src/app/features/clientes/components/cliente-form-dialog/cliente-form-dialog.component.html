@@ -1,0 +1,90 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section class="dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <header class="dialog__header">
+    <div>
+      <h2>{{ cliente() ? 'Editar cliente' : 'Nuevo cliente' }}</h2>
+      <p>DNI de 8 dígitos, RUC de 11 o Cliente varios / Público general para boletas.</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label class="wide recojo">
+        <input
+          type="checkbox"
+          formControlName="esPublicoGeneral"
+          (change)="onPublicoGeneral($any($event.target).checked)"
+        />
+        Cliente varios / Público general
+      </label>
+      <label class="wide">
+        Nombre / Razón social
+        <input type="text" formControlName="nombre" maxlength="160" />
+      </label>
+      <label>
+        Tipo de documento
+        <select formControlName="tipoDocumento">
+          @for (tipo of tipos; track tipo) {
+            <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Número
+        <input
+          type="text"
+          formControlName="numeroDocumento"
+          maxlength="16"
+          [readonly]="form.controls.esPublicoGeneral.value"
+        />
+      </label>
+      <label class="wide">
+        Teléfono
+        <input type="tel" formControlName="telefono" maxlength="32" />
+      </label>
+      <label>
+        Canal de contacto
+        <select formControlName="canalContacto">
+          <option value="">Sin preferencia</option>
+          @for (canal of canales; track canal) {
+            <option [value]="canal">{{ etiquetasCanal[canal] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Punto de entrega preferido
+        <input
+          type="text"
+          formControlName="puntoEntregaPreferido"
+          maxlength="80"
+          list="puntos-entrega-cliente"
+          placeholder="Papurris, Dapkris, TCG House…"
+        />
+        <datalist id="puntos-entrega-cliente">
+          @for (punto of puntosSugeridos; track punto) {
+            <option [value]="punto"></option>
+          }
+        </datalist>
+      </label>
+      <label class="wide">
+        Contacto de referencia
+        <input
+          type="text"
+          formControlName="contactoReferencia"
+          maxlength="160"
+          placeholder="Persona autorizada a recoger / contacto alternativo"
+        />
+      </label>
+    </div>
+    <p class="hint">Factura: RUC obligatorio. Boleta: DNI o sin documento.</p>
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </footer>
+  </form>
+</section>

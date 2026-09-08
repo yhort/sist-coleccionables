@@ -1,0 +1,164 @@
+<section class="pedidos">
+  <header class="pedidos__header">
+    <div>
+      <h2>Pedidos Digitales</h2>
+      <p>
+        Flujo operativo: Pendiente de pago → Pagado → Empaquetado → Pendiente de entrega →
+        Entregado. Cambia entre Kanban y Tabla según la operación.
+      </p>
+    </div>
+    <div class="pedidos__header-actions">
+      <div class="vista-toggle" role="group" aria-label="Selector de vista">
+        <button
+          type="button"
+          [class.vista-toggle__btn--active]="vista() === 'kanban'"
+          (click)="setVista('kanban')"
+        >
+          Kanban
+        </button>
+        <button
+          type="button"
+          [class.vista-toggle__btn--active]="vista() === 'tabla'"
+          (click)="setVista('tabla')"
+        >
+          Tabla
+        </button>
+      </div>
+      <button type="button" class="pedidos__add" (click)="formAbierta.set(true)">Nuevo pedido</button>
+    </div>
+  </header>
+
+  @if (sedeCajaId()) {
+    <app-caja-turno-banner [sedeId]="sedeCajaId()" (changed)="onCajaChanged()" />
+  }
+
+  <section class="kpis" aria-label="Resumen de pedidos">
+    <article>
+      <span>Pedidos</span>
+      <strong>{{ resumen().total }}</strong>
+    </article>
+    <article>
+      <span>Pendiente de pago</span>
+      <strong>{{ resumen().pendientePago }}</strong>
+    </article>
+    <article>
+      <span>En curso</span>
+      <strong>{{ resumen().enCurso }}</strong>
+    </article>
+    <article>
+      <span>Entregados</span>
+      <strong>{{ resumen().entregados }}</strong>
+    </article>
+    <article>
+      <span>Monto operativo</span>
+      <strong>{{ resumen().monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </article>
+  </section>
+
+  <section class="origenes" aria-label="Filtro por canal de origen">
+    <button
+      type="button"
+      [class.origenes__chip--active]="filtros().origen === 'TODOS'"
+      (click)="actualizarFiltro('origen', 'TODOS')"
+    >
+      Todos
+    </button>
+    @for (origen of origenes; track origen) {
+      <button
+        type="button"
+        class="origenes__chip"
+        [attr.data-origen]="origen"
+        [class.origenes__chip--active]="filtros().origen === origen"
+        (click)="actualizarFiltro('origen', origen)"
+      >
+        {{ etiquetasOrigen[origen] }}
+        <span>{{ conteoOrigen()[origen] }}</span>
+      </button>
+    }
+  </section>
+
+  <section class="toolbar" aria-label="Filtros de pedidos">
+    <label class="toolbar__busqueda">
+      <span>N° de pedido, cliente o tracking</span>
+      <input
+        #busquedaInput
+        type="search"
+        placeholder="Ej. #PED-7B0DE0, Juan, tracking…"
+        [ngModel]="filtros().busqueda"
+        (ngModelChange)="actualizarFiltro('busqueda', $event)"
+      />
+    </label>
+    <label>
+      <span>Desde</span>
+      <input
+        type="date"
+        [ngModel]="filtros().desde"
+        (ngModelChange)="actualizarFiltro('desde', $event)"
+      />
+    </label>
+    <label>
+      <span>Hasta</span>
+      <input
+        type="date"
+        [ngModel]="filtros().hasta"
+        (ngModelChange)="actualizarFiltro('hasta', $event)"
+      />
+    </label>
+    <label>
+      <span>Monto mín.</span>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        placeholder="0.00"
+        [ngModel]="filtros().montoMin"
+        (ngModelChange)="actualizarMonto('montoMin', $event)"
+      />
+    </label>
+    <label>
+      <span>Monto máx.</span>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        placeholder="—"
+        [ngModel]="filtros().montoMax"
+        (ngModelChange)="actualizarMonto('montoMax', $event)"
+      />
+    </label>
+    <button type="button" class="toolbar__clear" (click)="limpiarFiltros()">Limpiar</button>
+  </section>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  @if (vista() === 'kanban') {
+    <app-pedidos-kanban
+      [items]="items()"
+      (abrir)="abrirDetalle($event)"
+      (transicionar)="transicionar($event)"
+    />
+  } @else {
+    <app-pedidos-tabla
+      [items]="items()"
+      (abrir)="abrirDetalle($event)"
+      (transicionar)="transicionar($event)"
+    />
+  }
+</section>
+
+@if (seleccionadoId(); as id) {
+  <app-pedido-detalle-panel [pedidoId]="id" (closed)="cerrarDetalle()" />
+}
+
+@if (formAbierta()) {
+  <app-crear-pedido-digital-dialog
+    (saved)="onPedidoCreado($event)"
+    (cancelled)="formAbierta.set(false)"
+  />
+}
+
+@if (ticketFila(); as fila) {
+  <app-packing-slip-dialog [fila]="fila" [autoPrint]="true" (closed)="cerrarTicket()" />
+}

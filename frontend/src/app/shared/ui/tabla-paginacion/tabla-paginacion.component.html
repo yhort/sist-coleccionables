@@ -1,0 +1,39 @@
+<nav class="pager" aria-label="Paginación de la tabla">
+  <label>
+    <span>Por página</span>
+    <select [ngModel]="pageSize()" (ngModelChange)="cambiarTamano($event)">
+      @for (tamano of tamanos; track tamano) {
+        <option [ngValue]="tamano">{{ tamano }}</option>
+      }
+    </select>
+  </label>
+
+  <p>
+    Mostrando {{ rango().desde }}–{{ rango().hasta }} de {{ rango().total }} registros
+  </p>
+
+  <div class="pager__nav">
+    <button type="button" [disabled]="paginaActual() <= 1" (click)="irA(1)">Primera</button>
+    <button type="button" [disabled]="paginaActual() <= 1" (click)="irA(paginaActual() - 1)">
+      Anterior
+    </button>
+    @for (numero of paginas(); track numero) {
+      <button
+        type="button"
+        class="pager__page"
+        [class.pager__page--active]="numero === paginaActual()"
+        [attr.aria-current]="numero === paginaActual() ? 'page' : null"
+        (click)="irA(numero)"
+      >
+        {{ numero }}
+      </button>
+    }
+    <button
+      type="button"
+      [disabled]="paginaActual() >= totalPaginas()"
+      (click)="irA(paginaActual() + 1)"
+    >
+      Siguiente
+    </button>
+  </div>
+</nav>

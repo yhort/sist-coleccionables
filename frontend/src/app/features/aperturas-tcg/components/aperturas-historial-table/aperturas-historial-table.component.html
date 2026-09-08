@@ -1,0 +1,65 @@
+@if (filas().length === 0) {
+  <div class="empty">No hay aperturas con esos filtros.</div>
+} @else {
+  <div class="table-wrap">
+    <table class="historial">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Sede</th>
+          <th>Producto sellado origen</th>
+          <th>Usuario</th>
+          <th>Total de cartas obtenidas</th>
+          <th>Rendimiento</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track fila.apertura.id) {
+          <tr>
+            <td>
+              {{ fila.apertura.fechaCreacion | date: 'dd/MM/yyyy HH:mm' }}
+            </td>
+            <td>{{ fila.sedeNombre }}</td>
+            <td>
+              <strong>{{ fila.productoSelladoNombre }}</strong>
+            </td>
+            <td>{{ fila.apertura.usuarioNombre }}</td>
+            <td>{{ totalCartas(fila.apertura) }}</td>
+            <td>
+              @if (fila.apertura.estado === 'BORRADOR' || fila.rendimiento.yieldPorcentaje === null) {
+                —
+              } @else {
+                <span
+                  class="yield"
+                  [ngClass]="fila.rendimiento.diferencia >= 0 ? 'yield--pos' : 'yield--neg'"
+                >
+                  {{ fila.rendimiento.diferencia >= 0 ? '+' : ''
+                  }}{{ fila.rendimiento.yieldPorcentaje | number: '1.1-1' }}%
+                </span>
+              }
+            </td>
+            <td>
+              <span class="estado" [ngClass]="claseEstado(fila.apertura.estado)">
+                {{ etiquetas[fila.apertura.estado] }}
+              </span>
+            </td>
+            <td class="historial__actions">
+              @if (fila.apertura.estado === 'BORRADOR') {
+                <button type="button" class="link-btn" (click)="continuar.emit(fila.apertura)">
+                  Continuar
+                </button>
+              }
+              @if (fila.apertura.estado !== 'ANULADA') {
+                <button type="button" class="link-btn link-btn--danger" (click)="anular.emit(fila.apertura)">
+                  Anular
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

@@ -1,0 +1,66 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="sede-title">
+  <header>
+    <div>
+      <h2 id="sede-title">{{ sede() ? 'Editar sede' : 'Nueva sede' }}</h2>
+      <p>Punto de partida o llegada para GRE y almacén principal asignado.</p>
+    </div>
+    <button type="button" class="close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
+  </header>
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <label>
+      Nombre
+      <input type="text" formControlName="nombre" maxlength="120" />
+    </label>
+    <label>
+      Tipo
+      <select formControlName="tipo">
+        <option value="TIENDA">Sede física</option>
+        <option value="ALMACEN">Almacén</option>
+      </select>
+    </label>
+    <label class="wide">
+      Dirección
+      <input type="text" formControlName="direccion" maxlength="300" />
+    </label>
+    <label>
+      Distrito
+      <input type="text" formControlName="distrito" />
+    </label>
+    <label>
+      Provincia
+      <input type="text" formControlName="provincia" />
+    </label>
+    <label>
+      Departamento
+      <input type="text" formControlName="departamento" />
+    </label>
+    <label>
+      UBIGEO
+      <input type="text" formControlName="ubigeo" maxlength="6" />
+    </label>
+    <label class="check wide">
+      <input type="checkbox" formControlName="esPuntoPartidaGre" />
+      Punto de partida GRE
+    </label>
+    <label class="check wide">
+      <input type="checkbox" formControlName="esPuntoLlegadaGre" />
+      Punto de llegada GRE
+    </label>
+    <label class="check wide">
+      <input type="checkbox" formControlName="esAlmacenPrincipal" />
+      Almacén principal
+    </label>
+    <label class="check wide">
+      <input type="checkbox" formControlName="activa" />
+      Activa
+    </label>
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    <footer>
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Guardar sede</button>
+    </footer>
+  </form>
+</section>

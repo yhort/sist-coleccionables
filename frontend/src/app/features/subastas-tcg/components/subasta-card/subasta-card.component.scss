@@ -1,0 +1,111 @@
+:host {
+  display: block;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+
+  h3 {
+    margin: 0.15rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  &__top {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  &__product,
+  &__combo,
+  &__meta,
+  &__time {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+  }
+
+  &__combo {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  &__bid {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 0.35rem 0 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+
+    strong {
+      color: var(--color-text-primary);
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 0.45rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+.canal,
+.tipo {
+  display: inline-flex;
+  min-height: 20px;
+  padding: 0 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.canal {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.tipo {
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+
+  &[data-tipo='SELLADO'] {
+    color: #9a3412;
+    background: #ffedd5;
+  }
+
+  &[data-tipo='ACCESORIO'] {
+    color: #166534;
+    background: #dcfce7;
+  }
+
+  &[data-tipo='COMPUESTO'] {
+    color: #6b21a8;
+    background: #f3e8ff;
+  }
+}
+
+.link-btn {
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+}

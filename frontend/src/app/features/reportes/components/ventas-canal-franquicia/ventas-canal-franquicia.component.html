@@ -1,0 +1,88 @@
+<section class="panel" aria-label="Ventas por canal y franquicia">
+  <header>
+    <h3>Ventas por canal y franquicia</h3>
+    <p>Ingresos cobrados desglosados por origen comercial y juego TCG.</p>
+  </header>
+
+  <div class="grid">
+    <article>
+      <h4>Por canal</h4>
+      <ul class="bars">
+        @for (serie of canales(); track serie.clave) {
+          <li>
+            <div class="bars__meta">
+              <span>{{ serie.etiqueta }}</span>
+              <strong>{{ serie.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+            </div>
+            <div class="bars__track" [attr.aria-valuenow]="serie.porcentaje" aria-valuemin="0" aria-valuemax="100">
+              <div class="bars__fill" [style.width.%]="serie.porcentaje"></div>
+            </div>
+            <small>{{ serie.cantidad }} pedido{{ serie.cantidad === 1 ? '' : 's' }} · {{ serie.porcentaje | number: '1.1-1' }}%</small>
+          </li>
+        }
+      </ul>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Canal</th>
+              <th>Pedidos</th>
+              <th>Ingresos</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (serie of canales(); track serie.clave) {
+              <tr>
+                <td><code>{{ serie.clave }}</code></td>
+                <td>{{ serie.cantidad | number: '1.0-0' }}</td>
+                <td>{{ serie.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                <td>{{ serie.porcentaje | number: '1.1-1' }}%</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article>
+      <h4>Por franquicia TCG</h4>
+      <ul class="bars">
+        @for (serie of franquicias(); track serie.clave) {
+          <li>
+            <div class="bars__meta">
+              <span>{{ serie.etiqueta }}</span>
+              <strong>{{ serie.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+            </div>
+            <div class="bars__track">
+              <div class="bars__fill" [style.width.%]="serie.porcentaje"></div>
+            </div>
+            <small>{{ serie.cantidad }} ítem{{ serie.cantidad === 1 ? '' : 's' }} · {{ serie.porcentaje | number: '1.1-1' }}%</small>
+          </li>
+        }
+      </ul>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Franquicia</th>
+              <th>Ítems</th>
+              <th>Ingresos</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (serie of franquicias(); track serie.clave) {
+              <tr>
+                <td>{{ serie.etiqueta }}</td>
+                <td>{{ serie.cantidad | number: '1.0-0' }}</td>
+                <td>{{ serie.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                <td>{{ serie.porcentaje | number: '1.1-1' }}%</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </div>
+</section>

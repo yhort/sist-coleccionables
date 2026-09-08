@@ -1,0 +1,20 @@
+<section class="toolbar" aria-label="Periodo del reporte">
+  <label>
+    <span>Desde</span>
+    <input
+      type="date"
+      [ngModel]="periodo().desde"
+      (ngModelChange)="actualizar('desde', $event)"
+    />
+  </label>
+  <label>
+    <span>Hasta</span>
+    <input
+      type="date"
+      [ngModel]="periodo().hasta"
+      (ngModelChange)="actualizar('hasta', $event)"
+    />
+  </label>
+  <button type="button" class="toolbar__ghost" (click)="cleared.emit()">Limpiar</button>
+  <button type="button" class="toolbar__primary" (click)="exportar.emit()">Exportar CSV</button>
+</section>

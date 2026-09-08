@@ -1,0 +1,121 @@
+<section class="woo">
+  <header class="woo__header">
+    <div>
+      <h2>WooCommerce</h2>
+      <p>
+        REST API, publicación de catálogo y CantidadLibre, mapeo (producto/variación TCG) e
+        importación de pedidos web al Kanban (Pendiente de pago / Pagado) con canal WOOCOMMERCE.
+      </p>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Resumen de integración">
+    <article>
+      <span>Conexión</span>
+      <strong>{{ wooApi.kpis().conectado ? 'Conectado' : 'Desconectado' }}</strong>
+    </article>
+    <article>
+      <span>Sincronizados</span>
+      <strong>{{ wooApi.kpis().sincronizados }}</strong>
+    </article>
+    <article>
+      <span>Desfasados</span>
+      <strong>{{ wooApi.kpis().desfasados }}</strong>
+    </article>
+    <article>
+      <span>Pendiente de subida</span>
+      <strong>{{ wooApi.kpis().pendientesSubida }}</strong>
+    </article>
+    <article>
+      <span>Cola de pedidos web</span>
+      <strong>{{ wooApi.kpis().colaPedidos }}</strong>
+    </article>
+  </section>
+
+  <app-woo-config-form />
+
+  <section class="ops">
+    <article>
+      <h3>Sincronización Kardex → WooCommerce</h3>
+      <p>
+        El stock publicado es la CantidadLibre de la sede origen. Cada movimiento de Kardex
+        (venta, ajuste, apertura o liberación) se replica automáticamente.
+      </p>
+      <div class="ops__row">
+        <button
+          type="button"
+          class="primary"
+          [disabled]="wooApi.sincronizando()"
+          (click)="sincronizarCatalogo()"
+        >
+          {{ wooApi.sincronizando() ? 'Publicando…' : 'Sincronizar catálogo' }}
+        </button>
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="wooApi.sincronizando()"
+          (click)="sincronizarStock()"
+        >
+          Sincronizar stock
+        </button>
+      </div>
+    </article>
+    <article>
+      <h3>Importación de pedidos web</h3>
+      <p>
+        Webhook o polling. Reserva automática de stock (RESERVA). Deduplicación por
+        ReferenciaExterna <code>woo-ID</code>.
+      </p>
+      <div class="ops__row">
+        <button type="button" class="ghost" (click)="togglePolling()">
+          {{ wooApi.pollingActivo() ? 'Detener polling' : 'Iniciar polling' }}
+        </button>
+        <button type="button" class="ghost" (click)="importarPedidos()">Importar ahora</button>
+        <button type="button" class="ghost" (click)="simularWebhook()">Simular webhook</button>
+        <button type="button" class="ghost" (click)="reintentarWebhooks()">Reintentar fallidos</button>
+      </div>
+      <small>
+        Modo: {{ wooApi.modoRecepcion() === 'POLLING' ? 'Polling' : 'Webhook' }}
+        · {{ wooApi.colaPedidos().length }} en cola
+      </small>
+    </article>
+  </section>
+
+  @if (error()) {
+    <p class="banner banner--error">{{ error() }}</p>
+  }
+  @if (aviso()) {
+    <p class="banner banner--ok">
+      {{ aviso() }}
+      @if (ultimaReferencia()) {
+        <a routerLink="/app/pedidos-digitales">Ver en Kanban ({{ ultimaReferencia() }})</a>
+      }
+    </p>
+  }
+
+  @if (ultimoCsv().length > 0) {
+    <details class="csv">
+      <summary>Último batch CSV ({{ ultimoCsv().length }} filas)</summary>
+      <pre>{{ ultimoCsv() | json }}</pre>
+    </details>
+  }
+
+  @if (wooApi.colaPedidos().length > 0) {
+    <section class="cola">
+      <h3>Cola WooCommerce (aún no importada)</h3>
+      <ul>
+        @for (pedido of wooApi.colaPedidos(); track pedido.referenciaExterna) {
+          <li>
+            <strong>{{ pedido.referenciaExterna }}</strong>
+            <span>{{ pedido.clienteNombre }}</span>
+            <span>{{ pedido.pagado ? 'Pagado en Woo' : 'Pendiente de pago' }}</span>
+            <span>{{ pedido.lineas.length }} ítem(s)</span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <app-woo-mapeos-table />
+  <app-woo-sync-logs />
+</section>

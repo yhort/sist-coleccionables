@@ -1,0 +1,700 @@
+@CapitalPos.Tcg.Api_HostAddress = http://localhost:5249
+@empresaId = c0a1e001-0000-4000-8000-000000000001
+@sedeId = c0a1e001-0000-4000-8000-000000000010
+
+### Health
+GET {{CapitalPos.Tcg.Api_HostAddress}}/health
+Accept: application/json
+
+### a) Login JWT
+# @name login
+//POST {{CapitalPos.Tcg.Api_HostAddress}}/api/auth/login
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@trunqi.local",
+  "password": "Admin123!",
+  "empresaId": "{{empresaId}}"
+}
+
+### b) Listar productos TCG (Bearer + tenant)
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/productos-tcg
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### Setup — crear carta para el ajuste de kardex
+# @name crearCarta
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/productos-tcg
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "tipoProducto": "CARTA",
+  "nombre": "Pikachu Paldea Evolved 070 NM",
+  "codigoSku": "PKM-SV2-070-NM",
+  "precioVenta": 12.5,
+  "costo": 4,
+  "carta": {
+    "juego": "Pokémon",
+    "setCodigo": "SV2",
+    "setNombre": "Paldea Evolved",
+    "numeroCarta": "070/193",
+    "rareza": "COMUN",
+    "idioma": "ES",
+    "condicion": "NM",
+    "esFoil": false
+  }
+}
+
+### c) Ajuste de inventario → asiento kardex AJUSTE (inmutable)
+# @name ajustar
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/inventario/ajustar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "productoId": "{{crearCarta.response.body.id}}",
+  "sedeId": "{{sedeId}}",
+  "cantidad": 4,
+  "sentido": "ENTRADA",
+  "motivo": "Ingreso inicial de vitrina para pruebas HTTP"
+}
+
+### Verificar kardex del ajuste
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/inventario/kardex?productoId={{crearCarta.response.body.id}}&sedeId={{sedeId}}&tipoMovimiento=AJUSTE
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### Setup — sellado para apertura
+# @name crearSellado
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/productos-tcg
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "tipoProducto": "SELLADO",
+  "nombre": "ETB Prismatic Evolutions",
+  "codigoSku": "PKM-PRE-ETB-HTTP",
+  "precioVenta": 249.9,
+  "costo": 180,
+  "sellado": {
+    "juego": "Pokémon",
+    "edicion": "Prismatic Evolutions",
+    "tipoSellado": "COLECCION",
+    "cartasEsperadas": 45,
+    "permiteApertura": true
+  }
+}
+
+### Stock del sellado (entrada para poder abrir)
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/inventario/ajustar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "productoId": "{{crearSellado.response.body.id}}",
+  "sedeId": "{{sedeId}}",
+  "cantidad": 2,
+  "sentido": "ENTRADA",
+  "motivo": "Compra ETB para wizard de apertura"
+}
+
+### Apertura — crear borrador
+# @name crearApertura
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/aperturas-tcg
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "sedeId": "{{sedeId}}",
+  "productoSelladoId": "{{crearSellado.response.body.id}}",
+  "cantidadSellados": 1,
+  "observacion": "Pull session de prueba"
+}
+
+### Apertura — detalles (prorrateo de costo / yield)
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/aperturas-tcg/{{crearApertura.response.body.id}}/detalles
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+[
+  {
+    "productoCartaId": "{{crearCarta.response.body.id}}",
+    "cantidad": 2,
+    "estado": "NM",
+    "esFoil": false
+  }
+]
+
+### Apertura — confirmar (kardex APERTURA_SALIDA_SELLADO + APERTURA_INGRESO_CARTA)
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/aperturas-tcg/{{crearApertura.response.body.id}}/confirmar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### Subasta — crear borrador
+# @name crearSubasta
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/subastas-tcg
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "sedeId": "{{sedeId}}",
+  "productoId": "{{crearCarta.response.body.id}}",
+  "titulo": "Pikachu Paldea Evolved — live de prueba",
+  "canal": "FACEBOOK_SUBASTA",
+  "precioBase": 8,
+  "incrementoMinimo": 2,
+  "precioReserva": 10,
+  "fechaInicio": "2026-08-28T15:00:00-05:00",
+  "fechaCierre": "2026-08-28T18:00:00-05:00",
+  "observacion": "Reserva omnicanal al adjudicar"
+}
+
+### Subasta — activar
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/subastas-tcg/{{crearSubasta.response.body.id}}/activar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### Subasta — registrar puja
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/subastas-tcg/{{crearSubasta.response.body.id}}/pujas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "nombrePostor": "Luis F.",
+  "monto": 12
+}
+
+### Subasta — adjudicar (PUJA_GANADORA_RESERVA + pedido PendientePago sin segunda reserva)
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/subastas-tcg/{{crearSubasta.response.body.id}}/adjudicar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### ========== Sprint 3 — Pedidos, pagos, entregas → venta + CPE local ==========
+
+### S3 — abrir caja (obligatorio antes de convertir a venta)
+# @name abrirCajaS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/apertura
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "sedeId": "{{sedeId}}",
+  "montoApertura": 150.00,
+  "observacion": "Fondo de caja chica turno mañana"
+}
+
+### Setup S3 — carta para pedido omnicanal
+# @name crearCartaS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/productos-tcg
+Authorization: Bearer {{login.response.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "tipoProducto": "CARTA",
+  "nombre": "Gardevoir ex Temporal Forces 029 NM",
+  "codigoSku": "PKM-S3-GAR-029-NM",
+  "precioVenta": 89.9,
+  "costo": 40,
+  "carta": {
+    "juego": "Pokémon",
+    "setCodigo": "SV5",
+    "setNombre": "Temporal Forces",
+    "numeroCarta": "029/162",
+    "rareza": "ULTRA",
+    "idioma": "ES",
+    "condicion": "NM",
+    "esFoil": true
+  }
+}
+
+### Setup S3 — stock libre para reservar
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/inventario/ajustar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "productoId": "{{crearCartaS3.response.body.id}}",
+  "sedeId": "{{sedeId}}",
+  "cantidad": 5,
+  "sentido": "ENTRADA",
+  "motivo": "Ingreso vitrina para pedidos Sprint 3"
+}
+
+### S3a — crear pedido Kanban (RESERVA sobre stock libre)
+# @name crearPedidoS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "clienteNombre": "Ana Paredes",
+  "clienteTelefono": "912345678",
+  "sedeId": "{{sedeId}}",
+  "canalPedido": "WHATSAPP",
+  "observacion": "Pedido WhatsApp Gardevoir",
+  "detalles": [
+    {
+      "productoId": "{{crearCartaS3.response.body.id}}",
+      "cantidad": 1,
+      "precioUnitario": 89.9
+    }
+  ],
+  "entrega": {
+    "destinatarioNombre": "Ana Paredes",
+    "destinatarioTelefono": "912345678",
+    "esRecojoTienda": true
+  }
+}
+
+### S3a — bandeja Kanban PendientePago
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales?estado=PendientePago&sedeId={{sedeId}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S3b — registrar Yape asociado al pedido (ASOCIADO)
+# @name pagoYapeS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "origen": "YAPE",
+  "monto": 89.9,
+  "codigoOperacion": "YAPE-S3-08990",
+  "pedidoDigitalId": "{{crearPedidoS3.response.body.id}}",
+  "observacion": "Voucher Yape Ana P."
+}
+
+### S3b — confirmar pago → pedido Pagado si cubre el total
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos/{{pagoYapeS3.response.body.id}}/confirmar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S3b — bandeja de pagos confirmados
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos?estado=CONFIRMADO&origen=YAPE
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S3c — empaquetar (Pagado → Empaquetado / EnPreparacion)
+# @name empaqueS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/entregas/empaquetar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "pedidoDigitalId": "{{crearPedidoS3.response.body.id}}",
+  "notasEmpaque": "Toploader + sobre burbuja. Listo en mostrador."
+}
+
+### S3c — despachar recojo (Empaquetado → PendienteEntrega / ListoEntrega)
+# @name despachoS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/entregas/{{empaqueS3.response.body.id}}/despachar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "metodoEnvio": "RECOJO_TIENDA",
+  "costoEnvio": 0,
+  "observacion": "Clave de recojo en caja."
+}
+
+### S3d — confirmar entrega → Venta + kardex VENTA + CPE local SIMULADO
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/entregas/{{empaqueS3.response.body.id}}/confirmar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "tipoComprobante": "BOLETA",
+  "tipoDocumento": "DNI",
+  "numeroDocumento": "45678912"
+}
+
+### S3d — kardex VENTA del SKU
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/inventario/kardex?productoId={{crearCartaS3.response.body.id}}&sedeId={{sedeId}}&tipoMovimiento=VENTA
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S3e — pedido recojo: alta + efectivo confirmado + convertir-venta desde Empaquetado
+# @name crearPedidoRecojoS3
+//POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales
+//Authorization: Bearer {{login.response.body.accessToken}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "clienteNombre": "Diego Soto",
+  "sedeId": "{{sedeId}}",
+  "canalPedido": "OTRO",
+  "observacion": "Recojo en tienda mostrador",
+  "detalles": [
+    {
+      "productoId": "a1b2c3d4-0000-0000-0000-000000000000",
+      "cantidad": 1,
+      "precioUnitario": 89.9
+    }
+  ],
+  "entrega": {
+    "esRecojoTienda": true,
+    "destinatarioNombre": "Diego Soto"
+  }
+}
+
+### S3e — pago efectivo asociado y confirmado en un paso
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "origen": "EFECTIVO",
+  "monto": 89.9,
+  "pedidoDigitalId": "{{crearPedidoRecojoS3.response.body.id}}",
+  "confirmar": true,
+  "observacion": "Pago en mostrador"
+}
+
+### S3e — PUT estado Empaquetado
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales/{{crearPedidoRecojoS3.response.body.id}}/estado
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "estado": "Empaquetado",
+  "observacion": "Bolsa de tienda, listo en mostrador."
+}
+
+### S3e — convertir-venta (recojo, sin courier)
+//POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales/{{crearPedidoRecojoS3.response.body.id}}/convertir-venta
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales/{{crearPedidoRecojoS3.response.body.id}}/convertir-venta
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "tipoComprobante": "BOLETA",
+  "observacion": "Recojo confirmado en caja."
+}
+
+### S3f — cancelar pedido (LIBERACION_RESERVA)
+# @name crearPedidoCancelS3
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "clienteNombre": "Invitado WhatsApp",
+  "sedeId": "{{sedeId}}",
+  "canalPedido": "WHATSAPP",
+  "detalles": [
+    {
+      "productoId": "{{crearCartaS3.response.body.id}}",
+      "cantidad": 1,
+      "precioUnitario": 89.9
+    }
+  ],
+  "entrega": { "esRecojoTienda": true }
+}
+
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales/{{crearPedidoCancelS3.response.body.id}}/cancelar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+"observacion": "Cliente no confirmó el Yape."
+}
+
+### S3g — config Izipay (ShopId + HMAC cifrado; JWT)
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos/izipay/config
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "shopId": "12345678",
+  "hmacSha256Clave": "test-hmac-sha256-key-izipay",
+  "activa": true
+}
+
+### S3g — IPN Izipay (PAID, sin JWT; tenant en la ruta; form-urlencoded Lyra)
+# Sustituir kr-hash por HMAC-SHA256(kr-answer, hmacSha256Clave) en hex.
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos/izipay/ipn/{{empresaId}}
+Content-Type: application/x-www-form-urlencoded
+
+kr-hash-algorithm=sha256&kr-hash=REEMPLAZAR_HMAC_HEX&kr-answer={"shopId":"12345678","orderStatus":"PAID","orderDetails":{"orderTotalAmount":15000},"transactions":[{"uuid":"IZP-S3-99821","status":"PAID","amount":15000,"paymentMethodType":"YAPE"}]}
+
+### S3g — asociar transferencia huérfana (después del IPN, listar NOTIFICADO)
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/pagos?estado=NOTIFICADO
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### ========== Sprint 4 — WooCommerce, CPE SUNAT y Reportes ==========
+
+### S4a — ficha fiscal y series B001 / F001 / FC01
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/fiscal
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/series
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4a — salud de conexiones (CPE local, Woo, Yape, Izipay)
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/conexiones
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4b — config WooCommerce (secretos cifrados, no viajan en claro)
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/config
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4b — guardar config + probar REST (modo Local)
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/config
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "urlTienda": "https://trunqi.pe",
+  "consumerKey": "ck_demo_capitalpos",
+  "consumerSecret": "cs_demo_capitalpos",
+  "sedeOrigenId": "{{sedeId}}",
+  "modoSincronizacion": "MANUAL",
+  "modoRecepcionPedidos": "WEBHOOK",
+  "activa": true
+}
+
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/config/probar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### Setup S4 — carta TPT para catálogo / stock-out
+# @name crearCartaS4
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/productos-tcg
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "tipoProducto": "CARTA",
+  "nombre": "Mew ex 151 151 NM",
+  "codigoSku": "PKM-S4-MEW-151-NM",
+  "precioVenta": 45,
+  "costo": 18,
+  "carta": {
+    "juego": "Pokémon",
+    "setCodigo": "SV3.5",
+    "setNombre": "151",
+    "numeroCarta": "151/165",
+    "rareza": "ULTRA",
+    "idioma": "ES",
+    "condicion": "NM",
+    "esFoil": true
+  }
+}
+
+PUT {{CapitalPos.Tcg.Api_HostAddress}}/api/inventario/ajustar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+"productoId": "{{crearCartaS4.response.body.id}}",
+"sedeId": "{{sedeId}}",
+"cantidad": 6,
+"sentido": "ENTRADA",
+"motivo": "Ingreso vitrina para sync Woo Sprint 4"
+}
+
+### S4c — sync catálogo TPT (crea mapeo + publica precio/stock libre)
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/sync/catalogo
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4c — sync stock bidireccional (stock-out = cantidad libre sede origen)
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/sync/stock
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4c — forzar SKU y CantidadLibre de un producto mapeado
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/sincronizar-producto/{{crearCartaS4.response.body.id}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/mapeos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/logs
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4d — webhook pedido Woo → Kanban WOOCOMMERCE + RESERVA (AllowAnonymous)
+# @name webhookWooS4
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/webhooks/pedidos?empresaId={{empresaId}}
+Content-Type: application/json
+
+{
+  "id": 4520,
+  "status": "pending",
+  "billing": {
+    "first_name": "Carla",
+    "last_name": "Méndez",
+    "phone": "987110022"
+  },
+  "shipping": {
+    "address_1": "",
+    "city": "Miraflores"
+  },
+  "line_items": [
+    {
+      "sku": "PKM-S4-MEW-151-NM",
+      "quantity": 1,
+      "price": 45
+    }
+  ]
+}
+
+### S4d — bandeja Kanban del pedido Woo
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/pedidos-digitales?canalPedido=WOOCOMMERCE&estado=PendientePago
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4e — webhook producto (stock-in; local sigue siendo la fuente de verdad)
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/woocommerce/webhooks/productos?empresaId={{empresaId}}
+Content-Type: application/json
+
+{
+  "id": 10001,
+  "sku": "PKM-S4-MEW-151-NM",
+  "regular_price": "45.00",
+  "stock_quantity": 4
+}
+
+### S4f — emitir CPE real (XML UBL + firma) desde venta Sprint 3
+# Sustituir {{ventaIdS3}} por el ventaId de convertir-venta / confirmar entrega.
+# POST {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/cpe/emitir-desde-venta/{{ventaIdS3}}?tipo=BOLETA
+# Authorization: Bearer {{login.response.body.accessToken}}
+# X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4f — factura F001 (cliente con RUC) desde venta entregada
+# POST {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/cpe/emitir-desde-venta/{{ventaIdS3}}?tipo=FACTURA
+# Authorization: Bearer {{login.response.body.accessToken}}
+# X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4f — representación impresa PDF A4 / ticket 80mm
+# GET {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/cpe/{{comprobanteId}}/pdf?formato=a4
+# Authorization: Bearer {{login.response.body.accessToken}}
+# X-CapitalPos-EmpresaId: {{empresaId}}
+#
+# GET {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/cpe/{{comprobanteId}}/pdf?formato=ticket
+# Authorization: Bearer {{login.response.body.accessToken}}
+# X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S4f — nota de crédito FC01 sobre la misma venta
+# POST {{CapitalPos.Tcg.Api_HostAddress}}/api/ecosistema/cpe/nota-credito/{{ventaIdS3}}
+# Authorization: Bearer {{login.response.body.accessToken}}
+# X-CapitalPos-EmpresaId: {{empresaId}}
+# Content-Type: application/json
+#
+# {
+#   "codigoMotivo": "01",
+#   "descripcionMotivo": "Anulación de la operación"
+# }
+
+### S4g — reportes: kardex, ventas por sede, margen de aperturas
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/reportes/kardex-resumen?sedeId={{sedeId}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/reportes/ventas-por-sede
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/reportes/aperturas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### ========== Sprint 7 — Cierre de caja y arqueo diario ==========
+
+### S7a — estado del turno (POS: si abierta=false no se confirman ventas)
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/sesion-actual?sedeId={{sedeId}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S7a — resumen actual desglosado por medio de pago y tipo de documento
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/resumen-actual?sedeId={{sedeId}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S7b — ingreso / egreso de caja chica
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/movimientos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "sedeId": "{{sedeId}}",
+  "tipo": "INGRESO",
+  "monto": 20.00,
+  "concepto": "Cambio extra para el turno"
+}
+
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/movimientos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "sedeId": "{{sedeId}}",
+  "tipo": "EGRESO",
+  "monto": 8.50,
+  "concepto": "Taxi courier Olva"
+}
+
+### S7b — historial de turnos
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/caja?sedeId={{sedeId}}
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+
+### S7c — cierre con conteo físico (diferencia = real − teórico)
+# @name cierreCajaS7
+POST {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/cierre
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+Content-Type: application/json
+
+{
+  "sedeId": "{{sedeId}}",
+  "montoEfectivoReal": 251.40,
+  "observacion": "Arqueo de cierre de turno"
+}
+
+### S7c — ticket 80mm del arqueo
+GET {{CapitalPos.Tcg.Api_HostAddress}}/api/caja/{{cierreCajaS7.response.body.cajaSesionId}}/reporte-ticket
+Authorization: Bearer {{login.response.body.accessToken}}
+X-CapitalPos-EmpresaId: {{empresaId}}
+

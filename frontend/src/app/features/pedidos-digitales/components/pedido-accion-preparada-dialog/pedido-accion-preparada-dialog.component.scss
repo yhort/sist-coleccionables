@@ -1,0 +1,218 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(17 24 39 / 40%);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(480px, 100%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-md);
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem 0.35rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    p {
+      margin: 0.35rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+    }
+  }
+
+  &__close {
+    width: 36px;
+    height: 36px;
+    color: var(--color-text-secondary);
+    font-size: 1.4rem;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+
+    &:hover {
+      background: var(--color-background);
+    }
+  }
+
+  &__body {
+    padding: 0.75rem 1.5rem 0.25rem;
+    color: var(--color-text-secondary);
+    font-size: 0.88rem;
+
+    p + p {
+      margin-top: 0.55rem;
+    }
+
+    code {
+      font-size: 0.78rem;
+    }
+  }
+
+  &__tipo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+
+    select {
+      min-height: 40px;
+      padding: 0 0.7rem;
+      color: var(--color-text-primary);
+      font-size: 0.88rem;
+      font-weight: 500;
+      background: var(--color-background);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+  }
+
+  &__error {
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  &__resultado {
+    margin-top: 0.7rem;
+    padding: 0.7rem 0.8rem;
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+
+    &[data-estado='ACEPTADO'] {
+      border-color: #86efac;
+      background: #f0fdf4;
+    }
+
+    span {
+      display: inline-flex;
+      margin-left: 0.45rem;
+      padding: 0.1rem 0.45rem;
+      color: #166534;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: #dcfce7;
+      border-radius: 999px;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    padding: 1rem 1.5rem 1.25rem;
+  }
+
+  &__muted {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+  }
+}
+
+.pagos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    padding: 0.75rem 0.85rem;
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  p {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+  }
+
+  &__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  &__estado {
+    display: inline-flex;
+    min-height: 20px;
+    padding: 0 0.45rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-radius: 999px;
+    color: #1e40af;
+    background: #dbeafe;
+
+    &[data-estado='CONFIRMADO'] {
+      color: #166534;
+      background: #dcfce7;
+    }
+
+    &[data-estado='ASOCIADO'] {
+      color: #9a3412;
+      background: #ffedd5;
+    }
+  }
+}
+
+.ghost,
+.primary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.ghost {
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.primary {
+  color: #fff;
+  background: var(--color-primary);
+
+  &:hover {
+    background: var(--color-primary-hover);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}

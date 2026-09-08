@@ -1,0 +1,6 @@
+<section class="detalle-page">
+  <a class="back" routerLink="/app/subastas-tcg">← Volver al tablero</a>
+  @if (subastaId()) {
+    <app-subasta-detalle-panel [subastaId]="subastaId()" modo="pagina" />
+  }
+</section>

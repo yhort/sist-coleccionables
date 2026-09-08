@@ -1,0 +1,163 @@
+:host {
+  display: block;
+}
+
+.panel {
+  padding: 1.15rem 1.25rem 1.2rem;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-container, 12px);
+  box-shadow: var(--shadow-container, 0 1px 2px rgb(0 0 0 / 0.04));
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  p {
+    margin: 0.25rem 0 0;
+    color: var(--color-text-secondary, #6b7280);
+    font-size: 0.85rem;
+  }
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 28px;
+  padding: 0 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--color-background, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+
+  i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+  }
+
+  &[data-estado='CONECTADO'] {
+    color: #166534;
+    background: #dcfce7;
+    border-color: transparent;
+
+    i {
+      background: #16a34a;
+    }
+  }
+
+  &[data-estado='DESCONECTADO'] {
+    color: var(--color-text-secondary, #6b7280);
+  }
+
+  &[data-estado='ERROR_AUTENTICACION'] {
+    color: #991b1b;
+    background: #fee2e2;
+    border-color: transparent;
+
+    i {
+      background: #dc2626;
+    }
+  }
+}
+
+form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+input,
+select {
+  min-height: 40px;
+  padding: 0 0.75rem;
+  color: var(--color-text-primary, #111827);
+  font-weight: 500;
+  background: var(--color-background, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 0.625rem);
+  outline: none;
+
+  &:focus {
+    border-color: var(--color-primary, #2563eb);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+  }
+}
+
+.actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.primary {
+  min-height: 40px;
+  padding: 0 1rem;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-primary, #2563eb);
+  border-radius: var(--radius-md, 0.625rem);
+
+  &:hover {
+    background: var(--color-primary-hover, #1d4ed8);
+  }
+}
+
+small {
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.78rem;
+
+  code {
+    font-size: 0.75rem;
+  }
+}
+
+.hint {
+  margin: 0.9rem 0 0;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.82rem;
+
+  &[data-estado='ERROR_AUTENTICACION'] {
+    color: var(--color-danger, #dc2626);
+    font-weight: 600;
+  }
+
+  &[data-estado='CONECTADO'] {
+    color: #166534;
+  }
+}
+
+@media (max-width: 720px) {
+  form {
+    grid-template-columns: 1fr;
+  }
+}

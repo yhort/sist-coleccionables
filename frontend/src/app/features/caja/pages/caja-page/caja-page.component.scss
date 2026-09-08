@@ -1,0 +1,243 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.caja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-width: 1440px;
+  margin: 0 auto;
+
+  &__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    p {
+      margin: 0.3rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  &__add {
+    min-height: 40px;
+    padding: 0 1rem;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+
+    &:hover {
+      background: var(--color-primary-hover);
+    }
+  }
+
+  &__error {
+    margin: 0;
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+}
+
+.ghost {
+  min-height: 40px;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px);
+  gap: 0.75rem;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  select {
+    min-height: 40px;
+    padding: 0 0.75rem;
+    color: var(--color-text-primary);
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    outline: none;
+
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+    }
+  }
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+
+  article {
+    padding: 1rem 1.1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-container);
+    box-shadow: var(--shadow-container);
+
+    span {
+      display: block;
+      color: var(--color-text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    strong {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 1.25rem;
+    }
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.panel,
+.empty {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+
+  h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+  }
+}
+
+.empty {
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--color-background);
+}
+
+tbody tr:hover td {
+  background: #fcfcfd;
+}
+
+td:last-child,
+th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill {
+  display: inline-flex;
+  min-height: 22px;
+  padding: 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+
+  &[data-estado='ABIERTA'],
+  &[data-tipo='INGRESO'],
+  &[data-diff='CUADRADO'] {
+    color: #166534;
+    background: #dcfce7;
+  }
+
+  &[data-estado='CERRADA'] {
+    color: #6b7280;
+    background: #f3f4f6;
+  }
+
+  &[data-tipo='EGRESO'],
+  &[data-diff='FALTANTE'] {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+
+  &[data-diff='SOBRANTE'] {
+    color: #9a3412;
+    background: #ffedd5;
+  }
+}
+
+.link-btn {
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+}
+
+@media (max-width: 900px) {
+  .kpis,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

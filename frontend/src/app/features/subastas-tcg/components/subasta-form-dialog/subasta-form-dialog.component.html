@@ -1,0 +1,157 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="subasta-form-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="subasta-form-title">Nueva subasta</h2>
+      <p>
+        Single Hit (1×1), Bulk (1×N) o Combo Multi-SKU. Se crea en borrador; actívala cuando el live
+        esté listo.
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label class="wide">
+        Título
+        <input type="text" formControlName="titulo" maxlength="200" />
+      </label>
+      <label>
+        Sede
+        <select formControlName="sedeId">
+          @for (sede of sedes(); track sede.id) {
+            <option [value]="sede.id">{{ sede.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Canal
+        <select formControlName="canal">
+          @for (canal of canales; track canal) {
+            <option [value]="canal">{{ etiquetasCanal[canal] }}</option>
+          }
+        </select>
+      </label>
+
+      <section class="wide lote" aria-label="Productos del lote">
+        <div class="lote__head">
+          <h3>Productos del lote</h3>
+          <p>{{ resumenLote() }}</p>
+        </div>
+
+        @if (form.controls.sedeId.value; as sedeActual) {
+          <div class="lote__picker">
+            <app-selector-producto-cascada
+              [sedeId]="sedeActual"
+              [productoId]="productoPendienteId()"
+              [stockLibreFn]="stockLibreFn"
+              (productoChange)="onProductoSeleccionado($event)"
+            />
+            <label class="lote__qty">
+              Cantidad
+              <input
+                type="number"
+                min="1"
+                step="1"
+                [ngModel]="cantidadPendiente()"
+                (ngModelChange)="cantidadPendiente.set($event)"
+                [ngModelOptions]="{ standalone: true }"
+              />
+            </label>
+            <button type="button" class="ghost" (click)="agregarLinea()">Agregar al lote</button>
+          </div>
+        }
+
+        @if (lineas().length > 0) {
+          <table class="lote__tabla">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Tipo</th>
+                <th>Cant.</th>
+                <th>Libre</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (linea of lineas(); track linea.productoId) {
+                <tr>
+                  <td>
+                    <strong>{{ linea.nombre }}</strong>
+                    <small>{{ linea.codigoSku }}</small>
+                  </td>
+                  <td>{{ etiquetasTipo[linea.tipoProducto] }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      [value]="linea.cantidad"
+                      (change)="actualizarCantidad(linea.productoId, $any($event.target).value)"
+                    />
+                  </td>
+                  <td>{{ linea.stockLibre }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="link-btn"
+                      (click)="quitarLinea(linea.productoId)"
+                    >
+                      Quitar
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="lote__empty">Aún no hay productos. Escanea un SKU o elige por catálogo.</p>
+        }
+      </section>
+
+      <label>
+        Precio base
+        <input type="number" min="0.01" step="0.01" formControlName="precioBase" />
+      </label>
+      <label>
+        Incremento mínimo
+        <input type="number" min="0.01" step="0.01" formControlName="incrementoMinimo" />
+      </label>
+      <label>
+        Precio reserva (opcional)
+        <input type="number" min="0" step="0.01" formControlName="precioReserva" />
+      </label>
+      <label>
+        Inicio
+        <input type="datetime-local" formControlName="fechaInicio" />
+      </label>
+      <label>
+        Cierre
+        <input type="datetime-local" formControlName="fechaCierre" />
+      </label>
+      <label class="wide">
+        Observación
+        <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+      </label>
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Crear borrador</button>
+    </footer>
+  </form>
+</section>

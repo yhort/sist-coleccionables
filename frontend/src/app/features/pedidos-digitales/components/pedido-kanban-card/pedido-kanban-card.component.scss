@@ -1,0 +1,177 @@
+:host {
+  display: block;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+  cursor: grab;
+
+  h3 {
+    margin: 0.15rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  &__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  &__meta,
+  &__items {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+  }
+
+  &__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 0.35rem 0 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+
+    strong {
+      color: var(--color-text-primary);
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+    margin-top: 0.45rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+.codigo,
+.origen,
+.reserva {
+  display: inline-flex;
+  min-height: 20px;
+  padding: 0 0.45rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+}
+
+.codigo {
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+}
+
+.origen {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.card[data-origen='WEB_WOOCOMMERCE'] .origen {
+  color: #6b21a8;
+  background: #f3e8ff;
+}
+
+.card[data-origen='WHATSAPP_DIRECTO'] .origen {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.card[data-origen='TIENDA_PRESENCIAL'] .origen {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.reserva {
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+
+  &[data-reserva='Reservado'] {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  &[data-reserva='Confirmado'] {
+    color: #166534;
+    background: #dcfce7;
+  }
+
+  &[data-reserva='Liberado'] {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+}
+
+.link-btn {
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+}
+
+.entregar-btn {
+  min-height: 28px;
+  padding: 0 0.65rem;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: #166534;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    background: #14532d;
+  }
+}
+
+.menu select {
+  max-width: 132px;
+  min-height: 28px;
+  padding: 0 0.4rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

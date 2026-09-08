@@ -1,0 +1,106 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="cpe-title">
+  <header>
+    <div>
+      <h2 id="cpe-title">Emitir comprobante</h2>
+      <p>
+        Boleta, factura o nota de venta sobre un pedido Entregado. La nota de venta descuenta stock
+        y no se envía a SUNAT hasta consolidar.
+      </p>
+    </div>
+    <button type="button" class="close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="emitir()">
+    <label>
+      Tipo de documento
+      <select formControlName="tipo">
+        @for (tipo of tipos; track tipo) {
+          <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+        }
+      </select>
+    </label>
+    <p class="preview">Siguiente: <strong>{{ seriePreview() }}</strong></p>
+    <label class="wide">
+      Documento origen
+      <select formControlName="documentoId">
+        <option value="">Selecciona…</option>
+        @for (doc of documentos(); track doc.id) {
+          <option [value]="doc.id">
+            {{ doc.etiqueta }}
+            ({{ doc.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }})
+          </option>
+        }
+      </select>
+    </label>
+    @if (documentos().length === 0) {
+      <p class="hint">
+        @if (form.controls.tipo.value === 'GUIA_REMISION') {
+          No hay despachos listos en Entregas.
+        } @else if (form.controls.tipo.value === 'FACTURA') {
+          No hay pedidos Entregado con cliente RUC para factura F001.
+        } @else if (form.controls.tipo.value === 'NOTA_VENTA') {
+          No hay pedidos Entregado con venta para nota de venta.
+        } @else {
+          No hay pedidos Entregado con venta para emitir.
+        }
+      </p>
+    }
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    @if (emision(); as emision) {
+      <div class="resultado" [attr.data-estado]="emision.estado">
+        <p class="ok">
+          <strong>{{ numeroDe(emision) }}</strong>
+          <span class="estado">{{ etiquetasEstado[emision.estado] }}</span>
+        </p>
+        <p class="hint">{{ emision.mensaje }}</p>
+        <div class="descargas">
+          <button
+            type="button"
+            class="ghost"
+            [disabled]="!puedeXml(emision)"
+            (click)="descargarXml()"
+          >
+            Descargar XML
+          </button>
+          <button
+            type="button"
+            class="ghost"
+            [disabled]="!puedeCdr(emision)"
+            (click)="descargarCdr()"
+          >
+            Descargar CDR
+          </button>
+          <button
+            type="button"
+            class="ghost"
+            [disabled]="!puedePdf(emision)"
+            (click)="abrirPdf('a4')"
+          >
+            PDF
+          </button>
+          <button
+            type="button"
+            class="ghost"
+            [disabled]="!puedePdf(emision)"
+            (click)="abrirPdf('ticket')"
+          >
+            Ticket 80mm
+          </button>
+        </div>
+      </div>
+    }
+    <footer>
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cerrar</button>
+      <button
+        type="submit"
+        class="primary"
+        [disabled]="documentos().length === 0 || enviando()"
+      >
+        {{ enviando() ? 'Emitiendo…' : 'Emitir comprobante' }}
+      </button>
+    </footer>
+  </form>
+</section>

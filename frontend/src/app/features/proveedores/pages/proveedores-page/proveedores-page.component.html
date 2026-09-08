@@ -1,0 +1,72 @@
+<section class="maestros">
+  <header class="maestros__header">
+    <div>
+      <h2>Proveedores</h2>
+      <p>
+        Maestro de proveedores con RUC y razón social. El ingreso de mercadería se registra en
+        Inventario y queda asentado en el kardex como Ingreso por compra.
+      </p>
+    </div>
+    <button type="button" class="maestros__add" (click)="abrir()">Nuevo proveedor</button>
+  </header>
+
+  <section class="toolbar">
+    <label class="toolbar__search">
+      <span>Buscar</span>
+      <input
+        type="search"
+        placeholder="RUC o razón social…"
+        [ngModel]="busqueda()"
+        (ngModelChange)="busqueda.set($event); cargar()"
+      />
+    </label>
+  </section>
+
+  @if (error()) {
+    <p class="maestros__error">{{ error() }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Proveedor</th>
+          <th>RUC</th>
+          <th>Teléfono</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (proveedor of filtrados(); track proveedor.id) {
+          <tr>
+            <td>
+              <strong>{{ proveedor.razonSocial }}</strong>
+              @if (proveedor.nombreComercial) {
+                <small>{{ proveedor.nombreComercial }}</small>
+              }
+            </td>
+            <td>{{ proveedor.ruc }}</td>
+            <td>{{ proveedor.telefono || '—' }}</td>
+            <td>{{ proveedor.activo ? 'Activo' : 'Inactivo' }}</td>
+            <td>
+              <button type="button" class="link" (click)="abrir(proveedor)">Editar</button>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5">No hay proveedores registrados.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+@if (dialogAbierto()) {
+  <app-proveedor-form-dialog
+    [proveedor]="enCurso()"
+    (saved)="cerrar()"
+    (cancelled)="cerrar()"
+  />
+}

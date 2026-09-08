@@ -1,0 +1,98 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Matriz de mapeo catálogo ↔ WooCommerce</h3>
+      <p>
+        Estados: Sincronizado, Desfasado, Pendiente de Subida y No Mapeado. El batch usa el CSV
+        ID, SKU, Precio normal, Precio rebajado e Inventario.
+      </p>
+    </div>
+  </header>
+
+  <div class="chips" role="tablist" aria-label="Filtrar mapeo">
+    @for (estado of estados; track estado) {
+      <button
+        type="button"
+        [class.chips__btn--active]="filtro() === estado"
+        (click)="filtro.set(estado)"
+      >
+        {{ etiquetaFiltro(estado) }}
+      </button>
+    }
+  </div>
+
+  @if (filas().length === 0) {
+    <p class="empty">No hay productos en este estado de mapeo.</p>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>ID Woo</th>
+            <th>Variación</th>
+            <th>SKU</th>
+            <th>Precio normal</th>
+            <th>Precio rebajado</th>
+            <th>Inventario</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of filas(); track fila.productoId) {
+            <tr>
+              <td>
+                <strong>{{ fila.nombre }}</strong>
+                @if (fila.mensaje) {
+                  <small>{{ fila.mensaje }}</small>
+                }
+              </td>
+              <td>
+                @if (fila.wooCommerceId) {
+                  <code>{{ fila.wooCommerceId }}</code>
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                @if (fila.wooVariationId) {
+                  <code>{{ fila.wooVariationId }}</code>
+                } @else {
+                  —
+                }
+              </td>
+              <td><code>{{ fila.sku }}</code></td>
+              <td>
+                {{ fila.precioLocal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                @if (fila.precioNormalWoo !== fila.precioLocal) {
+                  <small>Woo {{ fila.precioNormalWoo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</small>
+                }
+              </td>
+              <td>
+                @if (fila.precioRebajadoWoo != null) {
+                  {{ fila.precioRebajadoWoo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                {{ fila.stockLocal }}
+                @if (fila.stockWoo != null && fila.stockWoo !== fila.stockLocal) {
+                  <small>Woo {{ fila.stockWoo }}</small>
+                }
+              </td>
+              <td>
+                <span class="badge" [attr.data-estado]="fila.estadoMapeo">
+                  {{ etiquetas[fila.estadoMapeo] }}
+                </span>
+                @if (fila.ultimaSincronizacion) {
+                  <small>{{ fila.ultimaSincronizacion | date: 'dd/MM HH:mm' }}</small>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

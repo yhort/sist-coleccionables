@@ -1,0 +1,86 @@
+<section class="productos">
+  <header class="productos__header">
+    <div>
+      <h2>Productos TCG</h2>
+      <p>
+        @if (tab() === 'skus') {
+          {{ totalFiltrado() }} SKUs en catálogo · cartas, sellados, accesorios y compuestos.
+        } @else {
+          Catálogo oficial por serie y set. Importa fichas y luego crea la variante física (SKU).
+        }
+      </p>
+    </div>
+
+    <div class="productos__actions">
+      <div class="tabs" role="tablist" aria-label="Vistas de productos">
+        <button
+          type="button"
+          role="tab"
+          [class.tabs__tab--active]="tab() === 'skus'"
+          [attr.aria-selected]="tab() === 'skus'"
+          (click)="tab.set('skus')"
+        >
+          SKUs
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.tabs__tab--active]="tab() === 'catalogo'"
+          [attr.aria-selected]="tab() === 'catalogo'"
+          (click)="abrirCatalogo()"
+        >
+          Catálogo TCG
+        </button>
+      </div>
+      @if (tab() === 'skus') {
+        <div class="view-toggle" role="group" aria-label="Vista del catálogo">
+          <button
+            type="button"
+            [class.view-toggle__btn--active]="vista() === 'tabla'"
+            (click)="vista.set('tabla')"
+          >
+            Tabla
+          </button>
+          <button
+            type="button"
+            [class.view-toggle__btn--active]="vista() === 'grid'"
+            (click)="vista.set('grid')"
+          >
+            Grid
+          </button>
+        </div>
+        <button type="button" class="productos__add" (click)="abrirAlta()">Nuevo producto</button>
+      }
+    </div>
+  </header>
+
+  @if (tab() === 'skus') {
+    <app-productos-tcg-filters [(filtros)]="filtros" />
+
+    @if (error()) {
+      <p class="productos__error">{{ error() }}</p>
+    }
+
+    <app-productos-tcg-table
+      [productos]="productosFiltrados()"
+      [vista]="vista()"
+      [page]="pagina()"
+      [pageSize]="pageSize()"
+      [total]="total()"
+      (editar)="abrirEdicion($event)"
+      (pageChange)="cambiarPagina($event)"
+      (pageSizeChange)="cambiarTamano($event)"
+    />
+  } @else {
+    <app-catalogo-tcg-panel (varianteCreada)="onVarianteCreada()" />
+  }
+</section>
+
+@if (formularioAbierto()) {
+  <app-producto-tcg-form-dialog
+    [producto]="productoEditando()"
+    [catalogo]="catalogo()"
+    (saved)="onGuardado($event)"
+    (cancelled)="cerrarFormulario()"
+  />
+}

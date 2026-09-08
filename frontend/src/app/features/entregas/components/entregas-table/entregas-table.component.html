@@ -1,0 +1,77 @@
+@if (filas().length === 0) {
+  <div class="empty">No hay pedidos Pagado / Empaquetado / Pendiente de entrega con esos filtros.</div>
+} @else {
+  <div class="table-wrap">
+    <table class="entregas-table">
+      <thead>
+        <tr>
+          <th>N° pedido</th>
+          <th>Cliente / contacto</th>
+          <th>Método de envío</th>
+          <th>Punto de entrega</th>
+          <th>N° tracking / agencia</th>
+          <th>Estado de logística</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track fila.pedido.id) {
+          <tr>
+            <td>
+              <a routerLink="/app/pedidos-digitales">{{ fila.pedido.codigo }}</a>
+              <small>{{ etiquetasPedido[fila.pedido.estado] }}</small>
+            </td>
+            <td>
+              <strong>{{ fila.pedido.clienteNombre }}</strong>
+              @if (fila.entrega.destinatarioTelefono || fila.pedido.clienteTelefono) {
+                <small>Tel. {{ fila.entrega.destinatarioTelefono || fila.pedido.clienteTelefono }}</small>
+              }
+              @if (canalDe(fila); as canal) {
+                <small>{{ canal }}</small>
+              }
+              @if (fila.entrega.contactoReferencia) {
+                <small>Ref. {{ fila.entrega.contactoReferencia }}</small>
+              }
+            </td>
+            <td>
+              <span class="metodo" [attr.data-metodo]="fila.entrega.metodoEnvio">
+                {{ etiquetasMetodo[fila.entrega.metodoEnvio] }}
+              </span>
+            </td>
+            <td>
+              <strong>{{ destino(fila.entrega, fila.sedeNombre) }}</strong>
+              @if (fila.entrega.puntoEntrega && fila.entrega.metodoEnvio !== 'RECOJO_TIENDA') {
+                <small>{{ etiquetasMetodo[fila.entrega.metodoEnvio] }} · {{ fila.sedeNombre }}</small>
+              } @else if (fila.entrega.metodoEnvio !== 'RECOJO_TIENDA') {
+                <small>{{ fila.sedeNombre }}</small>
+              }
+            </td>
+            <td>
+              <code>{{ fila.entrega.numeroTracking ?? '—' }}</code>
+              @if (fila.entrega.agencia) {
+                <small>{{ fila.entrega.agencia }}</small>
+              }
+            </td>
+            <td>
+              <span class="estado" [ngClass]="'estado--' + fila.entrega.estado">
+                {{ etiquetasLogistica[fila.entrega.estado] }}
+              </span>
+            </td>
+            <td class="acciones">
+              @if (puedeEmpaquetar(fila)) {
+                <button type="button" class="link-btn" (click)="empaquetar.emit(fila)">Empaquetar</button>
+              }
+              @if (puedeDespachar(fila)) {
+                <button type="button" class="link-btn" (click)="despachar.emit(fila)">Despachar</button>
+              }
+              @if (puedeConfirmar(fila)) {
+                <button type="button" class="link-btn" (click)="confirmar.emit(fila)">Confirmar entrega</button>
+              }
+              <button type="button" class="link-btn" (click)="etiqueta.emit(fila)">Etiqueta</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

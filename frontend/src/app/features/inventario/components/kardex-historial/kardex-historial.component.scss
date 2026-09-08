@@ -1,0 +1,126 @@
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.empty,
+.table-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+}
+
+.empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+  padding: var(--spacing-xl);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  max-height: calc(100vh - var(--topbar-height) - 16.5rem);
+}
+
+.kardex-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+
+  th,
+  td {
+    padding: 0.8rem 1rem;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+
+  th {
+    color: var(--color-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--color-background);
+    box-shadow: 0 1px 0 var(--color-border);
+  }
+
+  tbody tr:hover td {
+    background: #fcfcfd;
+  }
+
+  code,
+  small {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+  }
+
+  td:nth-child(5),
+  td:nth-child(6),
+  td:nth-child(7) {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+}
+
+.mov {
+  display: inline-flex;
+  max-width: 220px;
+  min-height: 22px;
+  padding: 0.15rem 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+
+  &--in {
+    color: #166534;
+    background: #dcfce7;
+    border-color: transparent;
+  }
+
+  &--out {
+    color: #9a3412;
+    background: #ffedd5;
+    border-color: transparent;
+  }
+
+  &--tcg {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border-color: #bfdbfe;
+  }
+}
+
+.motivo {
+  display: block;
+  max-width: 260px;
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .kardex-table th:nth-child(7),
+  .kardex-table td:nth-child(7) {
+    display: none;
+  }
+}

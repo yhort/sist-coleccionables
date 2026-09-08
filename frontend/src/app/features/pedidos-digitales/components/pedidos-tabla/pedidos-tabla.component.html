@@ -1,0 +1,129 @@
+<section class="tabla" aria-label="Vista tabla de pedidos">
+  <div class="tabla__tabs" role="tablist" aria-label="Filtro rápido por estado">
+    @for (estado of estadosTab; track estado) {
+      <button
+        type="button"
+        role="tab"
+        class="tabla__tab"
+        [attr.data-estado]="estado"
+        [class.tabla__tab--active]="estadoTab() === estado"
+        [attr.aria-selected]="estadoTab() === estado"
+        (click)="setEstadoTab(estado)"
+      >
+        {{ etiquetaEstadoTab(estado) }}
+        <span>{{ conteoPorEstado()[estado] ?? 0 }}</span>
+      </button>
+    }
+  </div>
+
+  @if (filtrados().length === 0) {
+    <div class="tabla__empty">No hay pedidos con esos filtros.</div>
+  } @else {
+    <div class="tabla__wrap">
+      <table class="tabla__grid">
+        <thead>
+          <tr>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('codigo')">
+                N° pedido{{ sortMark('codigo') }}
+              </button>
+            </th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('fecha')">
+                Fecha{{ sortMark('fecha') }}
+              </button>
+            </th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('cliente')">
+                Cliente{{ sortMark('cliente') }}
+              </button>
+            </th>
+            <th>Canal / origen</th>
+            <th>Punto de entrega</th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('total')">
+                Total{{ sortMark('total') }}
+              </button>
+            </th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('estado')">
+                Estado{{ sortMark('estado') }}
+              </button>
+            </th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of pageItems(); track item.pedido.id) {
+            <tr [attr.data-estado]="item.pedido.estado">
+              <td>
+                <button type="button" class="codigo" (click)="abrir.emit(item.pedido)">
+                  {{ item.pedido.codigo }}
+                </button>
+              </td>
+              <td class="fecha">
+                {{ item.pedido.fechaPedido | date: 'dd/MM/yyyy HH:mm' }}
+              </td>
+              <td>
+                <strong>{{ item.pedido.clienteNombre }}</strong>
+                @if (item.pedido.entrega.contactoReferencia; as ref) {
+                  <small>{{ ref }}</small>
+                }
+              </td>
+              <td>
+                <span class="origen" [attr.data-origen]="origenDe(item.pedido.canalPedido)">
+                  {{ etiquetasOrigen[origenDe(item.pedido.canalPedido)] }}
+                </span>
+              </td>
+              <td>
+                <span class="punto">{{ puntoEntrega(item) }}</span>
+              </td>
+              <td class="total">
+                {{ item.pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+              </td>
+              <td>
+                <span class="estado" [attr.data-estado]="item.pedido.estado">
+                  {{ etiquetasEstado[item.pedido.estado] }}
+                </span>
+              </td>
+              <td class="acciones">
+                <button type="button" class="link-btn" (click)="abrir.emit(item.pedido)">
+                  Ver detalle
+                </button>
+                @if (puedeEntregarRapido(item.pedido)) {
+                  <button
+                    type="button"
+                    class="entregar-btn"
+                    (click)="transicionar.emit({ pedido: item.pedido, estado: 'Entregado' })"
+                  >
+                    Entregar
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="tabla__pager">
+      <span>
+        {{ rango().desde }}–{{ rango().hasta }} de {{ rango().total }}
+      </span>
+      <div class="tabla__pager-btns">
+        <button type="button" class="ghost" [disabled]="paginaActual() <= 1" (click)="paginaAnterior()">
+          Anterior
+        </button>
+        <span>Pág. {{ paginaActual() }} / {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="paginaActual() >= totalPages()"
+          (click)="paginaSiguiente()"
+        >
+          Siguiente
+        </button>
+      </div>
+    </footer>
+  }
+</section>

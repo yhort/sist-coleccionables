@@ -1,0 +1,48 @@
+<section class="panel" aria-label="Arqueo y conciliación financiera">
+  <header>
+    <div>
+      <h3>Arqueo y conciliación financiera</h3>
+      <p>Ingresos confirmados por método de pago y estado de comprobante SUNAT.</p>
+    </div>
+    <strong>{{ arqueo().totalConfirmado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+  </header>
+
+  <div class="grid">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Método</th>
+            <th>Pagos</th>
+            <th>Total</th>
+            <th>Emitido SUNAT</th>
+            <th>Pendiente</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of arqueo().porMetodo; track fila.origen) {
+            <tr>
+              <td>
+                <span class="badge" [attr.data-origen]="fila.origen">{{ fila.etiqueta }}</span>
+              </td>
+              <td>{{ fila.cantidad | number: '1.0-0' }}</td>
+              <td>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ fila.emitidoSunat | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ fila.pendiente | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <ul class="comprobantes">
+      @for (fila of arqueo().porComprobante; track fila.estado) {
+        <li>
+          <span [attr.data-estado]="fila.estado">{{ fila.etiqueta }}</span>
+          <strong>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <small>{{ fila.cantidad }} pago{{ fila.cantidad === 1 ? '' : 's' }}</small>
+        </li>
+      }
+    </ul>
+  </div>
+</section>

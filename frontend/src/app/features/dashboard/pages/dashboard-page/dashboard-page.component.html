@@ -1,0 +1,143 @@
+<section class="dashboard">
+  <header class="dashboard__header">
+    <div>
+      <p class="dashboard__eyebrow">Control operativo</p>
+      <h2>{{ saludo() }}</h2>
+      <p>
+        @if (fechaOperativa()) {
+          Métricas en tiempo real · {{ fechaOperativa() }}
+        } @else {
+          Métricas en tiempo real de ventas, subastas, pagos IPN y stock.
+        }
+      </p>
+    </div>
+    <button type="button" class="dashboard__refresh" (click)="cargar()" [disabled]="cargando()">
+      {{ cargando() ? 'Actualizando…' : 'Actualizar' }}
+    </button>
+  </header>
+
+  @if (error()) {
+    <p class="dashboard__error">{{ error() }}</p>
+  }
+
+  @if (cargando() && !resumen()) {
+    <p class="dashboard__loading">Cargando métricas del día…</p>
+  } @else if (resumen(); as data) {
+    <section class="kpis" aria-label="KPIs principales">
+      <a class="kpi" routerLink="/app/pedidos-digitales">
+        <span>Ventas del día</span>
+        <strong>{{ data.ventasHoy.totalRecaudado | currency: 'PEN' : 'S/ ' : '1.2-2' }}</strong>
+        <small>
+          {{ data.ventasHoy.comprobantesEmitidos | number: '1.0-0' }}
+          comprobante{{ data.ventasHoy.comprobantesEmitidos === 1 ? '' : 's' }} emitido{{
+            data.ventasHoy.comprobantesEmitidos === 1 ? '' : 's'
+          }}
+          · {{ data.ventasHoy.ventasRegistradas | number: '1.0-0' }} venta{{
+            data.ventasHoy.ventasRegistradas === 1 ? '' : 's'
+          }}
+        </small>
+      </a>
+
+      <a class="kpi" routerLink="/app/subastas-tcg">
+        <span>Subastas activas</span>
+        <strong>{{ data.subastas.activas | number: '1.0-0' }}</strong>
+        <small>
+          {{ data.subastas.ganadoresPendientePago | number: '1.0-0' }}
+          ganador{{ data.subastas.ganadoresPendientePago === 1 ? '' : 'es' }} pendiente{{
+            data.subastas.ganadoresPendientePago === 1 ? '' : 's'
+          }}
+          de pago
+        </small>
+      </a>
+
+      <a
+        class="kpi"
+        [class.kpi--alert]="data.pagosNotificados.pendientesAsociar > 0"
+        routerLink="/app/pagos"
+        [queryParams]="{ estado: 'NOTIFICADO' }"
+      >
+        <span>Pagos notificados</span>
+        <strong>{{ data.pagosNotificados.pendientesAsociar | number: '1.0-0' }}</strong>
+        <small>
+          Izipay / Yape listos para asociar ·
+          {{ data.pagosNotificados.montoPendiente | currency: 'PEN' : 'S/ ' : '1.2-2' }}
+        </small>
+      </a>
+
+      <a
+        class="kpi"
+        [class.kpi--danger]="data.stockBajo.cantidad > 0"
+        routerLink="/app/inventario"
+      >
+        <span>Alerta de stock bajo</span>
+        <strong>{{ data.stockBajo.cantidad | number: '1.0-0' }}</strong>
+        <small>
+          Productos / cartas con {{ data.stockBajo.umbral | number: '1.0-0' }} unidades o menos
+        </small>
+      </a>
+    </section>
+
+    <section class="acciones" aria-label="Accesos rápidos">
+      <h3>Accesos rápidos</h3>
+      <div class="acciones__grid">
+        <a routerLink="/app/pedidos-digitales" [queryParams]="{ nueva: '1' }">
+          <strong>Nueva venta POS</strong>
+          <span>Abrir caja / pedidos para registrar una venta</span>
+        </a>
+        <a routerLink="/app/subastas-tcg" [queryParams]="{ crear: '1' }">
+          <strong>Crear subasta TCG</strong>
+          <span>Publicar un lote y empezar a recibir pujas</span>
+        </a>
+        <a routerLink="/app/pagos" [queryParams]="{ estado: 'NOTIFICADO' }">
+          <strong>Bandeja IPN</strong>
+          <span>Asociar pagos Izipay / Yape notificados</span>
+        </a>
+        <a routerLink="/app/caja">
+          <strong>Apertura / arqueo caja</strong>
+          <span>Abrir turno, movimientos y cierre del día</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="actividad" aria-label="Actividad reciente">
+      <header>
+        <h3>Actividad reciente</h3>
+        <p>Últimos 5 pedidos digitales o ventas registradas</p>
+      </header>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Monto</th>
+              <th>Estado</th>
+              <th>Método de pago</th>
+              <th>Hora</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of data.actividadReciente; track item.id) {
+              <tr>
+                <td>
+                  <strong>{{ item.clienteNombre }}</strong>
+                  <small>{{ item.tipo === 'VENTA' ? 'Venta POS' : 'Pedido digital' }}</small>
+                </td>
+                <td>{{ item.monto | currency: 'PEN' : 'S/ ' : '1.2-2' }}</td>
+                <td>
+                  <span class="badge" [attr.data-tone]="claseEstado(item.estado)">{{ item.estado }}</span>
+                </td>
+                <td>{{ item.metodoPago }}</td>
+                <td>{{ item.fecha | date: 'shortTime' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5">Aún no hay pedidos ni ventas registradas hoy.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</section>

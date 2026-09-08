@@ -1,0 +1,164 @@
+:host {
+  display: block;
+}
+
+.empty,
+.table-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.pagos-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 0.8rem 1rem;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  th {
+    color: var(--color-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--color-background);
+    white-space: nowrap;
+  }
+
+  tbody tr:hover td {
+    background: #fcfcfd;
+  }
+
+  code,
+  small {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+  }
+
+  code {
+    color: var(--color-text-primary);
+    font-size: 0.82rem;
+  }
+
+  a {
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+}
+
+.monto {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.origen,
+.estado {
+  display: inline-flex;
+  min-height: 22px;
+  padding: 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.origen {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+
+  &[data-origen='YAPE'] {
+    color: #6b21a8;
+    background: #f3e8ff;
+  }
+
+  &[data-origen='IZIPAY'] {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  &[data-origen='TRANSFERENCIA'] {
+    color: #9a3412;
+    background: #ffedd5;
+  }
+
+  &[data-origen='EFECTIVO'] {
+    color: #166534;
+    background: #dcfce7;
+  }
+}
+
+.estado {
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+
+  &--NOTIFICADO {
+    color: #9a3412;
+    background: #ffedd5;
+    border-color: transparent;
+  }
+
+  &--ASOCIADO {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border-color: transparent;
+  }
+
+  &--CONFIRMADO {
+    color: #166534;
+    background: #dcfce7;
+    border-color: transparent;
+  }
+
+  &--RECHAZADO {
+    color: #991b1b;
+    background: #fee2e2;
+    border-color: transparent;
+  }
+}
+
+.acciones {
+  white-space: nowrap;
+}
+
+.link-btn {
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &--danger {
+    color: var(--color-danger);
+  }
+
+  & + .link-btn {
+    margin-left: 0.65rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .pagos-table th:nth-child(3),
+  .pagos-table td:nth-child(3) {
+    min-width: 140px;
+  }
+}

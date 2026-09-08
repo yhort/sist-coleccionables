@@ -1,0 +1,127 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="importar-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="importar-title">Importar catálogo (CSV / Lista)</h2>
+      <p>
+        Carga un archivo CSV o pega la lista en texto plano (número, nombre, tipo y rareza). Las
+        fichas quedan en catálogo con stock 0 y sin movimiento de kardex.
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="importar()">
+    <div class="dialog__grid">
+      <label>
+        Juego
+        <input formControlName="juego" maxlength="80" />
+      </label>
+      <label>
+        Código de serie
+        <input formControlName="serieCodigo" maxlength="32" placeholder="MEGA" />
+      </label>
+      <label>
+        Nombre de serie
+        <input formControlName="serieNombre" maxlength="120" placeholder="Megaevolución" />
+      </label>
+      <label>
+        Código de set
+        <input formControlName="setCodigo" maxlength="32" placeholder="ME03" />
+      </label>
+      <label>
+        Nombre de set
+        <input formControlName="setNombre" maxlength="120" placeholder="Equilibrio Perfecto" />
+      </label>
+      <label>
+        Nombre EN
+        <input formControlName="setNombreEn" maxlength="120" placeholder="Perfect Order" />
+      </label>
+      <label>
+        Código de impresión
+        <input formControlName="codigoImpresion" maxlength="32" placeholder="P11218" />
+      </label>
+      <label class="wide">
+        Archivo CSV
+        <input
+          type="file"
+          accept=".csv,.tsv,.txt,text/csv,text/plain"
+          (change)="onArchivo($event)"
+        />
+        @if (archivoNombre()) {
+          <small>{{ archivoNombre() }}</small>
+        }
+      </label>
+      <label class="wide">
+        O pega la lista (Número, Nombre, Tipo, Rareza)
+        <textarea
+          formControlName="lista"
+          rows="4"
+          placeholder="001,Spinarak,Pokémon,Common"
+        ></textarea>
+      </label>
+    </div>
+
+    <div class="dialog__actions">
+      <button type="button" class="ghost" [disabled]="parseando()" (click)="parsearLista()">
+        {{ parseando() ? 'Leyendo…' : 'Leer lista pegada' }}
+      </button>
+    </div>
+
+    @if (aviso()) {
+      <p class="ok">{{ aviso() }}</p>
+    }
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    @if (resultado(); as parsed) {
+      <div class="preview">
+        <p>{{ parsed.cartas.length }} fichas · unicidad (número + rareza)</p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Rareza</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (carta of parsed.cartas.slice(0, 8); track carta.numero + carta.rareza) {
+              <tr>
+                <td>{{ carta.numero }}</td>
+                <td>{{ carta.nombre }}</td>
+                <td>{{ etiquetasTipo[carta.tipoCarta] }}</td>
+                <td>{{ etiquetasRareza[carta.rareza] }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (parsed.cartas.length > 8) {
+          <small>Mostrando 8 de {{ parsed.cartas.length }}.</small>
+        }
+      </div>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button
+        type="submit"
+        class="primary"
+        [disabled]="importando() || !resultado()?.cartas.length"
+      >
+        {{ importando() ? 'Importando…' : 'Importar fichas' }}
+      </button>
+    </footer>
+  </form>
+</section>

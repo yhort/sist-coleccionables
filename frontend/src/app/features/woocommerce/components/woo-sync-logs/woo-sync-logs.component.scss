@@ -1,0 +1,123 @@
+:host {
+  display: block;
+}
+
+.panel {
+  padding: 1.15rem 1.25rem 1.25rem;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-container, 12px);
+  box-shadow: var(--shadow-container, 0 1px 2px rgb(0 0 0 / 0.04));
+}
+
+header {
+  margin-bottom: 0.85rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  p {
+    margin: 0.25rem 0 0;
+    color: var(--color-text-secondary, #6b7280);
+    font-size: 0.85rem;
+  }
+}
+
+.empty,
+.table-wrap {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+}
+
+.empty {
+  margin: 0;
+  padding: 1.5rem;
+  color: var(--color-text-secondary, #6b7280);
+  text-align: center;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 0.75rem 0.9rem;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border, #e5e7eb);
+  }
+
+  th {
+    color: var(--color-text-secondary, #6b7280);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--color-background, #f9fafb);
+    white-space: nowrap;
+  }
+
+  code,
+  small {
+    display: block;
+  }
+
+  code {
+    font-size: 0.78rem;
+  }
+
+  small {
+    margin-top: 0.3rem;
+    color: var(--color-text-muted, #9ca3af);
+    font-size: 0.75rem;
+  }
+}
+
+.tipo,
+.resultado {
+  display: inline-flex;
+  min-height: 22px;
+  padding: 0 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.tipo {
+  color: var(--color-primary, #2563eb);
+  background: var(--color-primary-soft, #eff6ff);
+
+  &[data-tipo='PEDIDO'] {
+    color: #6b21a8;
+    background: #f3e8ff;
+  }
+
+  &[data-tipo='PRECIO'] {
+    color: #9a3412;
+    background: #ffedd5;
+  }
+}
+
+.resultado {
+  &[data-resultado='OK'] {
+    color: #166534;
+    background: #dcfce7;
+  }
+
+  &[data-resultado='ERROR'] {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+
+  &[data-resultado='REINTENTO'] {
+    color: #9a3412;
+    background: #ffedd5;
+  }
+}

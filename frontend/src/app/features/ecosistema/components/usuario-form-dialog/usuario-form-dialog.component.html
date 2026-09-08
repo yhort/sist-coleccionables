@@ -1,0 +1,36 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="usr-title">
+  <header>
+    <h2 id="usr-title">{{ usuario() ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+    <button type="button" class="close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
+  </header>
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <label>
+      Nombre
+      <input type="text" formControlName="nombre" maxlength="160" />
+    </label>
+    <label>
+      Correo
+      <input type="email" formControlName="email" />
+    </label>
+    <label>
+      Rol
+      <select formControlName="rol">
+        @for (rol of roles; track rol) {
+          <option [value]="rol">{{ etiquetas[rol] }}</option>
+        }
+      </select>
+    </label>
+    <label class="check">
+      <input type="checkbox" formControlName="activo" />
+      Activo
+    </label>
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    <footer>
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </footer>
+  </form>
+</section>

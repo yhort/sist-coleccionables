@@ -1,0 +1,78 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section class="dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <header class="dialog__header">
+    <div>
+      <h2>Ingreso por compra</h2>
+      <p>El stock entra a la sede y queda asentado en el kardex como INGRESO_COMPRA.</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label>
+        Proveedor
+        <select formControlName="proveedorId">
+          <option value="">Seleccionar</option>
+          @for (proveedor of proveedores(); track proveedor.id) {
+            <option [value]="proveedor.id">{{ etiquetaProveedor(proveedor) }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Sede
+        <select formControlName="sedeId">
+          @for (sede of sedes(); track sede.id) {
+            <option [value]="sede.id">{{ sede.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label class="wide">
+        Observación
+        <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+      </label>
+    </div>
+
+    <section class="lineas" formArrayName="detalles">
+      <header>
+        <h3>Ítems</h3>
+        <button type="button" class="link-btn" (click)="agregarLinea()">Agregar ítem</button>
+      </header>
+      @for (linea of detalles.controls; track $index) {
+        <div class="linea" [formGroupName]="$index">
+          <label class="wide">
+            Producto
+            <select formControlName="productoId">
+              <option value="">Seleccionar</option>
+              @for (producto of productos(); track producto.id) {
+                <option [value]="producto.id">{{ producto.nombre }} ({{ producto.codigoSku }})</option>
+              }
+            </select>
+          </label>
+          <label>
+            Cantidad
+            <input type="number" min="0.001" step="1" formControlName="cantidad" />
+          </label>
+          <label>
+            Costo unitario
+            <input type="number" min="0" step="0.01" formControlName="costoUnitario" />
+          </label>
+          <button type="button" class="ghost" [disabled]="detalles.length === 1" (click)="quitarLinea($index)">
+            Quitar
+          </button>
+        </div>
+      }
+      <p class="hint">Total {{ total() | number: '1.2-2' }}</p>
+    </section>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Registrar ingreso</button>
+    </footer>
+  </form>
+</section>

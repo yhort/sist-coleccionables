@@ -1,0 +1,88 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Usuarios, roles y permisos</h3>
+      <p>Admin, cajero/vendedor y encargado de almacén / logística.</p>
+    </div>
+    <button type="button" class="primary" (click)="abrir()">Nuevo usuario</button>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Rol</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (usuario of api.usuarios(); track usuario.id) {
+          <tr>
+            <td>
+              <strong>{{ usuario.nombre }}</strong>
+              <small>{{ usuario.email }}</small>
+            </td>
+            <td>{{ etiquetasRol[usuario.rol] }}</td>
+            <td>{{ usuario.activo ? 'Activo' : 'Inactivo' }}</td>
+            <td>
+              <button type="button" class="link" (click)="abrir(usuario)">Editar</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Matriz de permisos</h4>
+  <div class="table-wrap">
+    <table class="matriz">
+      <thead>
+        <tr>
+          <th>Módulo</th>
+          @for (rol of roles; track rol) {
+            <th>{{ etiquetasRol[rol] }} · L / E</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (modulo of modulos; track modulo) {
+          <tr>
+            <td>{{ etiquetasModulo[modulo] }}</td>
+            @for (rol of roles; track rol) {
+              @if (permisoDe(rol, modulo); as permiso) {
+                <td>
+                  <label>
+                    <input
+                      type="checkbox"
+                      [checked]="permiso.lectura"
+                      (change)="api.actualizarPermiso(rol, modulo, 'lectura', $any($event.target).checked)"
+                    />
+                    L
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      [checked]="permiso.escritura"
+                      (change)="api.actualizarPermiso(rol, modulo, 'escritura', $any($event.target).checked)"
+                    />
+                    E
+                  </label>
+                </td>
+              }
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+@if (dialogAbierto()) {
+  <app-usuario-form-dialog
+    [usuario]="usuarioEnCurso()"
+    (saved)="cerrar()"
+    (cancelled)="cerrar()"
+  />
+}

@@ -1,0 +1,95 @@
+<section class="eco">
+  <header class="eco__header">
+    <div>
+      <h2>Ecosistema</h2>
+      <p>
+        Ficha fiscal SUNAT, sedes para GRE, usuarios con matriz de permisos e integraciones
+        (Izipay IPN y WhatsApp).
+      </p>
+    </div>
+  </header>
+
+  @if (error()) {
+    <p class="eco__error">{{ error() }}</p>
+  }
+
+  <section class="kpis" aria-label="Resumen de configuración">
+    <article>
+      <span>RUC</span>
+      <strong>{{ api.kpis().ruc }}</strong>
+    </article>
+    <article>
+      <span>Series activas</span>
+      <strong>{{ api.kpis().seriesActivas }}</strong>
+    </article>
+    <article>
+      <span>Almacén principal</span>
+      <strong>{{ api.kpis().almacenPrincipal }}</strong>
+    </article>
+    <article>
+      <span>Usuarios activos</span>
+      <strong>{{ api.kpis().usuariosActivos }}</strong>
+    </article>
+    <article>
+      <span>Webhooks / emisiones</span>
+      <strong>{{ api.kpis().webhooksActivos }} / {{ api.kpis().emisiones }}</strong>
+    </article>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="Secciones de ecosistema">
+    <button
+      type="button"
+      role="tab"
+      [class.tabs__tab--active]="tab() === 'fiscal'"
+      (click)="tab.set('fiscal')"
+    >
+      Fiscal SUNAT
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.tabs__tab--active]="tab() === 'sedes'"
+      (click)="tab.set('sedes')"
+    >
+      Sedes
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.tabs__tab--active]="tab() === 'usuarios'"
+      (click)="tab.set('usuarios')"
+    >
+      Usuarios
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.tabs__tab--active]="tab() === 'integraciones'"
+      (click)="tab.set('integraciones')"
+    >
+      Integraciones
+    </button>
+  </div>
+
+  @switch (tab()) {
+    @case ('fiscal') {
+      <app-fiscal-sunat-panel (simular)="abrirSimulacion()" />
+    }
+    @case ('sedes') {
+      <app-sedes-panel />
+    }
+    @case ('usuarios') {
+      <app-usuarios-panel />
+    }
+    @case ('integraciones') {
+      <div class="integraciones">
+        <app-izipay-config-panel />
+        <app-webhooks-panel />
+      </div>
+    }
+  }
+</section>
+
+@if (dialogAbierto()) {
+  <app-emitir-cpe-dialog (cancelled)="cerrarSimulacion()" />
+}

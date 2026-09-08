@@ -1,0 +1,272 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="crear-pedido-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="crear-pedido-title">Nuevo pedido digital</h2>
+      <p>
+        Reserva stock al crear. Activa cobro inmediato para modo POS/caja (entra directo en
+        Pagado).
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label class="wide recojo">
+        <input
+          type="checkbox"
+          formControlName="esClienteVarios"
+          (change)="marcarVarios($any($event.target).checked)"
+        />
+        Cliente varios / Público general
+      </label>
+      <label class="wide">
+        Cliente
+        <input
+          #clienteInput
+          type="text"
+          formControlName="clienteNombre"
+          maxlength="160"
+          placeholder="Buscar por nombre, DNI o RUC…"
+          (input)="buscarCliente($any($event.target).value)"
+        />
+      </label>
+      @if (sugerencias().length) {
+        <ul class="sugerencias">
+          @for (cliente of sugerencias(); track cliente.id) {
+            <li>
+              <button type="button" (click)="elegirCliente(cliente)">
+                <strong>{{ cliente.nombre }}</strong>
+                <span>{{ etiquetaDocumento(cliente) }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+      <label>
+        Tipo de documento
+        <select formControlName="tipoDocumento">
+          @for (tipo of tiposDocumento; track tipo) {
+            <option [value]="tipo">{{ etiquetasDocumento[tipo] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Número
+        <input type="text" formControlName="numeroDocumento" maxlength="16" />
+      </label>
+      <label>
+        Teléfono
+        <input type="tel" formControlName="clienteTelefono" maxlength="32" />
+      </label>
+      <label>
+        Canal de contacto
+        <select formControlName="canalContacto">
+          <option value="">Sin preferencia</option>
+          @for (canal of canalesContacto; track canal) {
+            <option [value]="canal">{{ etiquetasCanalContacto[canal] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Sede
+        <select formControlName="sedeId" (change)="onSedeChange()">
+          @for (sede of sedes(); track sede.id) {
+            <option [value]="sede.id">{{ sede.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Canal / origen
+        <select formControlName="origen">
+          @for (origen of origenes; track origen) {
+            <option [value]="origen">{{ etiquetasOrigen[origen] }}</option>
+          }
+        </select>
+      </label>
+      <label class="wide">
+        Punto de entrega
+        <input
+          type="text"
+          formControlName="puntoEntrega"
+          maxlength="80"
+          list="puntos-entrega-pedido"
+          placeholder="Papurris, Dapkris, TCG House…"
+        />
+        <datalist id="puntos-entrega-pedido">
+          @for (punto of puntosSugeridos; track punto) {
+            <option [value]="punto"></option>
+          }
+        </datalist>
+      </label>
+      <label class="wide">
+        Contacto de referencia
+        <input
+          type="text"
+          formControlName="contactoReferencia"
+          maxlength="160"
+          placeholder="Persona autorizada a recoger / contacto alternativo"
+        />
+      </label>
+      <label class="wide recojo">
+        <input type="checkbox" formControlName="esRecojoTienda" />
+        Recojo en tienda
+      </label>
+      @if (!form.controls.esRecojoTienda.value) {
+        <label>
+          Destinatario
+          <input type="text" formControlName="destinatarioNombre" maxlength="160" />
+        </label>
+        <label>
+          Teléfono destinatario
+          <input type="tel" formControlName="destinatarioTelefono" maxlength="32" />
+        </label>
+        <label class="wide">
+          Dirección
+          <input type="text" formControlName="direccion" maxlength="300" />
+        </label>
+        <label>
+          Distrito
+          <input type="text" formControlName="distrito" maxlength="80" />
+        </label>
+        <label>
+          Courier
+          <input type="text" formControlName="courier" maxlength="80" placeholder="Olva, Shalom…" />
+        </label>
+      }
+      @if (clienteId()) {
+        <label class="wide recojo">
+          <input type="checkbox" formControlName="guardarPuntoEnCliente" />
+          Guardar como nuevo punto predeterminado en el perfil del cliente
+        </label>
+      }
+      <label class="wide">
+        Observación
+        <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+      </label>
+    </div>
+
+    <section class="lineas" formArrayName="detalles">
+      <header>
+        <h3>Ítems</h3>
+        <button type="button" class="link-btn" (click)="agregarLinea()">Agregar ítem</button>
+      </header>
+      @for (linea of detalles.controls; track $index) {
+        <div class="linea" [formGroupName]="$index">
+          <div class="linea__producto">
+            <app-selector-producto-cascada
+              [sedeId]="form.controls.sedeId.value"
+              [productoId]="linea.get('productoId')?.value"
+              [stockLibreFn]="stockLibreDe"
+              (productoChange)="onProductoSeleccionado($index, $event)"
+            />
+          </div>
+          <label>
+            Cantidad
+            <input type="number" min="1" step="1" formControlName="cantidad" />
+          </label>
+          <label>
+            Precio unitario
+            <input type="number" min="0" step="0.01" formControlName="precioUnitario" />
+          </label>
+          <button
+            type="button"
+            class="ghost ghost--icon"
+            [disabled]="detalles.length === 1"
+            (click)="quitarLinea($index)"
+          >
+            Quitar
+          </button>
+        </div>
+      }
+      <p class="lineas__total">
+        Total {{ montos().total | number: '1.2-2' }}
+        · IGV {{ montos().igv | number: '1.2-2' }}
+      </p>
+    </section>
+
+    <section class="pos" aria-label="Cobro inmediato POS">
+      <label class="pos__switch recojo">
+        <input
+          type="checkbox"
+          formControlName="cobroInmediato"
+          (change)="onCobroToggle($any($event.target).checked)"
+        />
+        Registrar como pagado de inmediato
+      </label>
+
+      @if (form.controls.cobroInmediato.value) {
+        @if (alertaCaja(); as alerta) {
+          <p class="pos__alerta" role="alert">{{ alerta }}</p>
+        }
+
+        <div class="pos__grid">
+          <label>
+            Método de pago
+            <select formControlName="metodoPago" (change)="onMetodoPagoChange()">
+              @for (origen of origenesPagoPos; track origen) {
+                <option [value]="origen">{{ etiquetasOrigenPago[origen] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            N° de operación / referencia
+            <input
+              type="text"
+              formControlName="codigoOperacion"
+              maxlength="80"
+              placeholder="Opcional"
+            />
+          </label>
+          @if (esEfectivo()) {
+            <label>
+              Monto recibido
+              <input type="number" min="0" step="0.01" formControlName="montoRecibido" />
+            </label>
+            <p class="pos__vuelto">
+              Vuelto
+              <strong>
+                {{ vuelto() === null ? '—' : (vuelto() | number: '1.2-2') }}
+              </strong>
+            </p>
+          }
+          <label class="wide recojo">
+            <input type="checkbox" formControlName="imprimirTicket" />
+            Imprimir ticket/etiqueta al finalizar
+          </label>
+        </div>
+      }
+    </section>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()" [disabled]="guardando()">
+        Cancelar
+      </button>
+      <button type="submit" class="primary" [disabled]="guardando() || !!alertaCaja()">
+        {{
+          form.controls.cobroInmediato.value
+            ? guardando()
+              ? 'Cobrando…'
+              : 'Cobrar y crear'
+            : guardando()
+              ? 'Guardando…'
+              : 'Crear y reservar'
+        }}
+      </button>
+    </footer>
+  </form>
+</section>

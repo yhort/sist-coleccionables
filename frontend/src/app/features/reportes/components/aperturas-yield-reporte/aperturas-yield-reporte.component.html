@@ -1,0 +1,81 @@
+<section class="panel" aria-label="Rendimiento de aperturas">
+  <header>
+    <h3>Rendimiento de aperturas (Yield TCG)</h3>
+    <p>
+      Costo de compra del sellado frente al valor comercial de las cartas obtenidas e ingresadas al
+      Kardex.
+    </p>
+  </header>
+
+  <div class="summary">
+    <article>
+      <span>Costo de compra</span>
+      <strong>{{ resumen().costoCompra | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </article>
+    <article>
+      <span>Valor comercial cartas</span>
+      <strong>{{ resumen().valorComercial | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </article>
+    <article>
+      <span>Diferencia</span>
+      <strong [ngClass]="'delta--' + signo(resumen().diferencia)">
+        {{ resumen().diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+      </strong>
+    </article>
+    <article>
+      <span>Yield</span>
+      <strong [ngClass]="'delta--' + signo(resumen().diferencia)">
+        @if (resumen().yieldPorcentaje === null) {
+          —
+        } @else {
+          {{ resumen().yieldPorcentaje | number: '1.1-1' }}%
+        }
+      </strong>
+    </article>
+  </div>
+
+  @if (resumen().filas.length === 0) {
+    <p class="empty">No hay aperturas confirmadas en el periodo.</p>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Apertura</th>
+            <th>Sellado</th>
+            <th>Cartas</th>
+            <th>Kardex</th>
+            <th>Costo compra</th>
+            <th>Valor comercial</th>
+            <th>Yield</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of resumen().filas; track fila.id) {
+            <tr>
+              <td>
+                <code>{{ fila.id }}</code>
+                <small>{{ fila.sedeNombre }} · {{ fila.fecha.slice(0, 10) }}</small>
+              </td>
+              <td>
+                {{ fila.selladoNombre }}
+                <small>×{{ fila.cantidadSellados }}</small>
+              </td>
+              <td>{{ fila.cartasObtenidas | number: '1.0-0' }}</td>
+              <td>{{ fila.cartasIngresadasKardex | number: '1.0-0' }}</td>
+              <td>{{ fila.costoCompra | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ fila.valorComercial | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td [ngClass]="'delta--' + signo(fila.diferencia)">
+                @if (fila.yieldPorcentaje === null) {
+                  —
+                } @else {
+                  {{ fila.yieldPorcentaje | number: '1.1-1' }}%
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

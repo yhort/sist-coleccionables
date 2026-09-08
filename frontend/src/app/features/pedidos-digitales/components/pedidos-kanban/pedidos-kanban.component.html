@@ -1,0 +1,36 @@
+<div class="tablero" role="list" aria-label="Tablero de pedidos digitales">
+  @for (estado of columnas; track estado) {
+    <section
+      class="columna"
+      [attr.data-estado]="estado"
+      [class.columna--hover]="destinoHover() === estado"
+      role="list"
+      (dragover)="onDragOver($event, estado)"
+      (drop)="onDrop($event, estado)"
+    >
+      <header>
+        <h3>{{ etiquetas[estado] }}</h3>
+        <span>{{ itemsDe(estado).length }}</span>
+      </header>
+      <div class="columna__cards">
+        @for (item of itemsDe(estado); track item.pedido.id) {
+          <div
+            class="card-wrap"
+            [class.card-wrap--dragging]="arrastrandoId() === item.pedido.id"
+            [attr.draggable]="puedeArrastrar(item.pedido)"
+            (dragstart)="onDragStart($event, item.pedido)"
+            (dragend)="onDragEnd()"
+          >
+            <app-pedido-kanban-card
+              [item]="item"
+              (abrir)="abrir.emit($event)"
+              (transicionar)="transicionar.emit($event)"
+            />
+          </div>
+        } @empty {
+          <p class="empty">Sin pedidos</p>
+        }
+      </div>
+    </section>
+  }
+</div>

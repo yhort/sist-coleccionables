@@ -1,0 +1,261 @@
+<section class="caja">
+  <header class="caja__header">
+    <div>
+      <h2>Caja y arqueo diario</h2>
+      <p>
+        Apertura de turno, ventas por medio de pago, caja chica y cierre con conteo físico.
+      </p>
+    </div>
+    <div class="caja__actions">
+      @if (estado()?.abierta) {
+        <button type="button" class="ghost" (click)="dialog.set('movimiento')">Ingreso / egreso</button>
+        <button type="button" class="caja__add" (click)="dialog.set('arqueo')">Arqueo y cierre</button>
+      } @else {
+        <button type="button" class="caja__add" (click)="dialog.set('apertura')">Abrir turno</button>
+      }
+    </div>
+  </header>
+
+  <section class="toolbar" aria-label="Filtro de sede">
+    <label>
+      <span>Sede</span>
+      <select [ngModel]="sedeId()" (ngModelChange)="onSede($event)">
+        @for (sede of sedes(); track sede.id) {
+          <option [value]="sede.id">{{ sede.nombre }}</option>
+        }
+      </select>
+    </label>
+  </section>
+
+  @if (error()) {
+    <p class="caja__error">{{ error() }}</p>
+  }
+
+  @if (estado(); as caja) {
+    <section class="kpis" [attr.aria-label]="'Turno ' + caja.sedeNombre">
+      <article>
+        <span>Estado</span>
+        <strong>{{ caja.abierta ? 'Abierta' : 'Cerrada' }}</strong>
+      </article>
+      <article>
+        <span>Fondo / teórico</span>
+        <strong>
+          {{
+            (caja.sesion?.montoEfectivoTeorico ?? 0)
+              | currency: 'PEN' : 'symbol-narrow' : '1.2-2'
+          }}
+        </strong>
+      </article>
+      <article>
+        <span>Ventas del turno</span>
+        <strong>{{ caja.sesion?.cantidadVentas ?? 0 }}</strong>
+      </article>
+      <article>
+        <span>Total vendido</span>
+        <strong>
+          {{ (caja.sesion?.totalVentas ?? 0) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        </strong>
+      </article>
+    </section>
+  }
+
+  @if (resumen(); as data) {
+    <div class="grid">
+      <section class="panel">
+        <h3>Medios de pago</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Medio</th>
+                <th>Operaciones</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fila of data.mediosPago; track fila.grupo) {
+                <tr>
+                  <td>{{ fila.etiqueta }}</td>
+                  <td>{{ fila.cantidad }}</td>
+                  <td>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3>Tipo de documento</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Cantidad</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fila of data.documentos; track fila.tipo) {
+                <tr>
+                  <td>{{ fila.etiqueta }}</td>
+                  <td>{{ fila.cantidad }}</td>
+                  <td>{{ fila.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3">Aún no hay comprobantes en este turno.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h3>Ventas del turno</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Documento</th>
+              <th>Medio</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (venta of data.ventas; track venta.ventaId) {
+              <tr>
+                <td>{{ venta.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ venta.clienteNombre || '—' }}</td>
+                <td>{{ venta.comprobante || 'Pendiente' }}</td>
+                <td>{{ venta.mediosPago || '—' }}</td>
+                <td>{{ venta.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5">Sin ventas confirmadas en el turno.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    @if (data.movimientos.length) {
+      <section class="panel">
+        <h3>Ingresos y egresos</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Concepto</th>
+                <th>Usuario</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (mov of data.movimientos; track mov.id) {
+                <tr>
+                  <td>
+                    <span class="pill" [attr.data-tipo]="mov.tipo">{{ etiquetasMovimiento[mov.tipo] }}</span>
+                  </td>
+                  <td>{{ mov.concepto }}</td>
+                  <td>{{ mov.usuarioNombre || '—' }}</td>
+                  <td>{{ mov.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  } @else if (estado() && !estado()?.abierta) {
+    <p class="empty">No hay un turno abierto en esta sede. Abre la caja para empezar a vender.</p>
+  }
+
+  <section class="panel">
+    <h3>Historial de turnos</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Apertura</th>
+            <th>Cierre</th>
+            <th>Cajero</th>
+            <th>Estado</th>
+            <th>Teórico</th>
+            <th>Diferencia</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (sesion of sesiones(); track sesion.id) {
+            <tr>
+              <td>{{ sesion.fechaApertura | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td>{{ sesion.fechaCierre ? (sesion.fechaCierre | date: 'dd/MM/yyyy HH:mm') : '—' }}</td>
+              <td>{{ sesion.usuarioNombre }}</td>
+              <td>
+                <span class="pill" [attr.data-estado]="sesion.estado">
+                  {{ etiquetasEstado[sesion.estado] }}
+                </span>
+              </td>
+              <td>{{ sesion.montoEfectivoTeorico | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>
+                @if (sesion.tipoDiferencia; as tipo) {
+                  <span class="pill" [attr.data-diff]="tipo">
+                    {{ etiquetasDiferencia[tipo] }}
+                    {{ sesion.diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                  </span>
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                <button type="button" class="link-btn" (click)="imprimir(sesion.id)">Ticket</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7">Aún no hay turnos registrados.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+@if (dialog() === 'apertura') {
+  <app-caja-apertura-dialog
+    [sedes]="sedes()"
+    [sedeIdInicial]="sedeId()"
+    (saved)="onGuardado()"
+    (cancelled)="dialog.set(null)"
+  />
+}
+
+@if (dialog() === 'movimiento' && sedeId()) {
+  <app-caja-movimiento-dialog
+    [sedeId]="sedeId()"
+    (saved)="onGuardado()"
+    (cancelled)="dialog.set(null)"
+  />
+}
+
+@if (dialog() === 'arqueo' && sedeId()) {
+  <app-caja-arqueo-dialog
+    [sedeId]="sedeId()"
+    (saved)="onArqueoGuardado()"
+    (cancelled)="dialog.set(null)"
+  />
+}
+
+@if (ticket(); as data) {
+  <app-caja-ticket-print [ticket]="data" (closed)="ticket.set(null)" />
+}

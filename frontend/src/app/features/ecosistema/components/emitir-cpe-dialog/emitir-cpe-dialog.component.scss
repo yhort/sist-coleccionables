@@ -1,0 +1,191 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(17 24 39 / 40%);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-md);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 1.4rem 0.35rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  p {
+    margin: 0.3rem 0 0;
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+  }
+}
+
+.close {
+  width: 36px;
+  height: 36px;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 1.4rem 0.2rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+select {
+  min-height: 40px;
+  padding: 0 0.7rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.preview,
+.hint,
+.error,
+.ok {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.preview {
+  color: var(--color-text-secondary);
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.ok {
+  color: #166534;
+  font-weight: 600;
+}
+
+.resultado {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  &[data-estado='ACEPTADO'] {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
+
+  &[data-estado='PENDIENTE_CONSOLIDAR'],
+  &[data-estado='CONSOLIDADA'] {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+  }
+
+  &[data-estado='RECHAZADO'],
+  &[data-estado='ERROR_SUNAT'],
+  &[data-estado='ERROR_VALIDACION'] {
+    border-color: #fecaca;
+    background: #fef2f2;
+
+    .ok {
+      color: var(--color-danger);
+    }
+  }
+}
+
+.estado {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  color: #166534;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: #dcfce7;
+  border-radius: 999px;
+}
+
+.resultado[data-estado='RECHAZADO'] .estado,
+.resultado[data-estado='ERROR_SUNAT'] .estado,
+.resultado[data-estado='ERROR_VALIDACION'] .estado {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.descargas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  padding: 0.8rem 0 1.15rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.ghost,
+.primary {
+  min-height: 40px;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.ghost {
+  border: 1px solid var(--color-border);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.primary {
+  color: #fff;
+  background: var(--color-primary);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}

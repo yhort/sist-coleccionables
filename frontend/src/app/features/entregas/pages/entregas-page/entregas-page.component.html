@@ -1,0 +1,57 @@
+<section class="entregas">
+  <header class="entregas__header">
+    <div>
+      <h2>Entregas y envíos</h2>
+      <p>
+        Cola de despacho de pedidos Pagado, Empaquetado y Pendiente de entrega. Confirmar genera
+        la venta y el movimiento de kardex VENTA.
+      </p>
+    </div>
+  </header>
+
+  @if (sedeCajaId()) {
+    <app-caja-turno-banner [sedeId]="sedeCajaId()" (changed)="onCajaChanged()" />
+  }
+
+  <app-entregas-kpis
+    [porEmpaquetar]="kpis().porEmpaquetar"
+    [porDespachar]="kpis().porDespachar"
+    [enTransito]="kpis().enTransito"
+  />
+
+  <app-entregas-filters
+    [filtros]="filtros()"
+    [sedes]="sedes()"
+    (changed)="actualizarFiltros($event)"
+    (cleared)="limpiarFiltros()"
+  />
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <app-entregas-table
+    [filas]="filas()"
+    (empaquetar)="abrirEmpaque($event)"
+    (despachar)="abrirDespacho($event)"
+    (confirmar)="confirmar($event)"
+    (etiqueta)="abrirEtiqueta($event)"
+  />
+</section>
+
+@if (dialogModo(); as modo) {
+  @if (filaActiva(); as fila) {
+    <app-programar-entrega-dialog
+      [fila]="fila"
+      [modo]="modo"
+      (saved)="onGuardado()"
+      (cancelled)="cerrarDialog()"
+    />
+  }
+}
+
+@if (etiquetaAbierta()) {
+  @if (filaActiva(); as fila) {
+    <app-packing-slip-dialog [fila]="fila" (closed)="cerrarDialog()" />
+  }
+}

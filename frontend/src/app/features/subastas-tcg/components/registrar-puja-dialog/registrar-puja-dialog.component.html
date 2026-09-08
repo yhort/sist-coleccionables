@@ -1,0 +1,46 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="puja-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="puja-title">Registrar puja</h2>
+      <p>{{ subasta().titulo }} · mínimo {{ minimo() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label class="wide">
+        Cliente / alias
+        <input
+          type="text"
+          formControlName="nombrePostor"
+          maxlength="160"
+          placeholder="Nombre en Facebook, web o evento…"
+        />
+      </label>
+      <label class="wide">
+        Monto
+        <input type="number" min="0.01" step="0.01" formControlName="monto" />
+      </label>
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Registrar puja</button>
+    </footer>
+  </form>
+</section>

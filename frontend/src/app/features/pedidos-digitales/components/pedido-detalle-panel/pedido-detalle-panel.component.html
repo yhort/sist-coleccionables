@@ -1,0 +1,235 @@
+<div class="backdrop" (click)="closed.emit()"></div>
+
+@if (pedido(); as pedido) {
+  <aside class="panel" role="dialog" aria-modal="true" aria-labelledby="pedido-detalle-title">
+    <header class="panel__header">
+      <div>
+        <p class="eyebrow">
+          <span class="estado" [ngClass]="'estado--' + pedido.estado">
+            {{ etiquetasEstado[pedido.estado] }}
+          </span>
+          <span class="origen" [attr.data-origen]="origenDe(pedido.canalPedido)">
+            {{ etiquetasOrigen[origenDe(pedido.canalPedido)] }}
+          </span>
+        </p>
+        <h2 id="pedido-detalle-title">{{ pedido.clienteNombre }}</h2>
+        <p>
+          {{ pedido.codigo }} · {{ sedeNombre() }} · {{ etiquetasCanal[pedido.canalPedido] }}
+          · reserva {{ reservaDe(pedido.estado) }}
+        </p>
+      </div>
+      <button type="button" class="panel__close" aria-label="Cerrar" (click)="closed.emit()">
+        ×
+      </button>
+    </header>
+
+    <section class="hint">
+      <p>
+        Crear reserva con <strong>{{ movimientoReserva }}</strong
+        >, cancelar con <strong>{{ movimientoLiberacion }}</strong>
+        y confirmar entrega con <strong>{{ movimientoVenta }}</strong
+        >.
+      </p>
+      @if (pedido.codigoSubasta) {
+        <p>Nació de la subasta <code>{{ pedido.codigoSubasta }}</code>.</p>
+      }
+      @if (pedido.codigoVenta) {
+        <p>Venta confirmada <code>{{ pedido.codigoVenta }}</code> — lista para CPE.</p>
+      }
+      @if (comprobante(); as cpe) {
+        <p class="cpe" [attr.data-estado]="cpe.estado">
+          SUNAT <strong>{{ numeroDe(cpe) }}</strong>
+          · <span>{{ etiquetasCpe[cpe.estado] }}</span>
+        </p>
+      }
+    </section>
+
+    <section class="bloque">
+      <h3>Cliente y entrega</h3>
+      <dl>
+        <div>
+          <dt>Cliente</dt>
+          <dd>{{ pedido.clienteNombre }}</dd>
+        </div>
+        <div>
+          <dt>Teléfono</dt>
+          <dd>{{ pedido.clienteTelefono ?? pedido.entrega.destinatarioTelefono ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>Canal de contacto</dt>
+          <dd>{{ etiquetaCanal(pedido.entrega.canalContacto) }}</dd>
+        </div>
+        <div>
+          <dt>Punto de entrega</dt>
+          <dd>{{ pedido.entrega.puntoEntrega || pedido.entrega.agencia || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Contacto de referencia</dt>
+          <dd>{{ pedido.entrega.contactoReferencia || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Destinatario</dt>
+          <dd>{{ pedido.entrega.destinatarioNombre }}</dd>
+        </div>
+        <div>
+          <dt>Modalidad</dt>
+          <dd>
+            @if (pedido.entrega.esRecojoTienda) {
+              Recojo en tienda
+            } @else {
+              Envío {{ pedido.entrega.courier ?? '' }}
+            }
+          </dd>
+        </div>
+        <div class="wide">
+          <dt>Dirección</dt>
+          <dd>
+            @if (pedido.entrega.esRecojoTienda) {
+              Recojo en {{ sedeNombre() }}
+            } @else {
+              {{ pedido.entrega.direccion }}
+              @if (pedido.entrega.distrito) {
+                · {{ pedido.entrega.distrito }}
+              }
+              @if (pedido.entrega.provincia) {
+                · {{ pedido.entrega.provincia }}
+              }
+              @if (pedido.entrega.departamento) {
+                · {{ pedido.entrega.departamento }}
+              }
+            }
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="bloque">
+      <h3>Ítems (cartas / sellados)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Tipo</th>
+            <th>Cant.</th>
+            <th>P. unit.</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of itemsEnriquecidos(); track item.detalle.id) {
+            <tr>
+              <td>
+                <strong>{{ item.detalle.descripcion }}</strong>
+                <small>{{ item.sku }}</small>
+              </td>
+              <td>{{ etiquetasTipo[item.tipoProducto] }}</td>
+              <td>{{ item.detalle.cantidad }}</td>
+              <td>{{ item.detalle.precioUnitario | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ item.detalle.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <p class="totales">
+        Subtotal {{ pedido.subtotal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        · IGV {{ pedido.igv | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        · <strong>Total {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      </p>
+    </section>
+
+    <section class="historial" aria-label="Historial de estados">
+      <h3>Auditoría de estados</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Cambio</th>
+            <th>Usuario</th>
+            <th>Fecha / hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (evento of historial(); track evento.id) {
+            <tr>
+              <td>
+                <strong>
+                  @if (evento.estadoAnterior) {
+                    {{ etiquetasEstado[evento.estadoAnterior] }} →
+                  }
+                  {{ etiquetasEstado[evento.estadoNuevo] }}
+                </strong>
+                @if (evento.observacion) {
+                  <small>{{ evento.observacion }}</small>
+                }
+              </td>
+              <td>{{ evento.usuarioNombre ?? '—' }}</td>
+              <td>{{ evento.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="panel__actions">
+      @if (puedeVerPagoVinculado()) {
+        <button
+          type="button"
+          class="ghost ghost--pago"
+          [disabled]="cargandoPagos()"
+          (click)="abrirPagoConsulta()"
+        >
+          {{ cargandoPagos() ? 'Cargando pago…' : 'Ver pago vinculado' }}
+        </button>
+      } @else if (puedeVincularPago()) {
+        <button type="button" class="primary" (click)="abrirPago()">
+          Vincular pago
+        </button>
+      }
+      <button
+        type="button"
+        class="ghost"
+        (click)="abrirCpe()"
+        [disabled]="pedido.estado !== 'Entregado' || !pedido.ventaId"
+      >
+        {{ comprobante()?.estado === 'ACEPTADO' || comprobante()?.estado === 'PENDIENTE_CONSOLIDAR' || comprobante()?.estado === 'CONSOLIDADA' ? 'Ver comprobante' : 'Emitir comprobante' }}
+      </button>
+      @if (comprobante(); as cpe) {
+        <button type="button" class="ghost" [disabled]="!puedeXml(cpe)" (click)="descargarXml()">
+          XML
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedeCdr(cpe)" (click)="descargarCdr()">
+          CDR
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedePdf(cpe)" (click)="abrirPdf('a4')">
+          PDF
+        </button>
+      }
+      @for (estado of transicionesDe(pedido); track estado) {
+        <button
+          type="button"
+          class="ghost"
+          [class.ghost--danger]="estado === 'Cancelado'"
+          (click)="transicionar(estado)"
+        >
+          {{ etiquetasEstado[estado] }}
+        </button>
+      }
+    </footer>
+  </aside>
+} @else {
+  <aside class="panel">
+    <p class="empty">No se encontró el pedido.</p>
+  </aside>
+}
+
+@if (accion(); as tipo) {
+  <app-pedido-accion-preparada-dialog
+    [tipo]="tipo"
+    [pedido]="pedido()"
+    [pagos]="pagosVinculados()"
+    (closed)="cerrarAccion()"
+  />
+}

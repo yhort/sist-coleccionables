@@ -1,0 +1,39 @@
+<article class="card">
+  <header class="card__top">
+    <span class="canal">{{ etiquetasCanal[item().subasta.canal] }}</span>
+    <span class="tipo" [attr.data-tipo]="item().tipoProducto">
+      {{ etiquetasTipo[item().tipoProducto] }}
+    </span>
+  </header>
+  <h3>{{ item().subasta.titulo }}</h3>
+  <p class="card__product">{{ item().productoNombre }}</p>
+  @if (item().subasta.detalles.length > 1) {
+    <p class="card__combo">{{ item().subasta.detalles.length }} SKUs en el lote</p>
+  }
+  <p class="card__meta">
+    {{ item().sedeNombre }} · {{ item().subasta.pujas.length }} puja{{
+      item().subasta.pujas.length === 1 ? '' : 's'
+    }}
+  </p>
+  <p class="card__bid">
+    @if (ultima(item().subasta); as puja) {
+      <span>Última oferta</span>
+      <strong>{{ puja.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    } @else {
+      <span>Precio base</span>
+      <strong>{{ item().subasta.precioBase | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    }
+  </p>
+  <p class="card__time">
+    Cierre {{ item().subasta.fechaCierre | date: 'dd/MM HH:mm' }}
+    @if (item().stockLibre < 1 && item().subasta.estado !== 'CANCELADA') {
+      · sin stock libre
+    }
+  </p>
+  <footer>
+    <button type="button" class="link-btn" (click)="ver.emit(item().subasta)">Ver pujas</button>
+    @if (item().subasta.estado === 'ACTIVA' && !vencida()) {
+      <button type="button" class="link-btn" (click)="pujar.emit(item().subasta)">Registrar puja</button>
+    }
+  </footer>
+</article>

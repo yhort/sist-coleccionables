@@ -1,0 +1,99 @@
+<div class="dialog-backdrop no-print" (click)="closed.emit()"></div>
+
+<section class="ticket-wrap" role="dialog" aria-modal="true" aria-labelledby="ticket-title">
+  <header class="ticket-wrap__toolbar no-print">
+    <div>
+      <h2 id="ticket-title">Ticket de arqueo 80mm</h2>
+      <p>Listo para impresora térmica.</p>
+    </div>
+    <div>
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+      <button type="button" class="primary" (click)="imprimir()">Imprimir</button>
+    </div>
+  </header>
+
+  <article class="ticket">
+    <p class="ticket__brand">{{ ticket().empresa.nombreComercial }}</p>
+    <p>{{ ticket().empresa.razonSocial }}</p>
+    <p>RUC {{ ticket().empresa.ruc }}</p>
+    <p class="ticket__title">{{ ticket().titulo }}</p>
+    <p class="ticket__muted">{{ etiquetasEstado[ticket().estado] }} · {{ ticket().anchoMm }}mm</p>
+    <hr />
+    @for (linea of ticket().encabezado; track linea.etiqueta) {
+      <p class="ticket__row">
+        <span>{{ linea.etiqueta }}</span>
+        <strong>{{ linea.valor }}</strong>
+      </p>
+    }
+    @if (ticket().fechaCierreLocal) {
+      <p class="ticket__row">
+        <span>Cierre</span>
+        <strong>{{ ticket().fechaCierreLocal }}</strong>
+      </p>
+    }
+    <hr />
+    <p class="ticket__section">Medios de pago</p>
+    @for (fila of ticket().mediosPago; track fila.grupo) {
+      <p class="ticket__row">
+        <span>{{ fila.etiqueta }} ({{ fila.cantidad }})</span>
+        <strong>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      </p>
+    }
+    <hr />
+    <p class="ticket__section">Documentos</p>
+    @for (fila of ticket().documentos; track fila.tipo) {
+      <p class="ticket__row">
+        <span>{{ fila.etiqueta }} ({{ fila.cantidad }})</span>
+        <strong>{{ fila.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      </p>
+    } @empty {
+      <p class="ticket__muted">Sin comprobantes</p>
+    }
+    @if (ticket().movimientos.length) {
+      <hr />
+      <p class="ticket__section">Caja chica</p>
+      @for (mov of ticket().movimientos; track mov.id) {
+        <p class="ticket__row">
+          <span>{{ etiquetasMovimiento[mov.tipo] }} · {{ mov.concepto }}</span>
+          <strong>{{ mov.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+        </p>
+      }
+    }
+    <hr />
+    <p class="ticket__row">
+      <span>Apertura</span>
+      <strong>{{ ticket().efectivo.montoApertura | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </p>
+    <p class="ticket__row">
+      <span>Ventas efectivo</span>
+      <strong>{{ ticket().efectivo.ventasEfectivo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </p>
+    <p class="ticket__row">
+      <span>Ingresos</span>
+      <strong>{{ ticket().efectivo.ingresos | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </p>
+    <p class="ticket__row">
+      <span>Egresos</span>
+      <strong>{{ ticket().efectivo.egresos | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </p>
+    <p class="ticket__row">
+      <span>Teórico</span>
+      <strong>{{ ticket().efectivo.montoEfectivoTeorico | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    </p>
+    <p class="ticket__row">
+      <span>Conteo real</span>
+      <strong>
+        {{
+          ticket().efectivo.montoEfectivoReal === null
+            ? '—'
+            : (ticket().efectivo.montoEfectivoReal | currency: 'PEN' : 'symbol-narrow' : '1.2-2')
+        }}
+      </strong>
+    </p>
+    <p class="ticket__diff">{{ ticket().leyendaDiferencia }}</p>
+    <hr />
+    @for (linea of ticket().pie; track linea) {
+      <p class="ticket__muted">{{ linea }}</p>
+    }
+  </article>
+</section>

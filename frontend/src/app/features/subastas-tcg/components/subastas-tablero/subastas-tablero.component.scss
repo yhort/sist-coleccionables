@@ -1,0 +1,132 @@
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.tablero {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 0.75rem;
+  min-height: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(156 163 175 / 55%) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgb(156 163 175 / 55%);
+    border-radius: 999px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+.columna {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  padding: 0.75rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+  overflow: hidden;
+
+  header {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+
+    h3 {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    span {
+      min-width: 22px;
+      padding: 0 0.4rem;
+      color: var(--color-primary);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-align: center;
+      background: var(--color-primary-soft);
+      border-radius: 999px;
+    }
+  }
+
+  &[data-estado='ACTIVA'] header span {
+    color: #166534;
+    background: #dcfce7;
+  }
+
+  &[data-estado='ADJUDICADA'] header span {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  &[data-estado='CANCELADA'] header span {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+
+  &__cards {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 0.15rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175 / 55%) transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgb(156 163 175 / 55%);
+      border-radius: 999px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+  }
+}
+
+.card-wrap {
+  flex-shrink: 0;
+}
+
+.empty {
+  margin: 0;
+  padding: 1.25rem 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}

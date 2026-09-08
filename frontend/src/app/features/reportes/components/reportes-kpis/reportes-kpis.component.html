@@ -1,0 +1,41 @@
+<section class="kpis" aria-label="KPIs consolidados">
+  <article>
+    <span>Ventas totales del periodo</span>
+    <strong>{{ kpis().ventasTotales | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <small>
+      {{ kpis().pedidosCobrados | number: '1.0-0' }} pedido{{
+        kpis().pedidosCobrados === 1 ? '' : 's'
+      }}
+      cobrado{{ kpis().pedidosCobrados === 1 ? '' : 's' }}
+    </small>
+  </article>
+  <article>
+    <span>Margen bruto estimado</span>
+    <strong>{{ kpis().margenBruto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <small>
+      @if (kpis().margenPorcentaje === null) {
+        Sin ventas en el periodo
+      } @else {
+        {{ kpis().margenPorcentaje | number: '1.1-1' }}% sobre ventas
+      }
+    </small>
+  </article>
+  <article>
+    <span>Valor del inventario activo</span>
+    <strong>{{ kpis().inventarioActivo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <small>
+      Sellado {{ kpis().inventarioSellado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }} · Cartas
+      sueltas {{ kpis().inventarioCartas | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+    </small>
+  </article>
+  <article>
+    <span>Total conciliado (Yape / Izipay)</span>
+    <strong>{{ kpis().totalConciliado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <small>
+      {{ kpis().pagosConciliados | number: '1.0-0' }} pago{{
+        kpis().pagosConciliados === 1 ? '' : 's'
+      }}
+      confirmado{{ kpis().pagosConciliados === 1 ? '' : 's' }}
+    </small>
+  </article>
+</section>

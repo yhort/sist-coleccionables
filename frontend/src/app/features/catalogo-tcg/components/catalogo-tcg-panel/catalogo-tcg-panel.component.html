@@ -1,0 +1,121 @@
+<section class="catalogo">
+  <header class="catalogo__toolbar">
+    <label>
+      Serie
+      <select
+        [value]="serieId()"
+        (change)="onSerieChange($any($event.target).value)"
+      >
+        <option value="">Seleccionar serie</option>
+        @for (serie of series(); track serie.id) {
+          <option [value]="serie.id">{{ serie.nombre }} · {{ serie.codigo }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Set
+      <select
+        [value]="setId()"
+        [disabled]="!serieId()"
+        (change)="onSetChange($any($event.target).value)"
+      >
+        <option value="">Seleccionar set</option>
+        @for (set of sets(); track set.id) {
+          <option [value]="set.id">{{ set.codigo }} · {{ set.nombre }}</option>
+        }
+      </select>
+    </label>
+    <label class="catalogo__search">
+      Buscar ficha
+      <input
+        type="search"
+        placeholder="Número, nombre o rareza…"
+        [value]="busquedaFicha()"
+        (input)="busquedaFicha.set($any($event.target).value)"
+      />
+    </label>
+    <button
+      type="button"
+      class="catalogo__import"
+      (click)="importadorAbierto.set(true)"
+    >
+      Importar catálogo (CSV / Lista)
+    </button>
+  </header>
+
+  <p class="catalogo__hint">
+    La importación crea o actualiza fichas oficiales. No genera SKU, stock ni movimientos de
+    kardex: eso ocurre al crear la variante.
+  </p>
+
+  @if (error()) {
+    <p class="catalogo__error">{{ error() }}</p>
+  }
+
+  <div class="table-shell">
+    @if (!setId()) {
+      <div class="catalog-empty">Selecciona una serie y un set, o importa un catálogo oficial.</div>
+    } @else if (cargando()) {
+      <div class="catalog-empty">Cargando fichas…</div>
+    } @else if (cartasFiltradas().length === 0) {
+      <div class="catalog-empty">No hay fichas en este set.</div>
+    } @else {
+      <div class="table-wrap">
+        <table class="catalog-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ficha</th>
+              <th>Tipo</th>
+              <th>Rareza</th>
+              <th>SKUs</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ficha of cartasFiltradas(); track ficha.id) {
+              <tr>
+                <td><code>{{ ficha.numero }}</code></td>
+                <td>
+                  <strong>{{ ficha.nombre }}</strong>
+                  <small>{{ ficha.setCodigo }} · {{ ficha.setNombre }}</small>
+                </td>
+                <td>{{ etiquetasTipo[ficha.tipoCarta] }}</td>
+                <td>{{ etiquetasRareza[ficha.rareza] }}</td>
+                <td>{{ skusDeFicha(ficha.id) }}</td>
+                <td>
+                  <button type="button" class="link-btn" (click)="abrirVariante(ficha)">
+                    Crear variante
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>
+
+@if (importadorAbierto()) {
+  <app-importar-catalogo-dialog
+    [serieActual]="serieSeleccionada()"
+    [setActual]="setSeleccionado()"
+    (saved)="onCatalogoImportado($event)"
+    (cancelled)="importadorAbierto.set(false)"
+  />
+}
+
+@if (toastExito()) {
+  <div class="catalogo-toast" role="status" aria-live="polite">
+    {{ toastExito() }}
+  </div>
+}
+
+@if (fichaVariante(); as ficha) {
+  <app-variante-sku-dialog
+    [ficha]="ficha"
+    (saved)="onVarianteGuardada()"
+    (cancelled)="fichaVariante.set(null)"
+  />
+}

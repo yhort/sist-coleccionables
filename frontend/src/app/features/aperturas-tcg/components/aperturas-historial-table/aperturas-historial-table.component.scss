@@ -1,0 +1,125 @@
+:host {
+  display: block;
+}
+
+.empty,
+.table-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.historial {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  th {
+    color: var(--color-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--color-background);
+  }
+
+  tbody tr:hover td {
+    background: #fcfcfd;
+  }
+
+  td:nth-child(5),
+  td:nth-child(6) {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  strong {
+    white-space: normal;
+  }
+
+  &__actions {
+    text-align: right;
+  }
+}
+
+.estado {
+  display: inline-flex;
+  min-height: 22px;
+  padding: 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+
+  &--borrador {
+    color: var(--color-text-secondary);
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+  }
+
+  &--confirmada {
+    color: #166534;
+    background: #dcfce7;
+  }
+
+  &--anulada {
+    color: #991b1b;
+    background: #fee2e2;
+  }
+}
+
+.yield {
+  font-weight: 700;
+
+  &--pos {
+    color: var(--color-success);
+  }
+
+  &--neg {
+    color: var(--color-danger);
+  }
+}
+
+.link-btn {
+  margin-left: 0.65rem;
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+
+  &--danger {
+    color: var(--color-danger);
+
+    &:hover {
+      color: #b91c1c;
+    }
+  }
+}
+
+@media (max-width: 800px) {
+  .historial th:nth-child(4),
+  .historial td:nth-child(4) {
+    display: none;
+  }
+}

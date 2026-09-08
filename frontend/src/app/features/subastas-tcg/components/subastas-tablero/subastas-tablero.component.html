@@ -1,0 +1,19 @@
+<div class="tablero" role="list" aria-label="Tablero de subastas">
+  @for (estado of columnas; track estado) {
+    <section class="columna" [attr.data-estado]="estado" role="list">
+      <header>
+        <h3>{{ etiquetas[estado] }}</h3>
+        <span>{{ itemsDe(estado).length }}</span>
+      </header>
+      <div class="columna__cards">
+        @for (item of itemsDe(estado); track item.subasta.id) {
+          <div class="card-wrap">
+            <app-subasta-card [item]="item" (ver)="ver.emit($event)" (pujar)="pujar.emit($event)" />
+          </div>
+        } @empty {
+          <p class="empty">Sin subastas</p>
+        }
+      </div>
+    </section>
+  }
+</div>

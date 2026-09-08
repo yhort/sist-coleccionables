@@ -1,0 +1,78 @@
+@if (filas().length === 0) {
+  <div class="empty">No hay pagos con esos filtros.</div>
+} @else {
+  <div class="table-wrap">
+    <table class="pagos-table">
+      <thead>
+        <tr>
+          <th>Fecha / hora</th>
+          <th>Origen</th>
+          <th>Código de operación</th>
+          <th>Monto</th>
+          <th>Cliente</th>
+          <th>Estado</th>
+          <th>Pedido vincular</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track fila.pago.id) {
+          <tr>
+            <td>
+              {{ fila.pago.fechaNotificacion | date: 'dd/MM/yyyy HH:mm' }}
+              @if (fila.pago.fechaConfirmacion) {
+                <small>Conf. {{ fila.pago.fechaConfirmacion | date: 'dd/MM HH:mm' }}</small>
+              }
+            </td>
+            <td>
+              <span class="origen" [attr.data-origen]="fila.pago.origen">
+                {{ etiquetasOrigen[fila.pago.origen] }}
+              </span>
+            </td>
+            <td>
+              <code>{{ fila.pago.codigoOperacion ?? '—' }}</code>
+              @if (fila.pago.referenciaExterna) {
+                <small>{{ fila.pago.referenciaExterna }}</small>
+              }
+            </td>
+            <td class="monto">
+              {{ fila.pago.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+            </td>
+            <td>{{ fila.clienteNombre }}</td>
+            <td>
+              <span class="estado" [ngClass]="'estado--' + fila.pago.estado">
+                {{ etiquetasEstado[fila.pago.estado] }}
+              </span>
+            </td>
+            <td>
+              @if (fila.pago.pedidoDigitalId) {
+                <a routerLink="/app/pedidos-digitales">{{ codigoPedidoDe(fila) }}</a>
+                @if (fila.pedidoEstado) {
+                  <small>{{ fila.pedidoEstado }}</small>
+                }
+              } @else if (fila.pago.estado === 'NOTIFICADO') {
+                <button type="button" class="link-btn" (click)="asociar.emit(fila.pago)">
+                  Vincular pedido
+                </button>
+              } @else {
+                —
+              }
+            </td>
+            <td class="acciones">
+              @if (puedeConfirmar(fila.pago)) {
+                <button type="button" class="link-btn" (click)="confirmar.emit(fila.pago)">
+                  Confirmar
+                </button>
+              }
+              @if (fila.pago.estado === 'NOTIFICADO' || fila.pago.estado === 'ASOCIADO') {
+                <button type="button" class="link-btn link-btn--danger" (click)="rechazar.emit(fila.pago)">
+                  Rechazar
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

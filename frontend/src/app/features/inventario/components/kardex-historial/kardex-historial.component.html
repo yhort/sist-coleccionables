@@ -1,0 +1,57 @@
+@if (movimientos().length === 0) {
+  <div class="empty">No hay movimientos con esos filtros.</div>
+} @else {
+  <div class="table-wrap">
+    <table class="kardex-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Sede</th>
+          <th>Producto</th>
+          <th>Movimiento</th>
+          <th>Cantidad</th>
+          <th>Disponible</th>
+          <th>Reservado</th>
+          <th>Motivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of movimientos(); track fila.id) {
+          <tr>
+            <td>{{ fila.fechaCreacion | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ fila.sedeNombre }}</td>
+            <td>
+              <strong>{{ fila.productoNombre }}</strong>
+              <code>{{ fila.codigoSku }}</code>
+            </td>
+            <td>
+              <span
+                class="mov"
+                [ngClass]="{
+                  'mov--tcg': esTcg(fila.tipoMovimiento),
+                  'mov--out': deltaDisponible(fila) < 0 || deltaReservado(fila) > 0,
+                  'mov--in': deltaDisponible(fila) > 0,
+                }"
+              >
+                {{ etiquetas[fila.tipoMovimiento] }}
+              </span>
+            </td>
+            <td>{{ fila.cantidad | number: '1.0-3' }}</td>
+            <td>
+              {{ fila.stockAnterior | number: '1.0-3' }}
+              → {{ fila.stockPosterior | number: '1.0-3' }}
+            </td>
+            <td>
+              {{ fila.reservadoAnterior | number: '1.0-3' }}
+              → {{ fila.reservadoPosterior | number: '1.0-3' }}
+            </td>
+            <td>
+              <span class="motivo">{{ fila.motivo }}</span>
+              <small>{{ fila.usuario }}</small>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

@@ -1,0 +1,58 @@
+<article class="card" [attr.data-origen]="origenDe(item().pedido.canalPedido)">
+  <header class="card__top">
+    <div class="card__badges">
+      <span class="codigo" title="N° de pedido">{{ item().pedido.codigo }}</span>
+      <span class="origen">{{ etiquetasOrigen[origenDe(item().pedido.canalPedido)] }}</span>
+    </div>
+    <span class="reserva" [attr.data-reserva]="reservaDe(item().pedido.estado)">
+      {{ reservaDe(item().pedido.estado) }}
+    </span>
+  </header>
+
+  <h3>{{ item().pedido.clienteNombre }}</h3>
+  <p class="card__meta">
+    {{ item().sedeNombre }}
+    @if (tiposEtiqueta(item().tiposProducto)) {
+      · {{ tiposEtiqueta(item().tiposProducto) }}
+    }
+  </p>
+  <p class="card__items">
+    {{ item().pedido.detalles.length }} ítem{{ item().pedido.detalles.length === 1 ? '' : 's' }}
+    @if (item().pedido.entrega.esRecojoTienda) {
+      · recojo en tienda
+    } @else if (item().pedido.entrega.distrito) {
+      · {{ item().pedido.entrega.distrito }}
+    }
+  </p>
+  <p class="card__total">
+    <span>Total</span>
+    <strong>{{ item().pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+  </p>
+
+  <footer>
+    <button type="button" class="link-btn" (click)="abrir.emit(item().pedido); $event.stopPropagation()">
+      Ver detalle
+    </button>
+    @if (puedeEntregarRapido(item().pedido)) {
+      <button
+        type="button"
+        class="entregar-btn"
+        (click)="entregar(item().pedido, $event)"
+        (pointerdown)="$event.stopPropagation()"
+      >
+        Entregar
+      </button>
+    }
+    @if (transicionesDe(item().pedido).length > 0) {
+      <label class="menu" (click)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()">
+        <span class="sr-only">Cambiar estado</span>
+        <select (change)="onMenu(item().pedido, $any($event.target).value); $any($event.target).value = ''">
+          <option value="">Mover a…</option>
+          @for (estado of transicionesDe(item().pedido); track estado) {
+            <option [value]="estado">{{ etiquetasEstado[estado] }}</option>
+          }
+        </select>
+      </label>
+    }
+  </footer>
+</article>

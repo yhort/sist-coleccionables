@@ -1,0 +1,43 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section class="dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <header class="dialog__header">
+    <div>
+      <h2>{{ proveedor() ? 'Editar proveedor' : 'Nuevo proveedor' }}</h2>
+      <p>RUC de 11 dígitos y razón social. Se vincula a los ingresos de stock en el kardex.</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label>
+        RUC
+        <input type="text" formControlName="ruc" maxlength="11" inputmode="numeric" />
+      </label>
+      <label>
+        Teléfono
+        <input type="tel" formControlName="telefono" maxlength="32" />
+      </label>
+      <label class="wide">
+        Razón social
+        <input type="text" formControlName="razonSocial" maxlength="200" />
+      </label>
+      <label class="wide">
+        Nombre comercial
+        <input type="text" formControlName="nombreComercial" maxlength="200" />
+      </label>
+      <label class="wide recojo">
+        <input type="checkbox" formControlName="activo" />
+        Proveedor activo
+      </label>
+    </div>
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </footer>
+  </form>
+</section>

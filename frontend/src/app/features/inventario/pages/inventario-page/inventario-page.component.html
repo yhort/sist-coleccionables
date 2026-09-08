@@ -1,0 +1,115 @@
+<section class="inventario">
+  <header class="inventario__header">
+    <div>
+      <h2>Inventario y Kardex TCG</h2>
+      <p>
+        Control de stock por sede, reservas de subastas/pedidos y libro inmutable de movimientos.
+      </p>
+    </div>
+    <div class="inventario__actions">
+      <div class="tabs" role="tablist" aria-label="Vistas de inventario">
+        <button
+          type="button"
+          role="tab"
+          [class.tabs__tab--active]="tab() === 'stock'"
+          [attr.aria-selected]="tab() === 'stock'"
+          (click)="irA('stock')"
+        >
+          Control de stock
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.tabs__tab--active]="tab() === 'kardex'"
+          [attr.aria-selected]="tab() === 'kardex'"
+          (click)="irA('kardex')"
+        >
+          Historial de kardex
+        </button>
+      </div>
+      <button type="button" class="inventario__add" (click)="abrirCompra()">Ingreso por compra</button>
+      <button type="button" class="inventario__add" (click)="abrirAjuste()">Nuevo ajuste</button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <p class="inventario__error">{{ error() }}</p>
+  }
+
+  @if (tab() === 'stock') {
+    <section class="toolbar" aria-label="Filtros de stock">
+      <label>
+        <span>Sede</span>
+        <select [ngModel]="sedeId()" (ngModelChange)="sedeId.set($event)">
+          @for (sede of sedes(); track sede.id) {
+            <option [value]="sede.id">{{ sede.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label class="toolbar__search">
+        <span>Buscar</span>
+        <input
+          type="search"
+          placeholder="Producto o SKU…"
+          [ngModel]="busquedaStock()"
+          (ngModelChange)="busquedaStock.set($event)"
+        />
+      </label>
+    </section>
+
+    <section class="kpis" [attr.aria-label]="'Resumen ' + sedeActual()">
+      <article>
+        <span>SKUs</span>
+        <strong>{{ resumen().skus }}</strong>
+      </article>
+      <article>
+        <span>Disponible</span>
+        <strong>{{ resumen().disponible | number: '1.0-3' }}</strong>
+      </article>
+      <article>
+        <span>Reservado</span>
+        <strong>{{ resumen().reservado | number: '1.0-3' }}</strong>
+      </article>
+      <article>
+        <span>Stock libre</span>
+        <strong>{{ resumen().libre | number: '1.0-3' }}</strong>
+      </article>
+    </section>
+
+    <app-stock-sede-table
+      [filas]="filasStock()"
+      [page]="pagina()"
+      [pageSize]="pageSize()"
+      [total]="totalStock()"
+      (ajustar)="abrirAjuste($event)"
+      (pageChange)="cambiarPagina($event)"
+      (pageSizeChange)="cambiarTamano($event)"
+    />
+  } @else {
+    <app-kardex-filters
+      [(filtros)]="filtrosKardex"
+      [sedes]="sedes()"
+      [productos]="productos()"
+    />
+    <app-kardex-historial [movimientos]="movimientos()" />
+  }
+</section>
+
+@if (ajusteAbierto()) {
+  <app-ajuste-stock-dialog
+    [sedes]="sedes()"
+    [productos]="productosActivos()"
+    [stockInicial]="stockAjuste()"
+    (saved)="cerrarAjuste()"
+    (cancelled)="cerrarAjuste()"
+  />
+}
+
+@if (compraAbierta()) {
+  <app-ingreso-compra-dialog
+    [sedes]="sedes()"
+    [productos]="productosActivos()"
+    (saved)="cerrarCompra()"
+    (cancelled)="cerrarCompra()"
+  />
+}

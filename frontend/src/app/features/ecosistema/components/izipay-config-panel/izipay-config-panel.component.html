@@ -1,0 +1,79 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Pasarela Izipay (IPN)</h3>
+      <p>
+        QR estático de Yape, Plin y tarjetas. Izipay avisará a esta URL; los pagos válidos entran
+        como Notificado para asociarlos a mano.
+      </p>
+    </div>
+    @if (api.config(); as config) {
+      <span class="status" [attr.data-activa]="config.activa">
+        <i></i>
+        {{ config.activa ? 'Activo' : 'Inactivo' }} · {{ config.modo }}
+      </span>
+    }
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <label>
+      Shop ID
+      <input
+        type="text"
+        formControlName="shopId"
+        autocomplete="off"
+        maxlength="32"
+        placeholder="12345678"
+      />
+    </label>
+    <label>
+      Clave HMAC-SHA-256
+      <input
+        type="password"
+        formControlName="hmacSha256Clave"
+        autocomplete="new-password"
+        [placeholder]="
+          api.config()?.tieneHmac
+            ? 'Dejar vacío para conservar la clave guardada'
+            : 'Clave HMAC-SHA-256 del Back Office'
+        "
+      />
+    </label>
+    <label>
+      Modo
+      <select formControlName="modo">
+        @for (modo of modos; track modo.valor) {
+          <option [value]="modo.valor">{{ modo.etiqueta }}</option>
+        }
+      </select>
+    </label>
+    <label class="check">
+      <input type="checkbox" formControlName="activa" />
+      Activo
+    </label>
+    <label class="wide">
+      URL de notificación IPN
+      <span class="url-row">
+        <input type="text" [value]="urlIpn()" readonly />
+        <button type="button" class="ghost" (click)="copiarUrl()">
+          {{ copiado() ? 'Copiada' : 'Copiar URL' }}
+        </button>
+      </span>
+      <small>
+        Pégala en el Back Office de Izipay. En producción debe ser HTTPS público.
+      </small>
+    </label>
+    <div class="actions">
+      <button type="submit" class="primary" [disabled]="cargando()">
+        Guardar configuración Izipay
+      </button>
+    </div>
+  </form>
+
+  @if (error()) {
+    <p class="banner banner--error">{{ error() }}</p>
+  }
+  @if (aviso()) {
+    <p class="banner banner--ok">{{ aviso() }}</p>
+  }
+</section>

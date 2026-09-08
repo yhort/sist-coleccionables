@@ -1,0 +1,52 @@
+<section class="filters" aria-label="Filtros de pagos">
+  <label>
+    <span>Origen</span>
+    <select [ngModel]="filtros().origen" (ngModelChange)="actualizar('origen', $event)">
+      <option value="TODOS">Todos</option>
+      @for (origen of origenes; track origen) {
+        <option [value]="origen">{{ etiquetasOrigen[origen] }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    <span>Estado</span>
+    <select [ngModel]="filtros().estado" (ngModelChange)="actualizar('estado', $event)">
+      <option value="TODOS">Todos</option>
+      @for (estado of estados; track estado) {
+        <option [value]="estado">{{ etiquetasEstado[estado] }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    <span>Monto mín.</span>
+    <input
+      type="number"
+      min="0"
+      step="0.01"
+      placeholder="0.00"
+      [ngModel]="filtros().montoMin"
+      (ngModelChange)="actualizarMonto('montoMin', $event)"
+    />
+  </label>
+  <label>
+    <span>Monto máx.</span>
+    <input
+      type="number"
+      min="0"
+      step="0.01"
+      placeholder="—"
+      [ngModel]="filtros().montoMax"
+      (ngModelChange)="actualizarMonto('montoMax', $event)"
+    />
+  </label>
+  <label class="filters__search">
+    <span>Operación o cliente</span>
+    <input
+      type="search"
+      placeholder="Código de operación o cliente…"
+      [ngModel]="filtros().busqueda"
+      (ngModelChange)="actualizar('busqueda', $event)"
+    />
+  </label>
+  <button type="button" class="filters__clear" (click)="cleared.emit()">Limpiar</button>
+</section>

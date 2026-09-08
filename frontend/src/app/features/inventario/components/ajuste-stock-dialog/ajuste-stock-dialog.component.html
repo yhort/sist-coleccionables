@@ -1,0 +1,100 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="ajuste-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="ajuste-title">Ajuste manual de inventario</h2>
+      <p>
+        Entrada o salida con justificación. Puedes ajustar cualquier SKU activo, aunque aún no tenga
+        movimientos previos.
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label>
+        Sede
+        <select formControlName="sedeId">
+          <option value="">Seleccionar sede</option>
+          @for (sede of sedes(); track sede.id) {
+            <option [value]="sede.id">{{ sede.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Buscar producto
+        <input
+          type="search"
+          [ngModel]="busquedaProducto()"
+          (ngModelChange)="busquedaProducto.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+          placeholder="Nombre o SKU"
+        />
+      </label>
+      <label class="wide">
+        Producto
+        <select formControlName="productoId">
+          <option value="">Seleccionar producto</option>
+          @for (producto of opcionesProducto(); track producto.id) {
+            <option [value]="producto.id">{{ producto.nombre }} ({{ producto.codigoSku }})</option>
+          }
+        </select>
+      </label>
+
+      <fieldset class="sentido">
+        <legend>Sentido</legend>
+        <label>
+          <input type="radio" formControlName="sentido" value="ENTRADA" />
+          Entrada
+        </label>
+        <label>
+          <input type="radio" formControlName="sentido" value="SALIDA" />
+          Salida
+        </label>
+      </fieldset>
+
+      <label>
+        Cantidad
+        <input type="number" min="0.001" step="1" formControlName="cantidad" />
+      </label>
+      <label class="wide">
+        Motivo / justificación
+        <textarea
+          formControlName="motivo"
+          rows="3"
+          maxlength="500"
+          placeholder="Ej. stock inicial, conteo físico, merma…"
+        ></textarea>
+      </label>
+    </div>
+
+    <p class="hint">{{ etiquetaEfecto }} · tipo {{ etiquetas.AJUSTE }}</p>
+
+    @if (stockActual(); as stock) {
+      <p class="hint">
+        Stock actual: disponible {{ stock.cantidadDisponible | number: '1.0-3' }} · reservado
+        {{ stock.cantidadReservada | number: '1.0-3' }} · libre
+        {{ stock.cantidadLibre | number: '1.0-3' }}
+      </p>
+    }
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Registrar movimiento</button>
+    </footer>
+  </form>
+</section>

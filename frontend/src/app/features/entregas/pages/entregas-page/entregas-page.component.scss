@@ -1,0 +1,38 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.entregas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-width: 1440px;
+  margin: 0 auto;
+
+  &__header {
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    p {
+      margin: 0.3rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@media print {
+  .entregas {
+    display: none;
+  }
+}

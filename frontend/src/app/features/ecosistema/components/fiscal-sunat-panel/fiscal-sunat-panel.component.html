@@ -1,0 +1,365 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Configuración fiscal y parámetros SUNAT</h3>
+      <p>Datos de empresa, series y boleta consolidada de notas de venta del día.</p>
+    </div>
+    <button type="button" class="primary" (click)="simular.emit()">Emitir comprobante</button>
+  </header>
+
+  <div class="subtabs" role="tablist" aria-label="Vistas fiscales">
+    <button
+      type="button"
+      role="tab"
+      [class.subtabs__tab--active]="vista() === 'config'"
+      (click)="vista.set('config')"
+    >
+      Ficha y series
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.subtabs__tab--active]="vista() === 'notas'"
+      (click)="mostrarNotas()"
+    >
+      Notas de venta pendientes de consolidar
+      @if (api.notasPendientes().length > 0) {
+        <span class="badge">{{ api.notasPendientes().length }}</span>
+      }
+    </button>
+  </div>
+
+  @if (vista() === 'config') {
+    <form class="ficha" [formGroup]="fiscalForm" (ngSubmit)="guardarFiscal()">
+      <label>
+        RUC
+        <input type="text" formControlName="ruc" maxlength="11" inputmode="numeric" />
+      </label>
+      <label>
+        Razón social
+        <input type="text" formControlName="razonSocial" maxlength="200" />
+      </label>
+      <label>
+        Nombre comercial
+        <input type="text" formControlName="nombreComercial" maxlength="120" />
+      </label>
+      <label class="wide">
+        Dirección fiscal
+        <input type="text" formControlName="direccionFiscal" maxlength="300" />
+      </label>
+      <label>
+        UBIGEO
+        <input type="text" formControlName="ubigeo" maxlength="6" inputmode="numeric" />
+      </label>
+      <label>
+        Departamento
+        <input type="text" formControlName="departamento" />
+      </label>
+      <label>
+        Provincia
+        <input type="text" formControlName="provincia" />
+      </label>
+      <label>
+        Distrito
+        <input type="text" formControlName="distrito" />
+      </label>
+      <div class="actions">
+        <button type="submit" class="primary">Guardar ficha fiscal</button>
+      </div>
+    </form>
+
+    <h4>Series y correlativos</h4>
+    <form class="series-form" [formGroup]="seriesForm" (ngSubmit)="guardarSeries()">
+      <div class="series">
+        @for (tipo of tipos; track tipo) {
+          <article [formGroupName]="tipo" class="serie-card">
+            <h5 class="serie-card__title">{{ etiquetas[tipo] }}</h5>
+            <div class="serie-card__meta">
+              <span class="serie-card__code">SUNAT {{ codigos[tipo] }}</span>
+              <label class="check">
+                <input type="checkbox" formControlName="activa" />
+                Activa
+              </label>
+            </div>
+            <div class="serie-card__fields">
+              <label>
+                Serie
+                <input type="text" formControlName="serie" maxlength="4" autocomplete="off" />
+              </label>
+              <label>
+                Correlativo
+                <input type="number" min="1" step="1" formControlName="correlativo" />
+              </label>
+            </div>
+          </article>
+        }
+      </div>
+      <div class="actions">
+        <button type="submit" class="ghost">Guardar series</button>
+      </div>
+    </form>
+  } @else {
+    <section class="consolidar">
+      <p class="hint">
+        Agrupa notas de venta internas del día en una boleta electrónica. Si SUNAT Beta acepta, las
+        notas pasan a <strong>Facturada / Consolidada</strong> para no duplicar la emisión.
+      </p>
+
+      <div class="consolidar__filtros">
+        <label>
+          Fecha (hora Perú)
+          <input
+            type="date"
+            [value]="fecha()"
+            (change)="fecha.set($any($event.target).value); cargarNotas()"
+          />
+        </label>
+        <fieldset>
+          <legend>Filtro de consolidación</legend>
+          <label class="check">
+            <input
+              type="radio"
+              name="filtro-consolidada"
+              [checked]="filtro() === 'VENTAS_MENORES'"
+              (change)="cambiarFiltro('VENTAS_MENORES')"
+            />
+            {{ etiquetasFiltro.VENTAS_MENORES }}
+          </label>
+          <label class="check">
+            <input
+              type="radio"
+              name="filtro-consolidada"
+              [checked]="filtro() === 'SELECCION_GENERAL'"
+              (change)="cambiarFiltro('SELECCION_GENERAL')"
+            />
+            {{ etiquetasFiltro.SELECCION_GENERAL }}
+          </label>
+        </fieldset>
+      </div>
+
+      @if (notasVisibles().length === 0) {
+        <p class="hint">
+          @if (filtro() === 'VENTAS_MENORES') {
+            No hay notas de venta del día menores a S/ 5.00 pendientes.
+          } @else {
+            No hay notas de venta pendientes de consolidar en esa fecha.
+          }
+        </p>
+      } @else {
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>
+                @if (filtro() === 'SELECCION_GENERAL') {
+                  Sel.
+                }
+              </th>
+              <th>Nota</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (nota of notasVisibles(); track nota.id) {
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    [checked]="estaSeleccionada(nota)"
+                    [disabled]="filtro() === 'VENTAS_MENORES'"
+                    (change)="toggleNota(nota.id)"
+                  />
+                </td>
+                <td>
+                  <code>{{ nota.serie }}-{{ nota.correlativo.toString().padStart(8, '0') }}</code>
+                  @if (nota.esVentaMenor) {
+                    <span class="pill">Menor a S/ 5</span>
+                  }
+                </td>
+                <td>{{ nota.clienteNombre || 'Sin cliente' }}</td>
+                <td>{{ nota.fechaEmision | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ nota.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+
+      <div class="consolidar__resumen">
+        <p>
+          {{ idsAConsolidar().length }} notas ·
+          {{ totalSeleccionado() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        </p>
+        <button
+          type="button"
+          class="primary"
+          [disabled]="generando() || idsAConsolidar().length === 0"
+          (click)="generarConsolidada()"
+        >
+          {{ generando() ? 'Generando…' : 'Generar boleta consolidada' }}
+        </button>
+      </div>
+    </section>
+  }
+
+  @if (error()) {
+    <p class="banner banner--error">{{ error() }}</p>
+  }
+  @if (aviso()) {
+    <p class="banner banner--ok">{{ aviso() }}</p>
+  }
+
+  @if (vista() === 'config') {
+    <section class="comprobantes" aria-label="Comprobantes emitidos">
+      <div class="comprobantes__head">
+        <div>
+          <h4>Comprobantes emitidos</h4>
+          <p>Historial SUNAT con correlativo, cliente y archivos XML / CDR / PDF.</p>
+        </div>
+      </div>
+
+      <section class="toolbar" aria-label="Filtros de comprobantes">
+        <label class="toolbar__search">
+          <span>Buscar</span>
+          <input
+            type="search"
+            placeholder="Correlativo o cliente…"
+            [ngModel]="busquedaComprobantes()"
+            (ngModelChange)="actualizarBusqueda($event)"
+          />
+        </label>
+        <label>
+          <span>Tipo de comprobante</span>
+          <select [ngModel]="tipoFiltro()" (ngModelChange)="actualizarTipo($event)">
+            <option value="TODOS">Todos</option>
+            @for (tipo of tipos; track tipo) {
+              <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span>Estado SUNAT</span>
+          <select [ngModel]="estadoFiltro()" (ngModelChange)="actualizarEstado($event)">
+            <option value="TODOS">Todos</option>
+            @for (estado of estadosEmision; track estado) {
+              <option [value]="estado">{{ etiquetasEstado[estado] }}</option>
+            }
+          </select>
+        </label>
+        <button type="button" class="ghost" (click)="limpiarFiltrosComprobantes()">Limpiar</button>
+      </section>
+
+      @if (emisionesFiltradas().length === 0) {
+        <div class="empty">
+          @if (api.emisiones().length === 0) {
+            Aún no hay comprobantes emitidos.
+          } @else {
+            No hay comprobantes con esos filtros.
+          }
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="comprobantes-table">
+            <thead>
+              <tr>
+                <th>Fecha / hora</th>
+                <th>Tipo</th>
+                <th>Serie - Número</th>
+                <th>Cliente</th>
+                <th>Monto total</th>
+                <th>Estado SUNAT</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (emision of emisionesPagina(); track emision.id) {
+                <tr>
+                  <td>
+                    <strong>{{ emision.fecha | date: 'dd/MM/yyyy' }}</strong>
+                    <small>{{ emision.fecha | date: 'HH:mm' }}</small>
+                  </td>
+                  <td>
+                    <span class="tipo" [attr.data-tipo]="emision.tipo">{{ etiquetas[emision.tipo] }}</span>
+                  </td>
+                  <td>
+                    <code>{{ numeroDe(emision) }}</code>
+                  </td>
+                  <td>
+                    <strong>{{ emision.clienteNombre || 'Sin cliente' }}</strong>
+                  </td>
+                  <td class="monto">{{ emision.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  <td>
+                    <span class="estado" [attr.data-estado]="emision.estado">
+                      {{ etiquetasEstado[emision.estado] }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="btn-group" role="group" aria-label="Archivos del comprobante">
+                      <button
+                        type="button"
+                        [disabled]="!puedeXml(emision)"
+                        (click)="descargarXml(emision)"
+                      >
+                        XML
+                      </button>
+                      <button
+                        type="button"
+                        [disabled]="!puedeCdr(emision)"
+                        (click)="descargarCdr(emision)"
+                      >
+                        CDR
+                      </button>
+                      <button
+                        type="button"
+                        [disabled]="!puedePdf(emision)"
+                        (click)="abrirPdf(emision, 'a4')"
+                      >
+                        PDF
+                      </button>
+                      <button
+                        type="button"
+                        [disabled]="!puedePdf(emision)"
+                        (click)="abrirPdf(emision, 'ticket')"
+                      >
+                        Ticket
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager" aria-label="Paginación de comprobantes">
+          <label>
+            <span>Por página</span>
+            <select [ngModel]="pageSize()" (ngModelChange)="cambiarTamano($event)">
+              @for (tamano of tamanosPagina; track tamano) {
+                <option [ngValue]="tamano">{{ tamano }}</option>
+              }
+            </select>
+          </label>
+          <p>
+            {{ rangoPagina().desde }}–{{ rangoPagina().hasta }} de {{ rangoPagina().total }}
+          </p>
+          <div class="pager__nav">
+            <button type="button" class="ghost" [disabled]="paginaActual() <= 1" (click)="paginaAnterior()">
+              Anterior
+            </button>
+            <span>Pág. {{ paginaActual() }} / {{ totalPaginas() }}</span>
+            <button
+              type="button"
+              class="ghost"
+              [disabled]="paginaActual() >= totalPaginas()"
+              (click)="paginaSiguiente()"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+  }
+</section>

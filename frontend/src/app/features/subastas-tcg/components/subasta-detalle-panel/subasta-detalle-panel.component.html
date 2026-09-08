@@ -1,0 +1,217 @@
+@if (modo() === 'panel') {
+  <div class="backdrop" (click)="closed.emit()"></div>
+}
+
+@if (subasta(); as subasta) {
+  <aside
+    class="panel"
+    [class.panel--pagina]="modo() === 'pagina'"
+    role="dialog"
+    [attr.aria-modal]="modo() === 'panel'"
+    aria-labelledby="subasta-detalle-title"
+  >
+    <header class="panel__header">
+      <div>
+        <p class="eyebrow">
+          <span class="estado" [ngClass]="'estado--' + subasta.estado.toLowerCase()">
+            {{ etiquetasEstado[subasta.estado] }}
+          </span>
+          @if (pendienteCierre()) {
+            <span class="estado estado--pendiente">Subasta finalizada / Pendiente de cierre</span>
+          }
+          {{ etiquetasCanal[subasta.canal] }}
+          · {{ subasta.codigo }}
+        </p>
+        <h2 id="subasta-detalle-title">{{ subasta.titulo }}</h2>
+        <p>{{ etiquetaLote() }} · {{ sedeNombre() }}</p>
+      </div>
+      @if (modo() === 'panel') {
+        <button type="button" class="panel__close" aria-label="Cerrar" (click)="closed.emit()">
+          ×
+        </button>
+      }
+    </header>
+
+    <section class="sala" aria-label="Sala de puja">
+      <div class="cronometro" [class.cronometro--urgente]="cronometro().totalMs > 0 && cronometro().totalMs < 300000" [class.cronometro--vencido]="cronometro().vencida">
+        <span>Cuenta regresiva</span>
+        <strong>{{ cronometro().texto }}</strong>
+      </div>
+      <div class="lider">
+        <span>{{ etiquetaOferta() }}</span>
+        @if (lider(); as lider) {
+          <strong>{{ lider.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <small>{{ lider.nombrePostor }}</small>
+        } @else {
+          <strong>{{ subasta.precioBase | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <small>Sin pujas · precio base</small>
+        }
+      </div>
+    </section>
+
+    <section class="lote" aria-label="Productos del lote">
+      <h3>Lote / Combo</h3>
+      <ul>
+        @for (linea of detalles(); track linea.id || linea.productoId) {
+          <li>
+            <div>
+              <strong>{{ linea.productoNombre }}</strong>
+              <small>{{ linea.codigoSku }} · {{ etiquetasTipo[linea.tipoProducto] }}</small>
+            </div>
+            <span>× {{ linea.cantidad }}</span>
+          </li>
+        }
+      </ul>
+      <p class="lote__meta">
+        {{ unidades() }} ud{{ unidades() === 1 ? '' : 's' }}
+        · lotes libres estimados: <strong>{{ stockLibreLote() }}</strong>
+      </p>
+    </section>
+
+    <app-subasta-margen-card
+      [margen]="margen()"
+      [etiquetaOferta]="etiquetaOferta()"
+      [compacto]="true"
+    />
+
+    <section class="hint">
+      <p>
+        Incremento mínimo
+        {{ subasta.incrementoMinimo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        @if (subasta.precioReserva !== null) {
+          · Reserva {{ subasta.precioReserva | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        }
+      </p>
+      <p>
+        Cierre programado {{ subasta.fechaCierre | date: 'dd/MM/yyyy HH:mm' }}
+        @if (subasta.fechaCierreReal) {
+          · cerrada {{ subasta.fechaCierreReal | date: 'dd/MM/yyyy HH:mm' }}
+        }
+      </p>
+      <p>
+        Al adjudicar se congela el lote con
+        <strong>{{ movimientoReserva }}</strong>
+        y se crea el pedido en Pendiente de pago.
+      </p>
+    </section>
+
+    @if (pedido(); as pedido) {
+      <p class="pedido">
+        Pedido <code>{{ pedido.codigo }}</code>
+        · {{ etiquetasPedido[pedido.estado] }}
+        · {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        <a routerLink="/app/pedidos-digitales">Ver Kanban</a>
+      </p>
+    }
+
+    @if (pendienteCierre()) {
+      <section class="aviso-finalizada" role="status">
+        <p class="aviso-finalizada__titulo">Subasta finalizada / Pendiente de cierre</p>
+        <p>
+          La fecha de cierre ya pasó. No se aceptan más pujas. El cierre automático
+          pasará esta ficha a Cerrada en menos de un minuto.
+        </p>
+      </section>
+    }
+
+    @if (aceptaPujas()) {
+      <form class="puja-form" (ngSubmit)="registrarPuja()">
+        <h3>Puja rápida</h3>
+        <div class="puja-form__rapida">
+          <button type="button" class="ghost" (click)="pujarRapido(1)">Mínimo</button>
+          <button type="button" class="ghost" (click)="pujarRapido(2)">+1 inc</button>
+          <button type="button" class="ghost" (click)="pujarRapido(3)">+2 inc</button>
+        </div>
+        <label>
+          Cliente / alias
+          <input
+            type="text"
+            maxlength="160"
+            [ngModel]="nombrePostor()"
+            (ngModelChange)="nombrePostor.set($event)"
+            name="nombrePostor"
+            placeholder="Alias Facebook o nombre en evento"
+          />
+        </label>
+        <label>
+          Monto (mín. {{ minimoSiguiente() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }})
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            [ngModel]="monto()"
+            (ngModelChange)="monto.set($event)"
+            name="monto"
+          />
+        </label>
+        <button type="submit" class="primary">Registrar puja</button>
+      </form>
+    }
+
+    <section class="historial" aria-label="Historial de pujas">
+      <h3>Historial de pujas</h3>
+      @if (pujas().length === 0) {
+        <p class="empty">Aún no hay pujas. El libro queda vacío hasta el primer registro.</p>
+      } @else {
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Monto</th>
+              <th>Fecha / hora</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (puja of pujas(); track puja.id) {
+              <tr [class.historial__win]="puja.esGanadora">
+                <td>
+                  <strong>{{ puja.nombrePostor }}</strong>
+                  @if (puja.esGanadora) {
+                    <small>Ganadora</small>
+                  }
+                </td>
+                <td>{{ puja.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                <td>{{ puja.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="panel__actions">
+      @if (subasta.estado === 'BORRADOR') {
+        <button type="button" class="primary" (click)="activar()">Activar</button>
+      }
+      @if (subasta.estado === 'ACTIVA') {
+        <button type="button" class="ghost" (click)="cerrar()">Cerrar</button>
+      }
+      @if (puedeAdjudicar()) {
+        <button type="button" class="primary" (click)="abrirCheckout()">Adjudicar / Checkout</button>
+      }
+      @if (subasta.estado !== 'CANCELADA') {
+        <button type="button" class="ghost ghost--danger" (click)="cancelar()">Cancelar</button>
+      }
+      @if (modo() === 'panel') {
+        <a class="link-btn" [routerLink]="['/app/subastas-tcg', subasta.id]">Abrir sala</a>
+      }
+    </footer>
+  </aside>
+
+  @if (checkoutAbierto()) {
+    <app-adjudicar-checkout-dialog
+      [subasta]="subasta"
+      (confirmed)="onCheckoutConfirmado()"
+      (cancelled)="checkoutAbierto.set(false)"
+    />
+  }
+} @else {
+  <aside class="panel" [class.panel--pagina]="modo() === 'pagina'">
+    <p class="empty">No se encontró la subasta.</p>
+    <a class="link-btn" routerLink="/app/subastas-tcg">Volver al tablero</a>
+  </aside>
+}

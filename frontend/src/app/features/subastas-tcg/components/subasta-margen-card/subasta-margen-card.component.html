@@ -1,0 +1,36 @@
+<section class="margen" [class.margen--compact]="compacto()" aria-label="Margen de la subasta">
+  <article>
+    <span>Precio base</span>
+    <strong>{{ margen().precioBase | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+  </article>
+  <article>
+    <span>{{ etiquetaOferta() }}</span>
+    <strong>
+      @if (margen().ofertaReferencia === null) {
+        —
+      } @else {
+        {{ margen().ofertaReferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+      }
+    </strong>
+  </article>
+  <article>
+    <span>Diferencia</span>
+    <strong [ngClass]="'margen__delta--' + signo(margen().diferencia)">
+      @if (margen().diferencia === null) {
+        —
+      } @else {
+        {{ margen().diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+      }
+    </strong>
+  </article>
+  <article>
+    <span>Margen</span>
+    <strong [ngClass]="'margen__delta--' + signo(margen().diferencia)">
+      @if (margen().porcentaje === null) {
+        —
+      } @else {
+        {{ margen().porcentaje | number: '1.1-1' }}%
+      }
+    </strong>
+  </article>
+</section>

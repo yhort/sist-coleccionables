@@ -1,0 +1,55 @@
+<div class="table-shell">
+  @if (filas().length === 0) {
+    <div class="empty">No hay stock en esta sede con esos filtros.</div>
+  } @else {
+    <div class="table-wrap">
+      <table class="stock-table">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>SKU</th>
+            <th>Tipo</th>
+            <th>Disponible</th>
+            <th>Reservado (subastas / pedidos)</th>
+            <th>Stock libre</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of filas(); track fila.id) {
+            <tr>
+              <td>
+                <strong>{{ fila.productoNombre }}</strong>
+              </td>
+              <td>
+                <code>{{ fila.codigoSku }}</code>
+              </td>
+              <td>
+                <span class="tipo" [attr.data-tipo]="fila.tipoProducto">
+                  {{ etiquetasTipo[fila.tipoProducto] }}
+                </span>
+              </td>
+              <td>{{ fila.cantidadDisponible | number: '1.0-3' }}</td>
+              <td>{{ fila.cantidadReservada | number: '1.0-3' }}</td>
+              <td>
+                <span class="libre" [ngClass]="'libre--' + estadoLibre(fila)">
+                  {{ fila.cantidadLibre | number: '1.0-3' }}
+                </span>
+              </td>
+              <td>
+                <button type="button" class="link-btn" (click)="ajustar.emit(fila)">Ajustar</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  <app-tabla-paginacion
+    [page]="page()"
+    [pageSize]="pageSize()"
+    [total]="total()"
+    (pageChange)="pageChange.emit($event)"
+    (pageSizeChange)="pageSizeChange.emit($event)"
+  />
+</div>

@@ -1,0 +1,162 @@
+<div class="dialog-backdrop" (click)="!enviando() && cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="checkout-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="checkout-title">Checkout del ganador</h2>
+      <p>
+        Se reserva el lote y se crea el pedido en <strong>Pendiente de pago</strong>. El cobro se
+        concilia después en Pagos.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="dialog__close"
+      aria-label="Cerrar"
+      [disabled]="enviando()"
+      (click)="cancelled.emit()"
+    >
+      ×
+    </button>
+  </header>
+
+  <div class="dialog__resumen">
+    <p>
+      <span>Lote</span>
+      <strong>{{ lote() }}</strong>
+    </p>
+    <p>
+      <span>Unidades</span>
+      <strong>{{ unidades() }}</strong>
+    </p>
+    @if (ganadora(); as ganadora) {
+      <p>
+        <span>Ganador</span>
+        <strong>{{ ganadora.nombrePostor }}</strong>
+      </p>
+      <p>
+        <span>Monto</span>
+        <strong>{{ ganadora.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      </p>
+    }
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="confirmar()">
+    <div class="dialog__grid">
+      <fieldset class="wide">
+        <legend>Método de pago local</legend>
+        <div class="chips">
+          @for (origen of origenes; track origen) {
+            <label class="chip" [class.chip--on]="form.controls.origenPagoPreferido.value === origen">
+              <input type="radio" formControlName="origenPagoPreferido" [value]="origen" />
+              {{ etiquetasOrigen[origen] }}
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <fieldset class="wide">
+        <legend>Método de entrega</legend>
+        <div class="chips">
+          @for (metodo of metodos; track metodo) {
+            <label class="chip" [class.chip--on]="form.controls.metodoEnvio.value === metodo">
+              <input type="radio" formControlName="metodoEnvio" [value]="metodo" />
+              {{ etiquetasMetodo[metodo] }}
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <label class="wide">
+        Destinatario
+        <input type="text" formControlName="destinatarioNombre" maxlength="160" />
+      </label>
+      <label>
+        Teléfono
+        <input type="text" formControlName="destinatarioTelefono" maxlength="32" />
+      </label>
+      <label>
+        Canal de contacto
+        <select formControlName="canalContacto">
+          <option value="">Sin preferencia</option>
+          @for (canal of canalesContacto; track canal) {
+            <option [value]="canal">{{ etiquetasCanalContacto[canal] }}</option>
+          }
+        </select>
+      </label>
+      <label class="wide">
+        Punto de entrega
+        <input
+          type="text"
+          formControlName="puntoEntrega"
+          maxlength="80"
+          list="puntos-entrega-checkout"
+          placeholder="Papurris, Dapkris, TCG House…"
+        />
+        <datalist id="puntos-entrega-checkout">
+          @for (punto of puntosSugeridos; track punto) {
+            <option [value]="punto"></option>
+          }
+        </datalist>
+      </label>
+      <label class="wide">
+        Contacto de referencia
+        <input
+          type="text"
+          formControlName="contactoReferencia"
+          maxlength="160"
+          placeholder="Persona autorizada a recoger / contacto alternativo"
+        />
+      </label>
+
+      @if (metodoEnvio() !== 'RECOJO_TIENDA') {
+        <label class="wide">
+          Dirección
+          <input type="text" formControlName="entregaDireccion" maxlength="300" />
+        </label>
+        <label>
+          Distrito
+          <input type="text" formControlName="entregaDistrito" maxlength="80" />
+        </label>
+        <label>
+          Provincia
+          <input type="text" formControlName="entregaProvincia" maxlength="80" />
+        </label>
+        <label>
+          Departamento
+          <input type="text" formControlName="entregaDepartamento" maxlength="80" />
+        </label>
+        <label>
+          Agencia / referencia
+          <input type="text" formControlName="agencia" maxlength="80" />
+        </label>
+      }
+
+      @if (tieneCliente()) {
+        <label class="wide recojo">
+          <input type="checkbox" formControlName="guardarPuntoEnCliente" />
+          Guardar como nuevo punto predeterminado en el perfil del cliente
+        </label>
+      }
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" [disabled]="enviando()" (click)="cancelled.emit()">
+        Cancelar
+      </button>
+      <button type="submit" class="primary" [disabled]="enviando()">
+        {{ enviando() ? 'Adjudicando…' : 'Adjudicar y crear pedido' }}
+      </button>
+    </footer>
+  </form>
+</section>

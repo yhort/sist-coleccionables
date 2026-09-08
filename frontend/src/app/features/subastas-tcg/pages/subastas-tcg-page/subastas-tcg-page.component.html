@@ -1,0 +1,92 @@
+<section class="subastas">
+  <header class="subastas__header">
+    <div>
+      <h2>Subastas TCG</h2>
+      <p>
+        Tablero por estado, pujas inmutables y adjudicación con reserva de stock y pedido en
+        Pendiente de pago.
+      </p>
+    </div>
+    <button type="button" class="subastas__add" (click)="formAbierta.set(true)">Nueva subasta</button>
+  </header>
+
+  <app-subasta-margen-card
+    [margen]="margenResumen()"
+    etiquetaOferta="Oferta final ganadora (acumulado)"
+  />
+
+  <section class="kpis" aria-label="Resumen de subastas">
+    <article>
+      <span>Subastas</span>
+      <strong>{{ resumen().total }}</strong>
+    </article>
+    <article>
+      <span>Activas</span>
+      <strong>{{ resumen().activas }}</strong>
+    </article>
+    <article>
+      <span>Adjudicadas</span>
+      <strong>{{ resumen().adjudicadas }}</strong>
+    </article>
+    <article>
+      <span>Pujas registradas</span>
+      <strong>{{ resumen().pujas }}</strong>
+    </article>
+  </section>
+
+  <section class="toolbar" aria-label="Filtros de subastas">
+    <label>
+      <span>Canal</span>
+      <select [ngModel]="filtros().canal" (ngModelChange)="actualizarFiltro('canal', $event)">
+        <option value="TODOS">Todos</option>
+        @for (canal of canales; track canal) {
+          <option [value]="canal">{{ etiquetasCanal[canal] }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Categoría de producto</span>
+      <select
+        [ngModel]="filtros().tipoProducto"
+        (ngModelChange)="actualizarFiltro('tipoProducto', $event)"
+      >
+        <option value="TODOS">Todas</option>
+        @for (tipo of tiposProducto; track tipo) {
+          <option [value]="tipo">{{ etiquetasTipo[tipo] }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Sede</span>
+      <select [ngModel]="filtros().sedeId" (ngModelChange)="actualizarFiltro('sedeId', $event)">
+        <option value="TODAS">Todas</option>
+        @for (sede of sedes(); track sede.id) {
+          <option [value]="sede.id">{{ sede.nombre }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" class="toolbar__clear" (click)="limpiarFiltros()">Limpiar</button>
+  </section>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <app-subastas-tablero [items]="items()" (ver)="abrirDetalle($event)" (pujar)="abrirPuja($event)" />
+</section>
+
+@if (seleccionadaId(); as id) {
+  <app-subasta-detalle-panel [subastaId]="id" modo="panel" (closed)="cerrarDetalle()" />
+}
+
+@if (pujaSubasta(); as subasta) {
+  <app-registrar-puja-dialog
+    [subasta]="subasta"
+    (saved)="onPujaGuardada()"
+    (cancelled)="cerrarPuja()"
+  />
+}
+
+@if (formAbierta()) {
+  <app-subasta-form-dialog (saved)="formAbierta.set(false)" (cancelled)="formAbierta.set(false)" />
+}

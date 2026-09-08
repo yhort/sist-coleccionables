@@ -1,0 +1,191 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="caja-arqueo-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="caja-arqueo-title">Arqueo diario</h2>
+      <p>Desglose del turno, conteo físico y diferencia en tiempo real.</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  @if (cargando()) {
+    <p class="hint">Cargando resumen del turno…</p>
+  } @else if (resumen(); as data) {
+    <div class="dialog__body">
+      <section class="kpis" aria-label="Resumen de efectivo">
+        <article>
+          <span>Apertura</span>
+          <strong>{{ data.efectivo.montoApertura | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+        </article>
+        <article>
+          <span>Ventas en efectivo</span>
+          <strong>{{ data.efectivo.ventasEfectivo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+        </article>
+        <article>
+          <span>Ingresos − egresos</span>
+          <strong>
+            {{
+              data.efectivo.ingresos - data.efectivo.egresos
+                | currency: 'PEN' : 'symbol-narrow' : '1.2-2'
+            }}
+          </strong>
+        </article>
+        <article>
+          <span>Efectivo teórico</span>
+          <strong>{{ teorico() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+        </article>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h3>Medios de pago</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Medio</th>
+                  <th>Ops.</th>
+                  <th>Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (fila of data.mediosPago; track fila.grupo) {
+                  <tr>
+                    <td>{{ fila.etiqueta }}</td>
+                    <td>{{ fila.cantidad }}</td>
+                    <td>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3>Documentos</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Cant.</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (fila of data.documentos; track fila.tipo) {
+                  <tr>
+                    <td>{{ fila.etiqueta }}</td>
+                    <td>{{ fila.cantidad }}</td>
+                    <td>{{ fila.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="3">Sin comprobantes en el turno.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      @if (data.movimientos.length) {
+        <section class="panel">
+          <h3>Caja chica</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Concepto</th>
+                  <th>Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (mov of data.movimientos; track mov.id) {
+                  <tr>
+                    <td>
+                      <span class="pill" [attr.data-tipo]="mov.tipo">
+                        {{ etiquetasMovimiento[mov.tipo] }}
+                      </span>
+                    </td>
+                    <td>{{ mov.concepto }}</td>
+                    <td>{{ mov.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      <section class="conteo">
+        <label>
+          <span>Conteo físico del cajero (S/)</span>
+          <input
+            type="number"
+            min="0"
+            step="0.10"
+            [ngModel]="montoReal()"
+            (ngModelChange)="onMontoReal($event)"
+            [disabled]="cerrado()"
+          />
+        </label>
+        <label class="wide">
+          <span>Observación de cierre</span>
+          <textarea
+            rows="2"
+            maxlength="500"
+            [ngModel]="observacion()"
+            (ngModelChange)="observacion.set($event)"
+            [disabled]="cerrado()"
+            placeholder="Opcional. Ej. billetes de 100, vuelto pendiente…"
+          ></textarea>
+        </label>
+        <article class="diff" [attr.data-tipo]="tipoDiferencia()">
+          <span>Diferencia</span>
+          <strong>{{ diferencia() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <small>
+            @if (tipoDiferencia(); as tipo) {
+              {{ etiquetasDiferencia[tipo] }}
+            } @else {
+              Ingresa el conteo
+            }
+          </small>
+        </article>
+      </section>
+    </div>
+  }
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <footer class="dialog__footer">
+    <button type="button" class="ghost" (click)="cancelled.emit()">
+      {{ cerrado() ? 'Cerrar' : 'Cancelar' }}
+    </button>
+    <button type="button" class="ghost" (click)="imprimir()" [disabled]="!resumen()">
+      Imprimir ticket
+    </button>
+    @if (!cerrado()) {
+      <button type="button" class="primary" (click)="cerrarTurno()" [disabled]="enviando() || !resumen()">
+        {{ enviando() ? 'Cerrando…' : 'Cerrar turno' }}
+      </button>
+    }
+  </footer>
+</section>
+
+@if (ticket(); as data) {
+  <app-caja-ticket-print [ticket]="data" (closed)="cerrarTicket()" />
+}

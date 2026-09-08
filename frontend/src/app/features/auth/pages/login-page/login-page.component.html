@@ -1,0 +1,40 @@
+<section class="login">
+  <article class="login__card">
+    <p class="login__eyebrow">CapitalPOS · Trunqi TCG</p>
+    <h1>Iniciar sesión</h1>
+    <p class="login__lead">
+      El POS habla solo con <code>CapitalPos.Tcg.Api</code>. La clave SUNAT nunca sale del
+      servidor.
+    </p>
+
+    <form [formGroup]="form" (ngSubmit)="entrar()">
+      <label>
+        Correo
+        <input type="email" formControlName="email" autocomplete="username" />
+      </label>
+      <label>
+        Contraseña
+        <input type="password" formControlName="password" autocomplete="current-password" />
+      </label>
+      @if (mostrarSelector()) {
+        <label>
+          Empresa
+          <select formControlName="empresaId">
+            <option value="">Selecciona por nombre comercial</option>
+            @for (empresa of empresas(); track empresa.id) {
+              <option [value]="empresa.id">{{ etiquetaEmpresa(empresa) }}</option>
+            }
+          </select>
+        </label>
+      } @else if (empresaUnica(); as empresa) {
+        <p class="login__tenant">{{ etiquetaEmpresa(empresa) }}</p>
+      }
+      @if (error()) {
+        <p class="login__error">{{ error() }}</p>
+      }
+      <button type="submit" class="login__submit" [disabled]="enviando() || cargandoEmpresas()">
+        {{ enviando() ? 'Entrando…' : 'Entrar' }}
+      </button>
+    </form>
+  </article>
+</section>

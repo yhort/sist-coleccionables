@@ -1,0 +1,52 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Panel de Conexión REST API</h3>
+      <p>URL de la tienda, Consumer Key y Consumer Secret. No se registran secretos en los logs.</p>
+    </div>
+    <span class="status" [attr.data-estado]="wooApi.conexion().estado">
+      <i></i>
+      {{ etiquetas[wooApi.conexion().estado] }}
+    </span>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardarYProbar()">
+    <label class="wide">
+      URL de la tienda
+      <input type="url" formControlName="urlTienda" placeholder="https://trunqi.pe" autocomplete="url" />
+    </label>
+    <label>
+      Consumer Key
+      <input type="text" formControlName="consumerKey" placeholder="ck_…" autocomplete="off" />
+    </label>
+    <label>
+      Consumer Secret
+      <input type="password" formControlName="consumerSecret" placeholder="cs_…" autocomplete="new-password" />
+    </label>
+    <label>
+      Sede origen (stock publicado)
+      <select formControlName="sedeOrigenId">
+        @for (sede of sedes(); track sede.id) {
+          <option [value]="sede.id">{{ sede.nombre }}</option>
+        }
+      </select>
+    </label>
+    <div class="actions">
+      <button type="submit" class="primary">Probar conexión</button>
+      <small>
+        Demo local: <code>ck_demo_capitalpos</code> / <code>cs_demo_capitalpos</code>.
+        Usa <code>cs_invalid</code> para simular error de autenticación.
+      </small>
+    </div>
+  </form>
+  @if (error()) {
+    <p class="hint" data-estado="ERROR_AUTENTICACION">{{ error() }}</p>
+  }
+
+  <p class="hint" [attr.data-estado]="wooApi.conexion().estado">
+    {{ wooApi.conexion().mensaje }}
+    @if (wooApi.conexion().ultimoIntento) {
+      <span>· {{ wooApi.conexion().ultimoIntento | date: 'dd/MM/yyyy HH:mm:ss' }}</span>
+    }
+  </p>
+</section>

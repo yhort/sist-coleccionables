@@ -1,0 +1,170 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: calc(100dvh - var(--topbar-height) - (2 * var(--spacing-lg)));
+  overflow: hidden;
+}
+
+.subastas {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-height: 0;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+
+  &__header {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    p {
+      margin: 0.3rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  &__add {
+    min-height: 40px;
+    padding: 0 1rem;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+
+    &:hover {
+      background: var(--color-primary-hover);
+    }
+  }
+}
+
+app-subasta-margen-card {
+  display: block;
+  flex-shrink: 0;
+}
+
+.kpis {
+  display: grid;
+  flex-shrink: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+
+  article {
+    padding: 1rem 1.1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-container);
+    box-shadow: var(--shadow-container);
+
+    span {
+      display: block;
+      color: var(--color-text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    strong {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 1.25rem;
+    }
+  }
+}
+
+.toolbar {
+  display: grid;
+  flex-shrink: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-container);
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  select {
+    min-height: 40px;
+    padding: 0 0.75rem;
+    color: var(--color-text-primary);
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    outline: none;
+
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+    }
+  }
+
+  &__clear {
+    min-height: 40px;
+    padding: 0 0.9rem;
+    color: var(--color-primary);
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+
+    &:hover {
+      background: var(--color-primary-soft);
+    }
+  }
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.9rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+app-subastas-tablero {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 1024px) {
+  :host {
+    height: calc(100dvh - var(--topbar-height) - (2 * var(--spacing-md)));
+  }
+}
+
+@media (max-width: 900px) {
+  .kpis,
+  .toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .kpis,
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,92 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-labelledby]="modo() === 'empaque' ? 'empaque-title' : 'despacho-title'"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      @if (modo() === 'empaque') {
+        <h2 id="empaque-title">Empaquetar pedido</h2>
+        <p>Registra las notas de empaque. El pedido pasa a Empaquetado en el Kanban.</p>
+      } @else {
+        <h2 id="despacho-title">Despachar / asignar tracking</h2>
+        <p>
+          Agencia, costo de envío y N° de seguimiento o clave de recojo. El pedido pasa a
+          Pendiente de entrega.
+        </p>
+      }
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <p class="pedido-hint">
+    {{ fila().pedido.codigo }} · {{ fila().pedido.clienteNombre }} ·
+    {{ fila().pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      @if (modo() === 'empaque') {
+        <label class="wide">
+          Notas de empaque
+          <textarea formControlName="notasEmpaque" rows="4" maxlength="500" placeholder="Toploader, burbuja, no doblar…"></textarea>
+        </label>
+      } @else {
+        <label>
+          Método de envío
+          <select
+            formControlName="metodoEnvio"
+            (change)="onMetodoChange($any($event.target).value)"
+          >
+            @for (metodo of metodos; track metodo) {
+              <option [value]="metodo">{{ etiquetasMetodo[metodo] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Costo de envío
+          <input type="number" min="0" step="0.01" formControlName="costoEnvio" />
+        </label>
+        <label>
+          N° tracking / clave de recojo
+          <input
+            type="text"
+            formControlName="numeroTracking"
+            maxlength="80"
+            [placeholder]="esRecojo() ? 'RECOJO-…' : 'Tracking Olva / Shalom'"
+          />
+        </label>
+        <label>
+          Agencia / sede
+          <input
+            type="text"
+            formControlName="agencia"
+            maxlength="80"
+            placeholder="Shalom Miraflores, Olva, mostrador…"
+          />
+        </label>
+        <label class="wide">
+          Observación
+          <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+        </label>
+      }
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">
+        {{ modo() === 'empaque' ? 'Empaquetar pedido' : 'Despachar / asignar tracking' }}
+      </button>
+    </footer>
+  </form>
+</section>

@@ -1,0 +1,56 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Sedes y almacenes</h3>
+      <p>Sedes físicas, puntos GRE y almacén principal asignado.</p>
+    </div>
+    <button type="button" class="primary" (click)="abrir()">Nueva sede</button>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Sede</th>
+          <th>Tipo</th>
+          <th>Dirección</th>
+          <th>GRE</th>
+          <th>Almacén</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (sede of api.sedes(); track sede.id) {
+          <tr>
+            <td>
+              <strong>{{ sede.nombre }}</strong>
+              <small>{{ sede.distrito }}, {{ sede.departamento }}</small>
+            </td>
+            <td>{{ etiquetasTipo[sede.tipo] }}</td>
+            <td>{{ sede.direccion }}</td>
+            <td>
+              @if (sede.esPuntoPartidaGre) {
+                <span>Partida</span>
+              }
+              @if (sede.esPuntoLlegadaGre) {
+                <span>Llegada</span>
+              }
+            </td>
+            <td>{{ sede.esAlmacenPrincipal ? 'Principal' : '—' }}</td>
+            <td>
+              <button type="button" class="link" (click)="abrir(sede)">Editar</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+@if (dialogAbierto()) {
+  <app-sede-form-dialog
+    [sede]="sedeEnCurso()"
+    (saved)="cerrar()"
+    (cancelled)="cerrar()"
+  />
+}

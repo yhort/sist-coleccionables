@@ -1,0 +1,149 @@
+<div class="dialog-backdrop no-print" (click)="closed.emit()"></div>
+
+<section class="slip" role="dialog" aria-modal="true" aria-labelledby="slip-title">
+  <header class="slip__toolbar no-print">
+    <div>
+      <h2 id="slip-title">Etiqueta de despacho</h2>
+      <p class="slip__hint">
+        Plantilla {{ esSubasta() ? 'TICKET SUBASTA' : 'TICKET PEDIDO WEB' }} · impresión térmica 58/80 mm
+      </p>
+    </div>
+    <div>
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+      <button type="button" class="primary" (click)="imprimir()">Imprimir</button>
+    </div>
+  </header>
+
+  <article class="ticket" [class.ticket--web]="!esSubasta()" [class.ticket--subasta]="esSubasta()">
+    <header class="ticket__brand">
+      <div class="ticket__logo" aria-hidden="true">
+        <svg viewBox="0 0 120 72" xmlns="http://www.w3.org/2000/svg">
+          <rect x="18" y="4" width="42" height="56" rx="5" fill="#1e4fad" transform="rotate(-12 39 32)" />
+          <path
+            d="M34 22 L44 32 L34 42 L30 38 L36 32 L30 26 Z"
+            fill="#7ec8ff"
+            transform="rotate(-12 37 32)"
+          />
+          <rect x="48" y="8" width="42" height="56" rx="5" fill="#f5c518" />
+          <path d="M62 24 L74 36 L62 48 L58 44 L66 36 L58 28 Z" fill="#1e4fad" />
+        </svg>
+        <div class="ticket__logo-text">
+          <span class="ticket__logo-trunqi">TRUNQI</span>
+          <span class="ticket__logo-tcg">TCG</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="ticket__type">
+      <span class="ticket__type-icon" aria-hidden="true">
+        @if (esSubasta()) {
+          <!-- Martillo subasta -->
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="12" fill="currentColor" />
+            <path
+              d="M7.2 14.8 L12.5 9.5 L14.5 11.5 L9.2 16.8 Z"
+              fill="#fff"
+            />
+            <path d="M12.2 9.2 L15.8 5.6 L18.4 8.2 L14.8 11.8 Z" fill="#fff" />
+            <rect x="6.2" y="15.8" width="8" height="1.8" rx="0.6" fill="#fff" />
+          </svg>
+        } @else {
+          <!-- Carrito -->
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="12" fill="currentColor" />
+            <path
+              d="M6.5 7h1.4l.5 1.6h8.3l-1.1 4.4H9.2L8.8 15h7.4v1.3H7.4l.7-2.7H6.2L5.2 7zm4 10.2a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm5.2 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"
+              fill="#fff"
+            />
+          </svg>
+        }
+      </span>
+      <div class="ticket__type-copy">
+        <span class="ticket__type-eyebrow">TICKET</span>
+        <strong>{{ tituloTicket() }}</strong>
+      </div>
+    </div>
+
+    <dl class="ticket__fields">
+      <div class="ticket__row">
+        <span class="ticket__row-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path fill="currentColor" d="M3 4h9l5 5v7a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 1v4h4l-4-4z"/></svg>
+        </span>
+        <dt>{{ etiquetaNumero() }}</dt>
+        <dd>{{ numeroTicket() }}</dd>
+      </div>
+
+      <div class="ticket__row">
+        <span class="ticket__row-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path fill="currentColor" d="M6 2h2v2h4V2h2v2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm10 7H4v7h12V9z"/></svg>
+        </span>
+        <dt>FECHA</dt>
+        <dd>{{ fila().pedido.fechaPedido | date: 'dd/MM/yyyy' }}</dd>
+      </div>
+
+      <div class="ticket__row ticket__row--cliente">
+        <span class="ticket__row-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path fill="currentColor" d="M10 10a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"/></svg>
+        </span>
+        <dt>CLIENTE</dt>
+        <dd>
+          <span>{{ clienteNombre() }}</span>
+          @if (contactoReferencia(); as ref) {
+            <span class="ticket__ref">Ref. {{ ref }}</span>
+          }
+        </dd>
+      </div>
+
+      <div class="ticket__row">
+        <span class="ticket__row-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path fill="currentColor" d="M4.5 2.5h3l1 4-2 1.5a10 10 0 0 0 5.5 5.5l1.5-2 4 1v3a2 2 0 0 1-2 2A13 13 0 0 1 2.5 4.5a2 2 0 0 1 2-2z"/></svg>
+        </span>
+        <dt>CELULAR</dt>
+        <dd>{{ celular() }}</dd>
+      </div>
+
+      <div class="ticket__row">
+        <span class="ticket__row-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path fill="currentColor" d="M3 8.5 10 3l7 5.5V17H12v-5H8v5H3V8.5z"/></svg>
+        </span>
+        <dt>TIENDA</dt>
+        <dd>{{ tienda() }}</dd>
+      </div>
+    </dl>
+
+    <footer class="ticket__footer">
+      <div class="ticket__mascot" aria-hidden="true">
+        <svg viewBox="0 0 88 96" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="44" cy="86" rx="26" ry="8" fill="#000" opacity=".12" />
+          <path
+            d="M28 34c0-14 8-26 16-26s16 12 16 26c6 4 10 12 10 22 0 18-10 30-26 30S18 74 18 56c0-10 4-18 10-22z"
+            fill="#f4efe6"
+          />
+          <path d="M30 18c-2-10 2-16 6-16 2 8 4 14 6 18" fill="#f4efe6" />
+          <path d="M58 18c2-10-2-16-6-16-2 8-4 14-6 18" fill="#f4efe6" />
+          <path d="M34 16c0 6 2 10 4 12M54 16c0 6-2 10-4 12" stroke="#c9b8a0" stroke-width="2" fill="none" />
+          <rect x="28" y="40" width="32" height="8" rx="2" fill="#111" />
+          <rect x="30" y="42" width="12" height="4" rx="1" fill="#333" />
+          <rect x="46" y="42" width="12" height="4" rx="1" fill="#333" />
+          <path d="M40 52c2 2 6 2 8 0" stroke="#c9b8a0" stroke-width="1.5" fill="none" />
+          <circle cx="36" cy="46" r="1.4" fill="#fff" />
+          <circle cx="52" cy="46" r="1.4" fill="#fff" />
+          <path d="M62 58c10 2 16 10 14 18-8-2-14-8-14-18z" fill="#f4efe6" />
+          <path d="M68 70c4 2 6 6 4 8" stroke="#111" stroke-width="2" fill="none" />
+        </svg>
+      </div>
+      <a class="ticket__url" href="https://www.trunqitcg.com.pe" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4" fill="none" />
+          <path
+            d="M1.5 8h13M8 1.5c2.2 2.4 2.2 10.6 0 13M8 1.5c-2.2 2.4-2.2 10.6 0 13"
+            stroke="currentColor"
+            stroke-width="1.2"
+            fill="none"
+          />
+        </svg>
+        www.trunqitcg.com.pe
+      </a>
+    </footer>
+  </article>
+</section>

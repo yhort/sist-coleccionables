@@ -1,0 +1,38 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vs/
+*.user
+*.suo
+*.swp
+
+# Secrets
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+**/secrets.json
+**/*credentials*
+**/*.pem
+**/*.pfx
+
+# Dependencies & build
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/tmp/
+frontend/out-tsc/
+backend/**/bin/
+backend/**/obj/
+**/TestResults/
+
+# Local archives / copies (not source)
+*.zip
+backup/
+backend 2.zip
+
+# Logs / caches
+*.log
+.sass-cache/
+**/__screenshots__/

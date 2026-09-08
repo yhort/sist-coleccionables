@@ -1,0 +1,59 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Integraciones generales</h3>
+      <p>Webhooks de salida para notificar por WhatsApp cambios de estado de pedidos y guías.</p>
+    </div>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <label>
+      Nombre
+      <input type="text" formControlName="nombre" />
+    </label>
+    <label class="wide">
+      URL del webhook
+      <input type="url" formControlName="url" placeholder="https://…" />
+    </label>
+    <label>
+      Token
+      <input type="password" formControlName="token" autocomplete="new-password" />
+    </label>
+    <label class="check">
+      <input type="checkbox" formControlName="activo" />
+      Activo
+    </label>
+    <label class="check">
+      <input type="checkbox" formControlName="pedidoEstado" />
+      {{ etiquetas['pedido.estado'] }}
+    </label>
+    <label class="check">
+      <input type="checkbox" formControlName="guiaEstado" />
+      {{ etiquetas['guia.estado'] }}
+    </label>
+    <div class="actions">
+      <button type="submit" class="primary">Guardar webhook</button>
+      <button type="button" class="ghost" (click)="probar('pedido.estado')">Probar pedido</button>
+      <button type="button" class="ghost" (click)="probar('guia.estado')">Probar guía</button>
+    </div>
+  </form>
+
+  @if (error()) {
+    <p class="banner banner--error">{{ error() }}</p>
+  }
+  @if (aviso()) {
+    <p class="banner banner--ok">{{ aviso() }}</p>
+  }
+
+  @if (api.webhookLogs().length > 0) {
+    <ul class="log">
+      @for (log of api.webhookLogs(); track log.id) {
+        <li>
+          <strong>{{ log.estado }}</strong>
+          <span>{{ etiquetas[log.evento] }} · {{ log.destino }}</span>
+          <small>{{ log.payloadResumen }} · {{ log.fecha | date: 'dd/MM HH:mm:ss' }}</small>
+        </li>
+      }
+    </ul>
+  }
+</section>

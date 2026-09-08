@@ -1,0 +1,110 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(17 24 39 / 40%);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(480px, 100%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-md);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  padding: 1.2rem 1.4rem 0.3rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.close {
+  width: 36px;
+  height: 36px;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+form {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 1.4rem 0.2rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.check {
+  flex-direction: row;
+  align-items: center;
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
+}
+
+input,
+select {
+  min-height: 40px;
+  padding: 0 0.7rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+}
+
+footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  padding: 0.8rem 0 1.1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.ghost,
+.primary {
+  min-height: 40px;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.ghost {
+  border: 1px solid var(--color-border);
+}
+
+.primary {
+  color: #fff;
+  background: var(--color-primary);
+}

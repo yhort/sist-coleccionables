@@ -1,0 +1,77 @@
+<header class="topbar">
+  <div class="topbar__row">
+    <div class="topbar__left">
+      <button
+        type="button"
+        class="topbar__menu-button"
+        aria-label="Abrir o cerrar menú principal"
+        [attr.aria-expanded]="menuExpanded()"
+        [attr.aria-controls]="menuControls()"
+        (click)="onMenuToggle()"
+      >
+        <span class="topbar__menu-icon" aria-hidden="true"></span>
+      </button>
+
+      <div class="topbar__page">
+        <span class="topbar__system-name">CapitalPOS · Trunqi TCG</span>
+        <h1 class="topbar__title">{{ pageTitle() }}</h1>
+      </div>
+    </div>
+
+    <div class="topbar__search" [class.topbar__search--open]="searchOpen()">
+      <label class="topbar__search-field">
+        <span class="visually-hidden">Buscar módulo</span>
+        <svg
+          class="topbar__search-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" stroke-linecap="round" />
+        </svg>
+        <input
+          type="search"
+          class="topbar__search-input"
+          placeholder="Buscar módulo…"
+          autocomplete="off"
+          [value]="searchQuery()"
+          (input)="onSearchInput($event)"
+          (focus)="onSearchFocus()"
+          (blur)="onSearchBlur()"
+          (keydown)="onSearchKeydown($event)"
+        />
+      </label>
+
+      @if (searchOpen()) {
+        <ul class="topbar__search-results" role="listbox">
+          @for (item of searchResults(); track item.route) {
+            <li>
+              <button type="button" class="topbar__search-option" (mousedown)="goToModule(item)">
+                <app-nav-icon [name]="item.icon" />
+                <span>{{ item.label }}</span>
+              </button>
+            </li>
+          } @empty {
+            <li class="topbar__search-empty">Sin coincidencias</li>
+          }
+        </ul>
+      }
+    </div>
+
+    <div class="topbar__user">
+      <span class="topbar__user-avatar" aria-hidden="true">{{ userName().slice(0, 1).toUpperCase() }}</span>
+      <div class="topbar__user-meta">
+        <strong class="topbar__user-name">{{ userName() }}</strong>
+        <span class="topbar__user-sede">{{ sedeLabel() }}</span>
+      </div>
+      <button type="button" class="topbar__logout" (click)="logout.emit()">Salir</button>
+    </div>
+  </div>
+
+  <div class="topbar__crumbs">
+    <app-breadcrumb [items]="breadcrumbItems()" />
+  </div>
+</header>

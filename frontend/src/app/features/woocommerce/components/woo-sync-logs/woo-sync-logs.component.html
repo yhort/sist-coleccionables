@@ -1,0 +1,53 @@
+<section class="panel">
+  <header>
+    <div>
+      <h3>Logs y auditoría de sincronización</h3>
+      <p>
+        Historial: fecha/hora, tipo (Stock / Precio / Pedido), resultado y reintentos de webhook.
+      </p>
+    </div>
+  </header>
+
+  @if (wooApi.logs().length === 0) {
+    <p class="empty">Todavía no hay eventos de sincronización.</p>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha / hora</th>
+            <th>Tipo</th>
+            <th>Ítems afectados</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (log of wooApi.logs(); track log.id) {
+            <tr>
+              <td>{{ log.fechaHora | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+              <td>
+                <span class="tipo" [attr.data-tipo]="log.tipo">{{ etiquetasTipo[log.tipo] }}</span>
+              </td>
+              <td>
+                @if (log.itemsAfectados.length === 0) {
+                  —
+                } @else {
+                  <code>{{ log.itemsAfectados.join(', ') }}</code>
+                }
+                <small>{{ log.detalle }}</small>
+              </td>
+              <td>
+                <span class="resultado" [attr.data-resultado]="log.resultado">
+                  {{ etiquetaResultado(log.resultado) }}
+                </span>
+                @if (log.intentos > 0) {
+                  <small>Intento {{ log.intentos }}/5</small>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

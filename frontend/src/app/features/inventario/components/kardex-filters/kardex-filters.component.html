@@ -1,0 +1,68 @@
+<section class="filters" aria-label="Filtros del kardex">
+  <label>
+    <span>Desde</span>
+    <input
+      type="date"
+      [ngModel]="filtros().desde"
+      (ngModelChange)="filtros.set({ ...filtros(), desde: $event })"
+    />
+  </label>
+  <label>
+    <span>Hasta</span>
+    <input
+      type="date"
+      [ngModel]="filtros().hasta"
+      (ngModelChange)="filtros.set({ ...filtros(), hasta: $event })"
+    />
+  </label>
+  <label>
+    <span>Sede</span>
+    <select
+      [ngModel]="filtros().sedeId"
+      (ngModelChange)="filtros.set({ ...filtros(), sedeId: $event })"
+    >
+      <option value="TODAS">Todas</option>
+      @for (sede of sedes(); track sede.id) {
+        <option [value]="sede.id">{{ sede.nombre }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    <span>Producto</span>
+    <select
+      [ngModel]="filtros().productoId"
+      (ngModelChange)="filtros.set({ ...filtros(), productoId: $event })"
+    >
+      <option value="TODOS">Todos</option>
+      @for (producto of productos(); track producto.id) {
+        <option [value]="producto.id">{{ producto.nombre }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    <span>Tipo de movimiento</span>
+    <select
+      [ngModel]="filtros().tipoMovimiento"
+      (ngModelChange)="filtros.set({ ...filtros(), tipoMovimiento: $event })"
+    >
+      <option value="TODOS">Todos</option>
+      @for (grupo of grupos; track grupo.etiqueta) {
+        <optgroup [label]="grupo.etiqueta">
+          @for (tipo of grupo.tipos; track tipo) {
+            <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+          }
+        </optgroup>
+      }
+    </select>
+  </label>
+  <label class="filters__search">
+    <span>Buscar</span>
+    <input
+      type="search"
+      placeholder="SKU, producto o motivo…"
+      [ngModel]="filtros().busqueda"
+      (ngModelChange)="filtros.set({ ...filtros(), busqueda: $event })"
+    />
+  </label>
+  <button type="button" class="filters__clear" (click)="limpiar()">Limpiar</button>
+</section>

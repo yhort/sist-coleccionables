@@ -1,0 +1,116 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="pago-form-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="pago-form-title">
+        {{ esAsociacion ? 'Conciliar pago' : 'Registrar pago' }}
+      </h2>
+      <p>
+        Captura Yape / voucher Izipay o constancia de transferencia. Si confirmas un pago
+        asociado, el pedido pasa a Pagado en el Kanban.
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label>
+        Origen
+        <select formControlName="origen">
+          @for (origen of origenes; track origen) {
+            <option [value]="origen">{{ etiquetasOrigen[origen] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Código de operación
+        <input
+          type="text"
+          formControlName="codigoOperacion"
+          maxlength="80"
+          placeholder="Nro. Yape / Izipay / CCI"
+          [class.invalid]="codigoDuplicado()"
+        />
+        @if (codigoDuplicado()) {
+          <small class="hint hint--danger">Ese código de operación ya está registrado.</small>
+        }
+      </label>
+      <label>
+        Monto
+        <input type="number" min="0.01" step="0.01" formControlName="monto" />
+      </label>
+      <label>
+        Comprobante / voucher
+        <input
+          type="text"
+          formControlName="referenciaExterna"
+          maxlength="120"
+          placeholder="Captura, constancia o referencia"
+        />
+      </label>
+      <label>
+        Cliente (si aún no hay pedido)
+        <input type="text" formControlName="clienteNombre" maxlength="160" />
+      </label>
+      <label>
+        Buscar pedido pendiente
+        <input
+          type="search"
+          [value]="busquedaPedido()"
+          (input)="busquedaPedido.set($any($event.target).value)"
+          placeholder="Cliente, código o referencia…"
+        />
+      </label>
+      <label class="wide">
+        Pedido digital pendiente
+        <select
+          formControlName="pedidoDigitalId"
+          (change)="onPedidoChange($any($event.target).value)"
+        >
+          <option value="">Sin asociar todavía</option>
+          @for (pedido of pedidos(); track pedido.id) {
+            <option [value]="pedido.id">
+              {{ etiquetaPedido(pedido) }}
+            </option>
+          }
+        </select>
+      </label>
+      @if (pedidoSeleccionado(); as pedido) {
+        <p class="pedido-hint">
+          {{ pedido.clienteNombre }} · total
+          {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+          · saldo {{ saldoDe(pedido) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        </p>
+      }
+      <label class="wide">
+        Observación
+        <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+      </label>
+      <label class="wide recojo">
+        <input type="checkbox" formControlName="confirmar" />
+        Confirmar ahora (si hay pedido en Pendiente de pago, el Kanban pasa a Pagado)
+      </label>
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary" [disabled]="codigoDuplicado() && !esAsociacion">
+        {{ esAsociacion ? 'Vincular pago' : 'Registrar pago' }}
+      </button>
+    </footer>
+  </form>
+</section>

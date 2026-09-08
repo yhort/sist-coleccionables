@@ -1,0 +1,41 @@
+@if (estado(); as caja) {
+  <aside class="banner" [class.banner--compact]="compacto()" [attr.data-estado]="caja.abierta ? 'ABIERTA' : 'CERRADA'">
+    <div>
+      <p class="banner__eyebrow">Caja {{ caja.sedeNombre }}</p>
+      @if (caja.abierta && caja.sesion) {
+        <p>
+          Turno abierto desde {{ caja.sesion.fechaApertura | date: 'dd/MM HH:mm' }} · Fondo
+          {{ caja.sesion.montoApertura | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }} ·
+          {{ caja.sesion.cantidadVentas }} venta(s)
+        </p>
+      } @else {
+        <p>{{ caja.mensaje || 'Caja cerrada. Abre el turno para confirmar ventas.' }}</p>
+      }
+    </div>
+    <div class="banner__actions">
+      @if (caja.abierta) {
+        <button type="button" class="ghost" (click)="abrirArqueo()">Arqueo / cierre</button>
+      } @else {
+        <button type="button" class="primary" (click)="abrirCaja()">Abrir caja</button>
+      }
+      <a routerLink="/app/caja">Ir a caja</a>
+    </div>
+  </aside>
+}
+
+@if (dialog() === 'apertura') {
+  <app-caja-apertura-dialog
+    [sedes]="sedes()"
+    [sedeIdInicial]="sedeId()"
+    (saved)="onDialogSaved()"
+    (cancelled)="cerrarDialog()"
+  />
+}
+
+@if (dialog() === 'arqueo') {
+  <app-caja-arqueo-dialog
+    [sedeId]="sedeId()"
+    (saved)="changed.emit()"
+    (cancelled)="cerrarDialog()"
+  />
+}

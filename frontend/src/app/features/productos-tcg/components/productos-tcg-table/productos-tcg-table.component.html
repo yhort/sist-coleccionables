@@ -1,0 +1,156 @@
+@if (vista() === 'tabla') {
+  <div class="table-shell">
+    @if (productos().length === 0) {
+      <div class="catalog-empty">No hay productos con esos filtros.</div>
+    } @else {
+      <div class="table-wrap">
+        <table class="catalog-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>SKU</th>
+              <th>Tipo</th>
+              <th>Juego</th>
+              <th>Precio Woo</th>
+              <th>Inventario</th>
+              <th>WooCommerce</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (producto of productos(); track producto.id) {
+              <tr>
+                <td>
+                  <div class="product-cell">
+                    <span class="thumb" [attr.data-tipo]="producto.tipoProducto">
+                      @if (imagenPrincipal(producto)) {
+                        <img
+                          [src]="srcImagen(producto)"
+                          [alt]="producto.nombre"
+                          referrerpolicy="no-referrer"
+                          (error)="onImagenError($event, producto)"
+                        />
+                      } @else {
+                        {{ producto.nombre.charAt(0) }}
+                      }
+                    </span>
+                    <div>
+                      <strong>{{ producto.nombre }}</strong>
+                      @if (producto.tipoProducto === 'CARTA' && producto.atributosTcg.numeroCarta) {
+                        <small>
+                          {{ producto.atributosTcg.setCodigo }}
+                          · {{ producto.atributosTcg.numeroCarta }}
+                          @if (producto.atributosTcg.esFoil) {
+                            · Foil
+                          }
+                        </small>
+                      }
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <code>{{ producto.codigoSku }}</code>
+                </td>
+                <td>{{ etiquetasTipo[producto.tipoProducto] }}</td>
+                <td>
+                  {{ producto.juego ? etiquetasJuego[producto.juego] : '—' }}
+                </td>
+                <td>
+                  <div class="price">
+                    @if (tieneRebajo(producto)) {
+                      <s>{{ producto.woo.precioNormal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</s>
+                      <strong>{{ producto.woo.precioRebajado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+                    } @else {
+                      <strong>{{ vigente(producto) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="'badge--stock-' + stockDe(producto.stockLocal)">
+                    {{ producto.stockLocal }} · {{ etiquetasStock[stockDe(producto.stockLocal)] }}
+                  </span>
+                  @if (producto.woo.stockWoo != null && producto.woo.stockWoo !== producto.stockLocal) {
+                    <small class="muted">Woo: {{ producto.woo.stockWoo }}</small>
+                  }
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="'badge--sync-' + producto.woo.estadoSincronizacion">
+                    {{ etiquetasSync[producto.woo.estadoSincronizacion] }}
+                  </span>
+                  @if (producto.woo.wooCommerceId) {
+                    <small class="muted">ID {{ producto.woo.wooCommerceId }}</small>
+                  }
+                </td>
+                <td>
+                  <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    <app-tabla-paginacion
+      [page]="page()"
+      [pageSize]="pageSize()"
+      [total]="total()"
+      (pageChange)="pageChange.emit($event)"
+      (pageSizeChange)="pageSizeChange.emit($event)"
+    />
+  </div>
+} @else {
+  <div class="table-shell">
+    @if (productos().length === 0) {
+      <div class="catalog-empty">No hay productos con esos filtros.</div>
+    } @else {
+      <div class="catalog-grid">
+        @for (producto of productos(); track producto.id) {
+          <article class="product-card">
+            <span class="thumb thumb--lg" [attr.data-tipo]="producto.tipoProducto">
+              @if (imagenPrincipal(producto)) {
+                <img
+                  [src]="srcImagen(producto)"
+                  [alt]="producto.nombre"
+                  referrerpolicy="no-referrer"
+                  (error)="onImagenError($event, producto)"
+                />
+              } @else {
+                {{ producto.nombre.charAt(0) }}
+              }
+            </span>
+            <span class="badge" [ngClass]="'badge--sync-' + producto.woo.estadoSincronizacion">
+              {{ etiquetasSync[producto.woo.estadoSincronizacion] }}
+            </span>
+            <h3>{{ producto.nombre }}</h3>
+            <p>
+              {{ etiquetasTipo[producto.tipoProducto] }}
+              @if (producto.juego) {
+                · {{ etiquetasJuego[producto.juego] }}
+              }
+            </p>
+            <code>{{ producto.codigoSku }}</code>
+            <div class="price">
+              @if (tieneRebajo(producto)) {
+                <s>{{ producto.woo.precioNormal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</s>
+                <strong>{{ producto.woo.precioRebajado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+              } @else {
+                <strong>{{ vigente(producto) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+              }
+            </div>
+            <span class="badge" [ngClass]="'badge--stock-' + stockDe(producto.stockLocal)">
+              {{ etiquetasStock[stockDe(producto.stockLocal)] }} · {{ producto.stockLocal }}
+            </span>
+            <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+          </article>
+        }
+      </div>
+    }
+    <app-tabla-paginacion
+      [page]="page()"
+      [pageSize]="pageSize()"
+      [total]="total()"
+      (pageChange)="pageChange.emit($event)"
+      (pageSizeChange)="pageSizeChange.emit($event)"
+    />
+  </div>
+}

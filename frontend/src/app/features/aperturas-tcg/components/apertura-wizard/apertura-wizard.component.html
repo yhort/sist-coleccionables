@@ -1,0 +1,288 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="apertura-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="apertura-title">Nueva apertura TCG</h2>
+      <p>Sale el sellado y entran las cartas a la misma sede, con kardex inmutable.</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <ol class="steps" aria-label="Pasos de la apertura">
+    <li [class.steps__item--active]="paso() === 1" [class.steps__item--done]="paso() > 1">
+      <span>1</span> Sellado
+    </li>
+    <li [class.steps__item--active]="paso() === 2" [class.steps__item--done]="paso() > 2">
+      <span>2</span> Cartas
+    </li>
+    <li [class.steps__item--active]="paso() === 3">
+      <span>3</span> Confirmar
+    </li>
+  </ol>
+
+  @if (paso() === 1) {
+    <form [formGroup]="form" (ngSubmit)="continuarPaso1()">
+      <div class="dialog__grid">
+        <label>
+          Sede
+          <select formControlName="sedeId">
+            @for (sede of sedes(); track sede.id) {
+              <option [value]="sede.id">{{ sede.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Producto sellado
+          <select formControlName="productoSelladoId">
+            <option value="">Seleccionar sellado</option>
+            @for (sellado of sellados(); track sellado.id) {
+              <option [value]="sellado.id">
+                {{ sellado.nombre }} ({{ sellado.codigoSku }})
+              </option>
+            }
+          </select>
+        </label>
+        <label>
+          Cantidad a abrir
+          <input type="number" min="1" step="1" formControlName="cantidadSellados" />
+        </label>
+        <label class="wide">
+          Observación
+          <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+        </label>
+      </div>
+
+      @if (selladoSeleccionado(); as sellado) {
+        <div class="hint-card">
+          <p>
+            Stock libre en sede:
+            <strong>{{ stockLibreSellado() | number: '1.0-0' }}</strong>
+            · Cartas esperadas:
+            <strong>{{ cartasEsperadas() || '—' }}</strong>
+          </p>
+          <p>
+            Al confirmar se descuenta con
+            <strong>{{ etiquetasMovimiento.APERTURA_SALIDA_SELLADO }}</strong>.
+          </p>
+          @if (sellado.atributosTcg.cartasEsperadas) {
+            <p>
+              Referencia de apertura: {{ sellado.atributosTcg.cartasEsperadas }} cartas por
+              unidad.
+            </p>
+          }
+        </div>
+      }
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+
+      <footer class="dialog__footer">
+        <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+        <button type="submit" class="primary" [disabled]="enviando()">
+          {{ enviando() ? 'Guardando…' : 'Continuar a cartas' }}
+        </button>
+      </footer>
+    </form>
+  }
+
+  @if (paso() === 2) {
+    <div class="dialog__body">
+      <section class="atajo" aria-label="Buscar carta por set y número">
+        <label>
+          Set
+          <input
+            type="text"
+            placeholder="SV3, OP07, 2X2…"
+            [ngModel]="setCodigo()"
+            (ngModelChange)="setCodigo.set($event)"
+          />
+        </label>
+        <label>
+          Número
+          <input
+            type="text"
+            placeholder="025/197"
+            [ngModel]="numeroCarta()"
+            (ngModelChange)="numeroCarta.set($event)"
+          />
+        </label>
+        <button type="button" class="primary" (click)="buscarPorSetNumero()">Buscar</button>
+      </section>
+
+      @if (busco()) {
+        <ul class="resultados">
+          @for (carta of resultados(); track carta.id) {
+            <li>
+              <div>
+                <strong>{{ carta.nombre }}</strong>
+                <small>
+                  {{ carta.codigoSku }} ·
+                  {{ carta.atributosTcg.setCodigo }} {{ carta.atributosTcg.numeroCarta }} ·
+                  {{ carta.atributosTcg.condicion || '—' }}
+                  {{ carta.atributosTcg.esFoil ? '· Foil' : '' }}
+                </small>
+              </div>
+              <button type="button" class="link-btn" (click)="agregarCarta(carta)">Agregar</button>
+            </li>
+          } @empty {
+            <li class="resultados__empty">Sin coincidencias en el catálogo.</li>
+          }
+        </ul>
+      }
+
+      <div class="table-wrap">
+        <table class="lineas">
+          <thead>
+            <tr>
+              <th>Carta</th>
+              <th>Cantidad</th>
+              <th>Estado</th>
+              <th>Foil</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (linea of lineas(); track linea.id) {
+              <tr>
+                <td>
+                  <strong>{{ cartaDe(linea.productoCartaId)?.nombre ?? 'Carta' }}</strong>
+                  <code>{{ cartaDe(linea.productoCartaId)?.codigoSku }}</code>
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    [ngModel]="linea.cantidad"
+                    (ngModelChange)="actualizarCantidad(linea.id, $event)"
+                  />
+                </td>
+                <td>
+                  <select
+                    [ngModel]="linea.estado"
+                    (ngModelChange)="actualizarEstado(linea.id, $event)"
+                  >
+                    @for (estado of estadosCarta; track estado) {
+                      <option [value]="estado">
+                        {{ estado }} · {{ etiquetasEstado[estado] }}
+                      </option>
+                    }
+                  </select>
+                </td>
+                <td>
+                  <label class="foil">
+                    <input
+                      type="checkbox"
+                      [ngModel]="linea.esFoil"
+                      (ngModelChange)="actualizarFoil(linea.id, $event)"
+                    />
+                    Foil
+                  </label>
+                </td>
+                <td>
+                  <button type="button" class="link-btn link-btn--danger" (click)="quitarLinea(linea.id)">
+                    Quitar
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="lineas__empty">
+                  Busca por set/número o espera haber seleccionado cartas del catálogo.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <p class="hint">
+        Cartas registradas: <strong>{{ totalLineas() }}</strong>
+        @if (cartasEsperadas()) {
+          · esperadas ~{{ cartasEsperadas() }}
+        }
+        . Cada línea ingresa con
+        <strong>{{ etiquetasMovimiento.APERTURA_INGRESO_CARTA }}</strong>.
+      </p>
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+
+      <footer class="dialog__footer">
+        <button type="button" class="ghost" (click)="irAtras()">Atrás</button>
+        <button type="button" class="primary" (click)="continuarPaso2()" [disabled]="enviando()">
+          {{ enviando() ? 'Guardando…' : 'Ver resumen' }}
+        </button>
+      </footer>
+    </div>
+  }
+
+  @if (paso() === 3) {
+    <div class="dialog__body">
+      <section class="resumen-sellado">
+        <h3>Impacto en inventario</h3>
+        <p>
+          <span class="mov mov--out">{{ etiquetasMovimiento.APERTURA_SALIDA_SELLADO }}</span>
+          {{ selladoSeleccionado()?.nombre }} ×{{ cabecera().cantidadSellados }}
+          · stock libre actual {{ stockLibreSellado() | number: '1.0-0' }}
+        </p>
+        <p>
+          <span class="mov mov--in">{{ etiquetasMovimiento.APERTURA_INGRESO_CARTA }}</span>
+          {{ totalLineas() }} carta{{ totalLineas() === 1 ? '' : 's' }} a la misma sede.
+        </p>
+      </section>
+
+      <app-apertura-yield-card [rendimiento]="rendimiento()" [compacto]="true" />
+
+      <div class="table-wrap">
+        <table class="lineas">
+          <thead>
+            <tr>
+              <th>Carta</th>
+              <th>Cant.</th>
+              <th>Estado</th>
+              <th>Foil</th>
+              <th>Valor est.</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (linea of lineas(); track linea.id) {
+              <tr>
+                <td>
+                  <strong>{{ cartaDe(linea.productoCartaId)?.nombre ?? 'Carta' }}</strong>
+                  <code>{{ cartaDe(linea.productoCartaId)?.codigoSku }}</code>
+                </td>
+                <td>{{ linea.cantidad }}</td>
+                <td>{{ linea.estado }}</td>
+                <td>{{ linea.esFoil ? 'Sí' : 'No' }}</td>
+                <td>{{ valorCarta(linea) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+
+      <footer class="dialog__footer">
+        <button type="button" class="ghost" (click)="irAtras()">Atrás</button>
+        <button type="button" class="primary" (click)="confirmar()" [disabled]="enviando()">
+          {{ enviando() ? 'Confirmando…' : 'Confirmar apertura' }}
+        </button>
+      </footer>
+    </div>
+  }
+</section>

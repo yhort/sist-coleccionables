@@ -1,0 +1,26 @@
+<section class="reportes">
+  <header class="reportes__header">
+    <div>
+      <h2>Reportes y métricas TCG</h2>
+      <p>
+        KPIs consolidados, mix de canales, yield de aperturas y arqueo Yape / Izipay a partir de los
+        módulos operativos.
+      </p>
+    </div>
+  </header>
+
+  <app-reportes-periodo-bar
+    [periodo]="periodo()"
+    (changed)="actualizarPeriodo($event)"
+    (cleared)="limpiarPeriodo()"
+    (exportar)="exportarCsv()"
+  />
+
+  <app-reportes-kpis [kpis]="reporte().kpis" />
+  <app-ventas-canal-franquicia
+    [canales]="reporte().ventasPorCanal"
+    [franquicias]="reporte().ventasPorFranquicia"
+  />
+  <app-aperturas-yield-reporte [resumen]="reporte().yieldAperturas" />
+  <app-arqueo-conciliacion [arqueo]="reporte().arqueo" />
+</section>

@@ -1,0 +1,85 @@
+<section class="aperturas">
+  <header class="aperturas__header">
+    <div>
+      <h2>Aperturas TCG</h2>
+      <p>
+        Abrir sellados, ingresar las cartas resultantes y medir el rendimiento frente al costo del
+        producto origen.
+      </p>
+    </div>
+    <button type="button" class="aperturas__add" (click)="abrirWizard()">Nueva apertura</button>
+  </header>
+
+  <app-apertura-yield-card [rendimiento]="resumen().rendimiento" />
+
+  <section class="kpis" aria-label="Resumen de aperturas">
+    <article>
+      <span>Registros</span>
+      <strong>{{ resumen().total }}</strong>
+    </article>
+    <article>
+      <span>Confirmadas</span>
+      <strong>{{ resumen().confirmadas }}</strong>
+    </article>
+    <article>
+      <span>Cartas ingresadas</span>
+      <strong>{{ resumen().cartas | number: '1.0-0' }}</strong>
+    </article>
+  </section>
+
+  <section class="toolbar" aria-label="Filtros de historial">
+    <label>
+      <span>Sede</span>
+      <select [ngModel]="filtros().sedeId" (ngModelChange)="actualizarFiltro('sedeId', $event)">
+        <option value="TODAS">Todas</option>
+        @for (sede of sedes(); track sede.id) {
+          <option [value]="sede.id">{{ sede.nombre }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Estado</span>
+      <select [ngModel]="filtros().estado" (ngModelChange)="actualizarFiltro('estado', $event)">
+        <option value="TODOS">Todos</option>
+        @for (estado of estadosOpciones; track estado) {
+          <option [value]="estado">{{ estados[estado] }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Desde</span>
+      <input
+        type="date"
+        [ngModel]="filtros().desde"
+        (ngModelChange)="actualizarFiltro('desde', $event)"
+      />
+    </label>
+    <label>
+      <span>Hasta</span>
+      <input
+        type="date"
+        [ngModel]="filtros().hasta"
+        (ngModelChange)="actualizarFiltro('hasta', $event)"
+      />
+    </label>
+    <button type="button" class="toolbar__clear" (click)="limpiarFiltros()">Limpiar</button>
+  </section>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <app-aperturas-historial-table
+    [filas]="filas()"
+    (continuar)="abrirWizard($event)"
+    (anular)="anular($event)"
+  />
+</section>
+
+@if (wizardAbierto()) {
+  <app-apertura-wizard
+    [aperturaId]="aperturaEnCurso()"
+    (saved)="onGuardado()"
+    (cancelled)="cerrarWizard()"
+  />
+}

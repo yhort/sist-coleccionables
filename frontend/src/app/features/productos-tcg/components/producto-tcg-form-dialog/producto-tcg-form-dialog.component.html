@@ -1,0 +1,386 @@
+<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-labelledby]="'producto-form-title'"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="producto-form-title">{{ titulo() }}</h2>
+      <p>Datos de venta en caja. La pestaña WooCommerce queda para IDs y parámetros de la tienda web.</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__general">
+      <label>
+        Nombre
+        <input formControlName="nombre" maxlength="200" />
+      </label>
+      <label>
+        SKU
+        <input formControlName="codigoSku" maxlength="64" />
+        @if (errorSku) {
+          <small class="field-error">{{ errorSku }}</small>
+        }
+      </label>
+      <label>
+        Tipo de producto
+        <select formControlName="tipoProducto">
+          @for (tipo of tipos; track tipo[0]) {
+            <option [value]="tipo[0]">{{ tipo[1] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Categoría / juego
+        <select formControlName="juego">
+          <option value="">Sin juego</option>
+          @for (juego of juegos; track juego[0]) {
+            <option [value]="juego[0]">{{ juego[1] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Código de barras
+        <input formControlName="codigoBarras" maxlength="64" />
+      </label>
+      <label>
+        Stock local
+        <input type="number" min="0" step="1" formControlName="stockLocal" />
+      </label>
+      @if (!esEdicion()) {
+        <label>
+          Sede del stock
+          <select formControlName="sedeId">
+            <option value="">Seleccionar sede</option>
+            @for (sede of sedes(); track sede.id) {
+              <option [value]="sede.id">{{ sede.nombre }}</option>
+            }
+          </select>
+        </label>
+      }
+      <label>
+        Costo
+        <input type="number" min="0" step="0.01" formControlName="costo" />
+      </label>
+      <label>
+        Precio de venta (S/)
+        <input type="number" min="0" step="0.01" formControlName="precioVenta" />
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" formControlName="activo" />
+        Activo
+      </label>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        [class.tabs__tab--active]="tabActiva === 'tcg'"
+        [attr.aria-selected]="tabActiva === 'tcg'"
+        (click)="seleccionarTab('tcg')"
+      >
+        Atributos TCG
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [class.tabs__tab--active]="tabActiva === 'woo'"
+        [attr.aria-selected]="tabActiva === 'woo'"
+        (click)="seleccionarTab('woo')"
+      >
+        Integración WooCommerce
+      </button>
+    </div>
+
+    @if (tabActiva === 'tcg') {
+      <div class="tab-panel" role="tabpanel">
+        <div class="tab-panel__fields" formGroupName="atributosTcg">
+        @if (tipoProducto === 'CARTA') {
+          <label>
+            Set
+            <input formControlName="setCodigo" placeholder="SV8, LOB, 2X2" />
+          </label>
+          <label>
+            Nombre del set
+            <input formControlName="setNombre" />
+          </label>
+          <label>
+            Número
+            <input formControlName="numeroCarta" placeholder="025/198" />
+          </label>
+          <label>
+            Rareza
+            <select formControlName="rareza">
+              <option value="">Seleccionar</option>
+              @for (rareza of rarezas; track rareza[0]) {
+                <option [value]="rareza[0]">{{ rareza[1] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Condición
+            <select formControlName="condicion">
+              <option value="">Seleccionar</option>
+              @for (condicion of condiciones; track condicion[0]) {
+                <option [value]="condicion[0]">{{ condicion[1] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Idioma
+            <select formControlName="idioma">
+              <option value="">Seleccionar</option>
+              @for (idioma of idiomas; track idioma[0]) {
+                <option [value]="idioma[0]">{{ idioma[1] }}</option>
+              }
+            </select>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" formControlName="esFoil" />
+            Foil
+          </label>
+          <label>
+            Artista
+            <input formControlName="artista" />
+          </label>
+        } @else if (tipoProducto === 'SELLADO') {
+          <label>
+            Tipo de sellado
+            <select formControlName="tipoSellado">
+              <option value="">Seleccionar</option>
+              @for (tipo of sellados; track tipo[0]) {
+                <option [value]="tipo[0]">{{ tipo[1] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Set
+            <input formControlName="setCodigo" />
+          </label>
+          <label>
+            Edición
+            <input formControlName="edicion" />
+          </label>
+          <label>
+            Cartas esperadas
+            <input type="number" min="0" formControlName="cartasEsperadas" />
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" formControlName="permiteApertura" />
+            Permite apertura
+          </label>
+        } @else if (tipoProducto === 'ACCESORIO') {
+          <label>
+            Tipo de accesorio
+            <select formControlName="tipoAccesorio">
+              <option value="">Seleccionar</option>
+              @for (tipo of accesorios; track tipo[0]) {
+                <option [value]="tipo[0]">{{ tipo[1] }}</option>
+              }
+            </select>
+          </label>
+        }
+        </div>
+        @if (permiteAperturaActiva) {
+          <div class="contenido-fijo">
+            <div class="bom__head">
+              <h3>Contenido Fijo de Apertura</h3>
+            </div>
+            <p class="hint">
+              SKUs que siempre vienen en la caja al abrirla (dados, fundas, carta promo, moneda).
+            </p>
+            <div class="contenido-fijo__alta">
+              <label class="contenido-fijo__buscar">
+                Buscar SKU / producto
+                <input
+                  type="search"
+                  autocomplete="off"
+                  [value]="busquedaContenido()"
+                  placeholder="SKU, nombre…"
+                  (input)="onBusquedaContenido($any($event.target).value)"
+                  (focus)="listaContenidoAbierta.set(true)"
+                />
+                @if (listaContenidoAbierta() && candidatosContenido.length) {
+                  <ul class="contenido-fijo__sugerencias">
+                    @for (candidato of candidatosContenido; track candidato.id) {
+                      <li>
+                        <button type="button" (mousedown)="elegirContenido(candidato)">
+                          <strong>{{ candidato.codigoSku }}</strong>
+                          <span>{{ candidato.nombre }}</span>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
+              </label>
+              <label>
+                Cantidad
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  [value]="cantidadContenido()"
+                  (input)="onCantidadContenido($any($event.target).value)"
+                />
+              </label>
+              <button type="button" class="ghost" (click)="agregarContenidoFijo()">Añadir</button>
+            </div>
+            @if (contenidoFijo().length) {
+              <div class="table-wrap">
+                <table class="contenido-fijo__tabla">
+                  <thead>
+                    <tr>
+                      <th>SKU</th>
+                      <th>Producto</th>
+                      <th>Cant.</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of contenidoFijo(); track item.productoId) {
+                      <tr>
+                        <td><code>{{ item.sku }}</code></td>
+                        <td>{{ item.nombre }}</td>
+                        <td>{{ item.cantidad }}</td>
+                        <td>
+                          <button type="button" class="link-btn" (click)="quitarContenidoFijo(item.productoId)">
+                            Quitar
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <p class="hint">Todavía no hay ítems fijos vinculados.</p>
+            }
+          </div>
+        }
+        @if (tipoProducto === 'COMPUESTO') {
+          <div class="bom" formArrayName="componentes">
+            <div class="bom__head">
+              <h3>Componentes del compuesto</h3>
+              <button type="button" class="ghost" (click)="agregarComponente()">Añadir componente</button>
+            </div>
+            @for (grupo of componentes.controls; track $index) {
+              <div class="bom__row" [formGroupName]="$index">
+                <select formControlName="productoHijoId">
+                  <option value="">Producto hijo</option>
+                  @for (hijo of candidatosBom; track hijo.id) {
+                    <option [value]="hijo.id">{{ hijo.nombre }} ({{ hijo.codigoSku }})</option>
+                  }
+                </select>
+                <input type="number" min="0.001" step="1" formControlName="cantidad" />
+                <button type="button" class="ghost" (click)="quitarComponente($index)">Quitar</button>
+              </div>
+            } @empty {
+              <p class="hint">Un compuesto se arma con cartas, sellados o accesorios existentes.</p>
+            }
+          </div>
+        }
+
+        <button type="button" class="ghost" (click)="copiarAtributosTcgAWoo()">
+          Copiar atributos TCG a WooCommerce
+        </button>
+      </div>
+    } @else {
+      <div class="tab-panel" role="tabpanel">
+        <p class="hint">
+          Solo IDs y parámetros de la tienda web. El precio de venta de caja está en la sección
+          principal.
+        </p>
+        <div class="tab-panel__fields" formGroupName="woo">
+        <label>
+          WooCommerce ID
+          <input type="number" min="1" formControlName="wooCommerceId" placeholder="ID de la CSV" />
+        </label>
+        <label>
+          SKU Woo
+          <input formControlName="sku" placeholder="Si vacío, usa el SKU local" />
+        </label>
+        <label class="wide">
+          Categorías Woo
+          <textarea
+            formControlName="categoriasWoo"
+            rows="2"
+            placeholder="Cartas > Pokémon > SV3"
+          ></textarea>
+        </label>
+        <label>
+          Precio regular Woo
+          <input type="number" min="0" step="0.01" formControlName="precioNormal" />
+        </label>
+        <label>
+          Precio rebajado Woo
+          <input type="number" min="0" step="0.01" formControlName="precioRebajado" />
+          @if (form.controls['woo'].get('precioRebajado')?.hasError('mayorQueNormal')) {
+            <small class="field-error">Debe ser menor al precio regular Woo.</small>
+          }
+        </label>
+        <label>
+          Stock Woo
+          <input type="number" min="0" step="1" formControlName="stockWoo" />
+        </label>
+        <label class="wide">
+          Imágenes (URLs)
+          <textarea
+            formControlName="imagenes"
+            rows="2"
+            placeholder="https://…/charizard.jpg, https://…/back.jpg"
+          ></textarea>
+          <small>
+            URLs directas a archivo (.png, .jpg, .webp), separadas por coma. Las páginas de galería
+            no se muestran en la tarjeta. Se envían a Woo solo al publicar la ficha, no en el stock-out.
+          </small>
+          @if (urlsImagenNoDirectas().length) {
+            <small class="field-error">
+              No es un archivo de imagen: {{ urlsImagenNoDirectas().join(', ') }}
+            </small>
+          }
+        </label>
+        </div>
+
+        <div class="wide atributos" formArrayName="atributosWoo">
+          <div class="bom__head">
+            <h3>Atributos WooCommerce</h3>
+            <button type="button" class="ghost" (click)="agregarAtributoWoo()">Añadir atributo</button>
+          </div>
+          @for (grupo of atributosWoo.controls; track $index) {
+            <div class="bom__row" [formGroupName]="$index">
+              <input formControlName="nombre" placeholder="Nombre (Set, Rareza…)" />
+              <input formControlName="valores" placeholder="Valores separados por coma" />
+              <button type="button" class="ghost" (click)="quitarAtributoWoo($index)">Quitar</button>
+            </div>
+          } @empty {
+            <p class="hint">Equivalente a las columnas Attribute N name / Attribute N value(s).</p>
+          }
+        </div>
+
+        @if (producto(); as actual) {
+          <p class="hint wide">
+            Estado actual:
+            <strong>{{ etiquetasSync[actual.woo.estadoSincronizacion] }}</strong>
+            @if (actual.woo.mensajeError) {
+              — {{ actual.woo.mensajeError }}
+            }
+          </p>
+        }
+      </div>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
+      <button type="submit" class="primary">Guardar producto</button>
+    </footer>
+  </form>
+</section>

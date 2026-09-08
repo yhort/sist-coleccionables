@@ -1,0 +1,40 @@
+<section class="pagos">
+  <header class="pagos__header">
+    <div>
+      <h2>Pagos</h2>
+      <p>
+        Bandeja Yape / Izipay / transferencia. Conciliar con un pedido en Pendiente de pago y
+        confirmar para moverlo a Pagado en el Kanban.
+      </p>
+    </div>
+    <button type="button" class="pagos__add" (click)="abrirRegistro()">Registrar pago</button>
+  </header>
+
+  <app-pagos-kpis [kpis]="kpis()" />
+
+  <app-pagos-filters
+    [filtros]="filtros()"
+    (changed)="actualizarFiltros($event)"
+    (cleared)="limpiarFiltros()"
+  />
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <app-pagos-table
+    [filas]="filas()"
+    (asociar)="abrirAsociar($event)"
+    (confirmar)="confirmar($event)"
+    (rechazar)="rechazar($event)"
+  />
+</section>
+
+@if (dialogAbierto()) {
+  <app-asociar-pago-dialog
+    [pago]="pagoEnCurso()"
+    [pedidoIdInicial]="pedidoIdInicial()"
+    (saved)="onGuardado()"
+    (cancelled)="cerrarDialog()"
+  />
+}

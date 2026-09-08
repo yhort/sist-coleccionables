@@ -1,0 +1,133 @@
+:host {
+  display: block;
+}
+
+.cascada {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+input,
+select {
+  min-height: 40px;
+  padding: 0.45rem 0.7rem;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.cascada__pasos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.ficha {
+  position: relative;
+}
+
+.sugerencias--ficha {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  right: 0;
+  left: 0;
+  z-index: 5;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.vacio {
+  padding: 0.55rem 0.7rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.sugerencias {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+
+  button {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    cursor: pointer;
+
+    span {
+      color: var(--color-text-muted, var(--color-text-secondary));
+      font-size: 0.75rem;
+    }
+
+    &:hover {
+      background: var(--color-primary-soft);
+    }
+  }
+}
+
+.seleccion {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+
+  strong {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+}
+
+.hint,
+.error {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.hint {
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.link-btn {
+  margin-left: 0.4rem;
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .cascada__pasos {
+    grid-template-columns: 1fr 1fr;
+  }
+}
