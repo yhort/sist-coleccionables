@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe, NgClass } from '@angular/common';
+import { DatePipe, NgClass } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
@@ -10,6 +10,7 @@ import {
   Pago,
   esOrigenDigital,
 } from '../../models/pago.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 export interface PagoFila {
   pago: Pago;
@@ -19,7 +20,7 @@ export interface PagoFila {
 
 @Component({
   selector: 'app-pagos-table',
-  imports: [CurrencyPipe, DatePipe, NgClass, RouterLink],
+  imports: [SolesPipe, DatePipe, NgClass, RouterLink],
   templateUrl: './pagos-table.component.html',
   styleUrl: './pagos-table.component.scss',
 })

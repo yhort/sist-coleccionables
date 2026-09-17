@@ -90,4 +90,30 @@ public static class PedidoKanban
         MetodoEnvio.DELIVERY_MOTO => "Delivery moto",
         _ => metodo.ToString()
     };
+
+    public static bool MismoCliente(
+        IReadOnlyList<(Guid? ClienteId, string? ClienteNombre)> pedidos)
+    {
+        if (pedidos.Count <= 1)
+        {
+            return true;
+        }
+
+        var nombres = pedidos
+            .Select(p => (p.ClienteNombre ?? string.Empty).Trim().ToUpperInvariant())
+            .Where(nombre => nombre.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (nombres.Count == 1)
+        {
+            return true;
+        }
+
+        var ids = pedidos
+            .Select(p => p.ClienteId)
+            .Where(id => id is { } valor && valor != Guid.Empty)
+            .Distinct()
+            .ToList();
+        return ids.Count == 1 && pedidos.All(p => p.ClienteId == ids[0]);
+    }
 }

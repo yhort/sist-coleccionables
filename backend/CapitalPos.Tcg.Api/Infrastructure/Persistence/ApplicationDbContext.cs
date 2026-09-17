@@ -348,7 +348,9 @@ public sealed class ApplicationDbContext : DbContext
         entity.HasKey(e => e.Id);
         entity.Property(e => e.CantidadDisponible).HasPrecision(18, 3);
         entity.Property(e => e.CantidadReservada).HasPrecision(18, 3);
-        entity.Property(e => e.CantidadLibre).HasPrecision(18, 3);
+        entity.Property(e => e.CantidadLibre)
+            .HasPrecision(18, 3)
+            .ValueGeneratedOnAddOrUpdate();
 
         entity.HasOne(e => e.Empresa)
             .WithMany()
@@ -480,6 +482,7 @@ public sealed class ApplicationDbContext : DbContext
         entity.HasKey(e => e.Id);
         entity.Property(e => e.Titulo).HasMaxLength(200).IsRequired();
         EnumAsString(entity.Property(e => e.Canal), 24);
+        EnumAsString(entity.Property(e => e.Modo), 16);
         entity.Property(e => e.PrecioBase).HasPrecision(18, 2);
         entity.Property(e => e.IncrementoMinimo).HasPrecision(18, 2);
         entity.Property(e => e.PrecioReserva).HasPrecision(18, 2);
@@ -516,6 +519,8 @@ public sealed class ApplicationDbContext : DbContext
         detalle.ToTable("subasta_detalles");
         detalle.HasKey(e => e.Id);
         detalle.Property(e => e.Cantidad).HasPrecision(18, 3);
+        detalle.Property(e => e.TituloPersonalizado).HasMaxLength(200);
+        EnumAsString(detalle.Property(e => e.Estado), 16);
 
         detalle.HasOne(e => e.Subasta)
             .WithMany(s => s.Detalles)
@@ -545,8 +550,16 @@ public sealed class ApplicationDbContext : DbContext
             .HasPrincipalKey(s => new { s.EmpresaId, s.Id })
             .OnDelete(DeleteBehavior.Cascade);
 
+        puja.HasOne(e => e.Detalle)
+            .WithMany()
+            .HasForeignKey(e => e.SubastaDetalleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         puja.HasIndex(e => new { e.EmpresaId, e.SubastaTcgId, e.Fecha })
             .HasDatabaseName("ix_pujas_empresa_subasta_fecha");
+
+        puja.HasIndex(e => new { e.EmpresaId, e.SubastaTcgId, e.SubastaDetalleId, e.Fecha })
+            .HasDatabaseName("ix_pujas_empresa_subasta_detalle_fecha");
     }
 
     private static void ConfigurePedidoDigital(ModelBuilder modelBuilder)
@@ -579,6 +592,7 @@ public sealed class ApplicationDbContext : DbContext
         entity.Property(e => e.PuntoEntrega).HasMaxLength(80);
         EnumAsString(entity.Property(e => e.CanalContacto), 16);
         entity.Property(e => e.ContactoReferencia).HasMaxLength(160);
+        entity.Property(e => e.Notificado).HasDefaultValue(false);
 
         entity.HasAlternateKey(e => new { e.EmpresaId, e.Id })
             .HasName("ak_pedidos_digitales_empresa_id");

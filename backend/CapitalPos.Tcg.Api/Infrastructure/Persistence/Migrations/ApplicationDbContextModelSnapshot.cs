@@ -1410,6 +1410,10 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(24)")
                         .HasColumnName("estado");
 
+                    b.Property<DateTimeOffset?>("FechaNotificacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_notificacion");
+
                     b.Property<DateTimeOffset>("FechaPedido")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_pedido");
@@ -1430,6 +1434,12 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notas_empaque");
+
+                    b.Property<bool>("Notificado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("notificado");
 
                     b.Property<string>("NumeroTracking")
                         .HasMaxLength(80)
@@ -1793,14 +1803,23 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(160)")
                         .HasColumnName("nombre_postor");
 
+                    b.Property<Guid?>("SubastaDetalleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subasta_detalle_id");
+
                     b.Property<Guid>("SubastaTcgId")
                         .HasColumnType("uuid")
                         .HasColumnName("subasta_tcg_id");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SubastaDetalleId");
+
                     b.HasIndex("EmpresaId", "SubastaTcgId", "Fecha")
                         .HasDatabaseName("ix_pujas_empresa_subasta_fecha");
+
+                    b.HasIndex("EmpresaId", "SubastaTcgId", "SubastaDetalleId", "Fecha")
+                        .HasDatabaseName("ix_pujas_empresa_subasta_detalle_fecha");
 
                     b.ToTable("pujas", (string)null);
                 });
@@ -1993,17 +2012,37 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("empresa_id");
 
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("estado");
+
                     b.Property<int>("Orden")
                         .HasColumnType("integer")
                         .HasColumnName("orden");
+
+                    b.Property<Guid?>("PedidoDigitalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pedido_digital_id");
 
                     b.Property<Guid>("ProductoId")
                         .HasColumnType("uuid")
                         .HasColumnName("producto_id");
 
+                    b.Property<Guid?>("PujaGanadoraId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("puja_ganadora_id");
+
                     b.Property<Guid>("SubastaTcgId")
                         .HasColumnType("uuid")
                         .HasColumnName("subasta_tcg_id");
+
+                    b.Property<string>("TituloPersonalizado")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo_personalizado");
 
                     b.HasKey("Id");
 
@@ -2056,6 +2095,13 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("incremento_minimo");
+
+                    b.Property<string>("Modo")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("modo");
 
                     b.Property<string>("Observacion")
                         .HasMaxLength(500)
@@ -3327,12 +3373,19 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CapitalPos.Tcg.Api.Domain.Entities.Puja", b =>
                 {
+                    b.HasOne("CapitalPos.Tcg.Api.Domain.Entities.SubastaDetalle", "Detalle")
+                        .WithMany()
+                        .HasForeignKey("SubastaDetalleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CapitalPos.Tcg.Api.Domain.Entities.SubastaTcg", "Subasta")
                         .WithMany("Pujas")
                         .HasForeignKey("EmpresaId", "SubastaTcgId")
                         .HasPrincipalKey("EmpresaId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Detalle");
 
                     b.Navigation("Subasta");
                 });

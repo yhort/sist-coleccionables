@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
@@ -9,10 +9,11 @@ import {
   claseEstadoActividad,
   formatearFechaOperativa,
 } from '../../models/dashboard.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [CurrencyPipe, DatePipe, DecimalPipe, RouterLink],
+  imports: [SolesPipe, DatePipe, DecimalPipe, RouterLink],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.scss',
 })

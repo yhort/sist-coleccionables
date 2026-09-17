@@ -13,6 +13,10 @@ import { SubastaFormDialogComponent } from '../../components/subasta-form-dialog
 import { SubastaDetallePanelComponent } from '../../components/subasta-detalle-panel/subasta-detalle-panel.component';
 import { SubastaMargenCardComponent } from '../../components/subasta-margen-card/subasta-margen-card.component';
 import { SubastaTableroItem } from '../../components/subasta-card/subasta-card.component';
+import {
+  PedidoVinculoSubasta,
+  SubastasTablaComponent,
+} from '../../components/subastas-tabla/subastas-tabla.component';
 import { SubastasTableroComponent } from '../../components/subastas-tablero/subastas-tablero.component';
 import { SubastasTcgApiService } from '../../data-access/subastas-tcg.service';
 import {
@@ -22,9 +26,23 @@ import {
   SubastaTcg,
   SubastasTcgFiltros,
   calcularMargenSubasta,
+  esEventoIndividuales,
   etiquetaLoteSubasta,
   subastaVencida,
 } from '../../models/subasta-tcg.model';
+
+const VISTA_STORAGE_KEY = 'subastas_view_mode';
+
+export type SubastasVistaMode = 'kanban' | 'tabla';
+
+function leerVistaPreferida(): SubastasVistaMode {
+  try {
+    const valor = localStorage.getItem(VISTA_STORAGE_KEY);
+    return valor === 'tabla' ? 'tabla' : 'kanban';
+  } catch {
+    return 'kanban';
+  }
+}
 
 @Component({
   selector: 'app-subastas-tcg-page',
@@ -34,6 +52,7 @@ import {
     SubastaFormDialogComponent,
     SubastaDetallePanelComponent,
     SubastaMargenCardComponent,
+    SubastasTablaComponent,
     SubastasTableroComponent,
   ],
   templateUrl: './subastas-tcg-page.component.html',
@@ -55,6 +74,7 @@ export class SubastasTcgPageComponent {
   readonly etiquetasTipo = ETIQUETAS_TIPO;
 
   readonly filtros = signal<SubastasTcgFiltros>({ ...FILTROS_SUBASTAS_VACIOS });
+  readonly vista = signal<SubastasVistaMode>(leerVistaPreferida());
   readonly seleccionadaId = signal<string | null>(null);
   readonly pujaSubasta = signal<SubastaTcg | null>(null);
   readonly formAbierta = signal(false);
@@ -121,6 +141,15 @@ export class SubastasTcgPageComponent {
     };
   });
 
+  setVista(mode: SubastasVistaMode): void {
+    this.vista.set(mode);
+    try {
+      localStorage.setItem(VISTA_STORAGE_KEY, mode);
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+
   actualizarFiltro<K extends keyof SubastasTcgFiltros>(
     clave: K,
     valor: SubastasTcgFiltros[K],
@@ -141,10 +170,64 @@ export class SubastasTcgPageComponent {
     this.seleccionadaId.set(null);
   }
 
+  abrirAdjudicar(subasta: SubastaTcg): void {
+    this.error.set('');
+    this.seleccionadaId.set(subasta.id);
+  }
+
+  abrirSala(subasta: SubastaTcg): void {
+    void this.router.navigate(['/app/subastas-tcg', subasta.id]);
+  }
+
+  editarSubasta(subasta: SubastaTcg): void {
+    this.error.set('');
+    this.seleccionadaId.set(subasta.id);
+  }
+
+  irAPedido(pedido: PedidoVinculoSubasta): void {
+    void this.router.navigate(['/app/pedidos-digitales'], {
+      queryParams: { pedidoId: pedido.id },
+    });
+  }
+
+  async activarSubasta(subasta: SubastaTcg): Promise<void> {
+    if (!globalThis.confirm(`¿Activar ${subasta.codigo}? Pasará a estado Activa.`)) {
+      return;
+    }
+    this.error.set('');
+    try {
+      await this.subastasApi.activar(subasta.id);
+    } catch (err) {
+      this.error.set(readApiError(err));
+    }
+  }
+
+  async declararDesierta(subasta: SubastaTcg): Promise<void> {
+    // En Cerrada o eventos individuales: abrir panel (carta / adjudicar / anular).
+    if (esEventoIndividuales(subasta) || subasta.estado === 'CERRADA') {
+      this.seleccionadaId.set(subasta.id);
+      return;
+    }
+    if (!globalThis.confirm('¿Declarar desierta esta subasta? No se creará pedido.')) {
+      return;
+    }
+    this.error.set('');
+    try {
+      await this.subastasApi.declararDesierta(subasta.id);
+    } catch (err) {
+      this.error.set(readApiError(err));
+    }
+  }
+
   abrirPuja(subasta: SubastaTcg): void {
     this.error.set('');
     if (subastaVencida(subasta)) {
       this.error.set('La subasta ha finalizado y no acepta más pujas.');
+      return;
+    }
+    // Eventos individuales: la puja es por carta dentro de la sala.
+    if (subasta.modo === 'INDIVIDUALES') {
+      this.seleccionadaId.set(subasta.id);
       return;
     }
     this.pujaSubasta.set(subasta);

@@ -18,6 +18,12 @@ import {
 import { CatalogoTcgApiService } from '../../data-access/catalogo-tcg.service';
 import { TcgCarta, TcgSerie, TcgSet } from '../../models/catalogo-tcg.model';
 
+export interface OpcionAgregarSet {
+  prefijo: string;
+  etiqueta: string;
+  productos: ProductoTcg[];
+}
+
 @Component({
   selector: 'app-selector-producto-cascada',
   templateUrl: './selector-producto-cascada.component.html',
@@ -29,8 +35,11 @@ export class SelectorProductoCascadaComponent {
 
   readonly sedeId = input.required<string>();
   readonly productoId = input<string>('');
+  /** Habilita la acción masiva «Agregar todo el set» en el desplegable de SKU. */
+  readonly permitirAgregarSet = input(false);
   readonly stockLibreFn = input.required<(productoId: string) => number>();
   readonly productoChange = output<ProductoTcg | null>();
+  readonly agregarSet = output<ProductoTcg[]>();
 
   readonly series = signal<TcgSerie[]>([]);
   readonly sets = signal<TcgSet[]>([]);
@@ -64,6 +73,49 @@ export class SelectorProductoCascadaComponent {
       .slice(0, 8);
   });
 
+  /** Prefijo/Set detectado a partir de la búsqueda de SKU (p. ej. ME-ASC). */
+  readonly opcionAgregarSet = computed<OpcionAgregarSet | null>(() => {
+    if (!this.permitirAgregarSet()) {
+      return null;
+    }
+    const raw = this.busqueda().trim();
+    if (raw.length < 2) {
+      return null;
+    }
+    // Si ya hay un SKU exacto seleccionado, no ofrecer el set.
+    const seleccionado = this.seleccionado();
+    if (seleccionado && seleccionado.codigoSku.toLowerCase() === raw.toLowerCase()) {
+      return null;
+    }
+    const productos = this.productosDelPrefijoSet(raw);
+    if (productos.length < 2) {
+      return null;
+    }
+    const etiqueta = etiquetaPrefijoSet(raw, productos);
+    return { prefijo: etiqueta, etiqueta, productos };
+  });
+
+  readonly mostrarSugerencias = computed(() => {
+    const q = this.busqueda().trim().toLowerCase();
+    if (!q) {
+      return false;
+    }
+    if (this.opcionAgregarSet()) {
+      return true;
+    }
+    const skuSel = this.seleccionado()?.codigoSku.toLowerCase() ?? '';
+    return this.coincidencias().length > 0 && q !== skuSel;
+  });
+
+  readonly fichasFiltradas = computed(() => {
+    const q = this.busquedaFicha().trim();
+    const items = this.cartas();
+    if (!q) {
+      return items.slice(0, 12);
+    }
+    return items.filter((ficha) => coincideFicha(ficha, q)).slice(0, 12);
+  });
+
   readonly variantesFicha = computed(() => {
     const cartaId = this.cartaId();
     if (!cartaId) {
@@ -77,15 +129,6 @@ export class SelectorProductoCascadaComponent {
   readonly variantesConStock = computed(() => {
     this.sedeId();
     return this.variantesFicha().filter((item) => this.stockLibreFn()(item.id) > 0);
-  });
-
-  readonly fichasFiltradas = computed(() => {
-    const q = this.busquedaFicha().trim();
-    const items = this.cartas();
-    if (!q) {
-      return items.slice(0, 12);
-    }
-    return items.filter((ficha) => coincideFicha(ficha, q)).slice(0, 12);
   });
 
   constructor() {
@@ -116,8 +159,33 @@ export class SelectorProductoCascadaComponent {
     this.aplicarProducto(producto);
   }
 
+  confirmarAgregarSet(): void {
+    const opcion = this.opcionAgregarSet();
+    if (!opcion || opcion.productos.length === 0) {
+      return;
+    }
+    this.agregarSet.emit(opcion.productos);
+    this.busqueda.set('');
+    this.errorScan.set('');
+    this.productoChange.emit(null);
+  }
+
   limpiar(): void {
     this.busqueda.set('');
+    this.errorScan.set('');
+    this.productoChange.emit(null);
+  }
+
+  /** Limpia SKU, cascada (serie/set/ficha/variante) y selección para escanear el siguiente ítem. */
+  resetCompleto(): void {
+    this.busqueda.set('');
+    this.busquedaFicha.set('');
+    this.serieId.set('');
+    this.setId.set('');
+    this.cartaId.set('');
+    this.sets.set([]);
+    this.cartas.set([]);
+    this.listaFichasAbierta.set(false);
     this.errorScan.set('');
     this.productoChange.emit(null);
   }
@@ -231,6 +299,16 @@ export class SelectorProductoCascadaComponent {
     this.productoChange.emit(producto);
   }
 
+  private productosDelPrefijoSet(texto: string): ProductoTcg[] {
+    const q = texto.trim().toLowerCase();
+    if (!q) {
+      return [];
+    }
+    return this.productos()
+      .filter((producto) => coincidePrefijoSet(producto, q))
+      .sort((a, b) => a.codigoSku.localeCompare(b.codigoSku, 'es'));
+  }
+
   private buscarExacto(texto: string): ProductoTcg | undefined {
     const q = texto.trim().toLowerCase();
     if (!q) {
@@ -269,6 +347,38 @@ export class SelectorProductoCascadaComponent {
       .toLowerCase()
       .includes(q);
   }
+}
+
+function coincidePrefijoSet(producto: ProductoTcg, q: string): boolean {
+  const setCodigo = producto.atributosTcg.setCodigo?.trim().toLowerCase() ?? '';
+  if (setCodigo && setCodigo === q) {
+    return true;
+  }
+  const sku = producto.codigoSku.toLowerCase();
+  const woo = producto.woo.sku.toLowerCase();
+  // Prefijo de set en SKU: ME-ASC, ME-ASC-, ME-ASC-047…
+  return (
+    sku === q ||
+    sku.startsWith(`${q}-`) ||
+    sku.startsWith(`${q}_`) ||
+    woo === q ||
+    woo.startsWith(`${q}-`) ||
+    woo.startsWith(`${q}_`)
+  );
+}
+
+function etiquetaPrefijoSet(raw: string, productos: ProductoTcg[]): string {
+  const setCodigos = [
+    ...new Set(
+      productos
+        .map((p) => p.atributosTcg.setCodigo?.trim())
+        .filter((c): c is string => !!c),
+    ),
+  ];
+  if (setCodigos.length === 1) {
+    return setCodigos[0];
+  }
+  return raw.trim().toUpperCase();
 }
 
 function normalizarNumeroFicha(valor: string): string {

@@ -124,16 +124,16 @@
               </td>
               <td>{{ etiquetasTipo[item.tipoProducto] }}</td>
               <td>{{ item.detalle.cantidad }}</td>
-              <td>{{ item.detalle.precioUnitario | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
-              <td>{{ item.detalle.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ item.detalle.precioUnitario | soles }}</td>
+              <td>{{ item.detalle.total | soles }}</td>
             </tr>
           }
         </tbody>
       </table>
       <p class="totales">
-        Subtotal {{ pedido.subtotal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
-        · IGV {{ pedido.igv | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
-        · <strong>Total {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+        Subtotal {{ pedido.subtotal | soles }}
+        · IGV {{ pedido.igv | soles }}
+        · <strong>Total {{ pedido.total | soles }}</strong>
       </p>
     </section>
 
@@ -185,7 +185,7 @@
         </button>
       } @else if (puedeVincularPago()) {
         <button type="button" class="primary" (click)="abrirPago()">
-          Vincular pago
+          Registrar pago
         </button>
       }
       <button
@@ -212,9 +212,10 @@
           type="button"
           class="ghost"
           [class.ghost--danger]="estado === 'Cancelado'"
+          [class.ghost--entregar]="estado === 'Entregado'"
           (click)="transicionar(estado)"
         >
-          {{ etiquetasEstado[estado] }}
+          {{ etiquetaAccion(estado) }}
         </button>
       }
     </footer>
@@ -223,6 +224,16 @@
   <aside class="panel">
     <p class="empty">No se encontró el pedido.</p>
   </aside>
+}
+
+@if (cobrando()) {
+  @if (pedido(); as pedidoCobro) {
+    <app-registrar-pago-lote-dialog
+      [pedidos]="[pedidoCobro]"
+      (saved)="onPagoRegistrado()"
+      (cancelled)="cobrando.set(false)"
+    />
+  }
 }
 
 @if (accion(); as tipo) {

@@ -44,6 +44,10 @@ public class PedidoDigital : IEmpresaScoped
     /// <summary>Persona autorizada a recoger / contacto alternativo de este pedido.</summary>
     public string? ContactoReferencia { get; set; }
 
+    /// <summary>True cuando se copió/envió el resumen de WhatsApp al cliente.</summary>
+    public bool Notificado { get; set; }
+    public DateTimeOffset? FechaNotificacion { get; set; }
+
     public Empresa Empresa { get; set; } = null!;
     public Sede Sede { get; set; } = null!;
     public Cliente? Cliente { get; set; }

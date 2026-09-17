@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import {
   Component,
   HostListener,
@@ -12,6 +11,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { readApiError } from '../../../../core/http/api-error';
 import { ClientesApiService } from '../../../clientes/data-access/clientes.service';
+import { Cliente } from '../../../clientes/models/cliente.model';
 import {
   CANALES_CONTACTO,
   CanalContactoCliente,
@@ -27,14 +27,17 @@ import {
   SubastaTcg,
   MetodoEnvioCheckout,
   OrigenPagoCheckout,
+  esEventoIndividuales,
   etiquetaLoteSubasta,
+  nombreVisibleLinea,
   pujaGanadoraActual,
   unidadesLote,
 } from '../../models/subasta-tcg.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-adjudicar-checkout-dialog',
-  imports: [CurrencyPipe, ReactiveFormsModule],
+  imports: [SolesPipe, ReactiveFormsModule],
   templateUrl: './adjudicar-checkout-dialog.component.html',
   styleUrl: './adjudicar-checkout-dialog.component.scss',
 })
@@ -44,6 +47,8 @@ export class AdjudicarCheckoutDialogComponent {
   private readonly clientesApi = inject(ClientesApiService);
 
   readonly subasta = input.required<SubastaTcg>();
+  /** En eventos individuales: carta a adjudicar. */
+  readonly subastaDetalleId = input<string | null>(null);
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();
 
@@ -51,6 +56,11 @@ export class AdjudicarCheckoutDialogComponent {
   readonly enviando = signal(false);
   readonly metodoEnvio = signal<MetodoEnvioCheckout>('RECOJO_TIENDA');
   readonly tieneCliente = signal(false);
+  /** Adjudicación directa (sin historial de pujas). */
+  readonly nombrePostorDirecto = signal('');
+  readonly clienteIdDirecto = signal<string | null>(null);
+  readonly montoDirecto = signal(0);
+  readonly sugerenciasCliente = signal<Cliente[]>([]);
   readonly metodos = METODOS_ENVIO_CHECKOUT;
   readonly origenes = ORIGENES_PAGO_CHECKOUT;
   readonly etiquetasMetodo = ETIQUETAS_METODO_ENVIO_CHECKOUT;
@@ -58,6 +68,7 @@ export class AdjudicarCheckoutDialogComponent {
   readonly canalesContacto = CANALES_CONTACTO;
   readonly etiquetasCanalContacto = ETIQUETAS_CANAL_CONTACTO;
   readonly puntosSugeridos = PUNTOS_ENTREGA_SUGERIDOS;
+  readonly nombreVisibleLinea = nombreVisibleLinea;
 
   readonly form = this.fb.nonNullable.group({
     origenPagoPreferido: this.fb.nonNullable.control<OrigenPagoCheckout>('YAPE'),
@@ -77,8 +88,12 @@ export class AdjudicarCheckoutDialogComponent {
 
   constructor() {
     effect(() => {
-      const ganadora = pujaGanadoraActual(this.subasta());
+      const ganadora = this.ganadora();
       if (!ganadora) {
+        const base = this.subasta().precioBase;
+        if (this.montoDirecto() < base) {
+          this.montoDirecto.set(base);
+        }
         return;
       }
       if (!this.form.controls.destinatarioNombre.value) {
@@ -99,20 +114,87 @@ export class AdjudicarCheckoutDialogComponent {
     });
   }
 
-  ganadora() {
-    return pujaGanadoraActual(this.subasta());
+  requiereAdjudicacionDirecta(): boolean {
+    return !this.ganadora();
   }
 
-  lote() {
+  lineaSeleccionada() {
+    const id = this.subastaDetalleId();
+    if (!id) {
+      return null;
+    }
+    return this.subasta().detalles.find((d) => d.id === id) ?? null;
+  }
+
+  ganadora() {
+    return pujaGanadoraActual(this.subasta(), this.subastaDetalleId());
+  }
+
+  /** Descripción del lote / carta (secundaria al título del evento). */
+  resumenLote() {
+    const linea = this.lineaSeleccionada();
+    if (linea && esEventoIndividuales(this.subasta())) {
+      return nombreVisibleLinea(linea);
+    }
     return etiquetaLoteSubasta(this.subasta());
   }
 
   unidades() {
+    const linea = this.lineaSeleccionada();
+    if (linea && esEventoIndividuales(this.subasta())) {
+      return linea.cantidad;
+    }
     return unidadesLote(this.subasta());
+  }
+
+  async buscarGanador(texto: string): Promise<void> {
+    this.clienteIdDirecto.set(null);
+    this.tieneCliente.set(false);
+    this.nombrePostorDirecto.set(texto);
+    this.form.controls.destinatarioNombre.setValue(texto, { emitEvent: false });
+
+    const query = texto.trim();
+    if (query.length < 2) {
+      this.sugerenciasCliente.set([]);
+      return;
+    }
+
+    try {
+      const hits = await this.clientesApi.buscar(query);
+      const q = query.toLowerCase();
+      this.sugerenciasCliente.set(
+        hits.filter(
+          (c) =>
+            c.nombre.toLowerCase().includes(q) ||
+            (c.telefono ?? '').includes(query) ||
+            (c.contactoReferencia ?? '').toLowerCase().includes(q),
+        ),
+      );
+    } catch {
+      this.sugerenciasCliente.set([]);
+    }
+  }
+
+  elegirClienteGanador(cliente: Cliente): void {
+    this.clienteIdDirecto.set(cliente.id);
+    this.tieneCliente.set(true);
+    this.nombrePostorDirecto.set(cliente.nombre);
+    this.sugerenciasCliente.set([]);
+    this.form.patchValue({
+      destinatarioNombre: cliente.nombre,
+      destinatarioTelefono: cliente.telefono || '',
+      puntoEntrega: cliente.puntoEntregaPreferido || '',
+      canalContacto: cliente.canalContacto || '',
+      contactoReferencia: cliente.contactoReferencia || '',
+    });
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.sugerenciasCliente().length) {
+      this.sugerenciasCliente.set([]);
+      return;
+    }
     if (!this.enviando()) {
       this.cancelled.emit();
     }
@@ -121,9 +203,35 @@ export class AdjudicarCheckoutDialogComponent {
   async confirmar(): Promise<void> {
     this.form.markAllAsTouched();
     this.error.set('');
+    this.sugerenciasCliente.set([]);
     if (this.form.invalid) {
       this.error.set('Completa los datos de entrega requeridos.');
       return;
+    }
+
+    if (esEventoIndividuales(this.subasta()) && !this.subastaDetalleId()) {
+      this.error.set('Selecciona la carta a adjudicar.');
+      return;
+    }
+
+    const directa = this.requiereAdjudicacionDirecta();
+    if (directa) {
+      const nombre =
+        this.nombrePostorDirecto().trim() || this.form.controls.destinatarioNombre.value.trim();
+      const monto = Number(this.montoDirecto());
+      if (nombre.length < 2) {
+        this.error.set('Indica el nombre del ganador para adjudicar sin pujas previas.');
+        return;
+      }
+      if (!Number.isFinite(monto) || monto < this.subasta().precioBase) {
+        this.error.set(
+          `El monto adjudicado debe ser al menos ${this.subasta().precioBase.toFixed(2)}.`,
+        );
+        return;
+      }
+      if (!this.form.controls.destinatarioNombre.value.trim()) {
+        this.form.patchValue({ destinatarioNombre: nombre });
+      }
     }
 
     const raw = this.form.getRawValue();
@@ -132,6 +240,12 @@ export class AdjudicarCheckoutDialogComponent {
     this.enviando.set(true);
     try {
       await this.subastasApi.adjudicar(this.subasta().id, {
+        subastaDetalleId: this.subastaDetalleId(),
+        nombrePostor: directa
+          ? this.nombrePostorDirecto().trim() || raw.destinatarioNombre.trim()
+          : null,
+        clienteId: directa ? this.clienteIdDirecto() : null,
+        montoAdjudicado: directa ? Number(this.montoDirecto()) : null,
         metodoEnvio: raw.metodoEnvio,
         origenPagoPreferido: raw.origenPagoPreferido,
         destinatarioNombre: raw.destinatarioNombre.trim() || this.ganadora()?.nombrePostor,

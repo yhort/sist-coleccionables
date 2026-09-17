@@ -233,12 +233,13 @@
               Monto recibido
               <input type="number" min="0" step="0.01" formControlName="montoRecibido" />
             </label>
-            <p class="pos__vuelto">
+            <p class="pos__vuelto" [class.pos__vuelto--alerta]="cobroInsuficiente()">
               Vuelto
-              <strong>
-                {{ vuelto() === null ? '—' : (vuelto() | number: '1.2-2') }}
-              </strong>
+              <strong>{{ vuelto() | soles }}</strong>
             </p>
+            @if (cobroInsuficiente()) {
+              <p class="pos__hint" role="status">El monto recibido debe cubrir el total ({{ totalEstimado() | soles }}).</p>
+            }
           }
           <label class="wide recojo">
             <input type="checkbox" formControlName="imprimirTicket" />
@@ -256,7 +257,7 @@
       <button type="button" class="ghost" (click)="cancelled.emit()" [disabled]="guardando()">
         Cancelar
       </button>
-      <button type="submit" class="primary" [disabled]="guardando() || !!alertaCaja()">
+      <button type="submit" class="primary" [disabled]="guardando() || !!alertaCaja() || cobroInsuficiente()">
         {{
           form.controls.cobroInmediato.value
             ? guardando()

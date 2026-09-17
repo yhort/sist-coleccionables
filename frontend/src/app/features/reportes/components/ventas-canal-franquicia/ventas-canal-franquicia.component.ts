@@ -1,11 +1,12 @@
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { Component, input } from '@angular/core';
 
 import { SerieReporte } from '../../models/reporte.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-ventas-canal-franquicia',
-  imports: [CurrencyPipe, DecimalPipe],
+  imports: [SolesPipe, DecimalPipe],
   templateUrl: './ventas-canal-franquicia.component.html',
   styleUrl: './ventas-canal-franquicia.component.scss',
 })

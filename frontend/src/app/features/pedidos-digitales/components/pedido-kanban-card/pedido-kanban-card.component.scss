@@ -155,6 +155,22 @@
   }
 }
 
+.accion-btn {
+  min-height: 28px;
+  padding: 0 0.65rem;
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--color-primary-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+}
+
 .menu select {
   max-width: 132px;
   min-height: 28px;

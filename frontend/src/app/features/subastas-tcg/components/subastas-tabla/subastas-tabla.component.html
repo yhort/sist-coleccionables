@@ -1,0 +1,205 @@
+<section class="tabla" aria-label="Vista tabla de subastas">
+  <div class="tabla__tabs" role="tablist" aria-label="Filtro rápido por estado">
+    @for (estado of estadosTab; track estado) {
+      <button
+        type="button"
+        role="tab"
+        class="tabla__tab"
+        [attr.data-estado]="estado"
+        [class.tabla__tab--active]="estadoTab() === estado"
+        [attr.aria-selected]="estadoTab() === estado"
+        (click)="setEstadoTab(estado)"
+      >
+        {{ etiquetaEstadoTab(estado) }}
+        <span>{{ conteoPorEstado()[estado] ?? 0 }}</span>
+      </button>
+    }
+  </div>
+
+  @if (filtrados().length === 0) {
+    <div class="tabla__empty">No hay subastas con esos filtros.</div>
+  } @else {
+    <div class="tabla__wrap">
+      <table class="tabla__grid">
+        <thead>
+          <tr>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('fecha')">
+                Código / Fecha{{ sortMark('fecha') }}
+              </button>
+            </th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('producto')">
+                Carta / Producto{{ sortMark('producto') }}
+              </button>
+            </th>
+            <th>Canal / Sede</th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('precioBase')">
+                Precio base{{ sortMark('precioBase') }}
+              </button>
+            </th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('oferta')">
+                Última oferta{{ sortMark('oferta') }}
+              </button>
+            </th>
+            <th>
+              <button type="button" class="sort" (click)="ordenar('estado')">
+                Estado{{ sortMark('estado') }}
+              </button>
+            </th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of pageItems(); track item.subasta.id) {
+            <tr [attr.data-estado]="item.subasta.estado">
+              <td>
+                <button type="button" class="codigo" (click)="ver.emit(item.subasta)">
+                  {{ item.subasta.codigo }}
+                </button>
+                <small class="fecha">
+                  {{ item.subasta.fechaInicio | date: 'dd/MM HH:mm' }}
+                </small>
+              </td>
+              <td>
+                <strong>{{ tituloEvento(item) }}</strong>
+                <span class="lote-badge" [title]="detalleLote(item)">{{ detalleLote(item) }}</span>
+              </td>
+              <td>
+                <div class="canal-cell">
+                  <span class="canal" [attr.data-canal]="item.subasta.canal">
+                    {{ etiquetasCanal[item.subasta.canal] }}
+                  </span>
+                  <span class="sede">{{ item.sedeNombre }}</span>
+                </div>
+              </td>
+              <td class="monto">{{ item.subasta.precioBase | soles }}</td>
+              <td>
+                @if (ofertaMostrada(item.subasta); as oferta) {
+                  <strong class="monto">
+                    {{ oferta.monto | soles }}
+                    <span class="pujas-count">· {{ etiquetaPujas(oferta.totalPujas) }}</span>
+                  </strong>
+                  <small>{{ oferta.postor }}</small>
+                } @else {
+                  <span class="sin-oferta">
+                    Sin ofertas
+                    @if (item.subasta.pujas.length > 0) {
+                      · {{ etiquetaPujas(item.subasta.pujas.length) }}
+                    }
+                  </span>
+                }
+              </td>
+              <td>
+                <div class="estado-cell">
+                  <span class="estado" [attr.data-estado]="item.subasta.estado">
+                    {{ etiquetasEstado[item.subasta.estado] }}
+                  </span>
+                  @if (item.subasta.estado === 'ADJUDICADA') {
+                    @for (pedido of pedidosVinculados(item.subasta); track pedido.id) {
+                      <a
+                        class="pedido-badge"
+                        [routerLink]="['/app/pedidos-digitales']"
+                        [queryParams]="{ pedidoId: pedido.id }"
+                      >
+                        {{ pedido.codigo }}
+                      </a>
+                    }
+                  }
+                </div>
+              </td>
+              <td class="acciones">
+                @switch (item.subasta.estado) {
+                  @case ('CERRADA') {
+                    <button
+                      type="button"
+                      class="accion-btn"
+                      (click)="adjudicar.emit(item.subasta)"
+                    >
+                      Adjudicar
+                    </button>
+                    <button
+                      type="button"
+                      class="link-btn"
+                      (click)="desierta.emit(item.subasta)"
+                    >
+                      Declarar Desierta
+                    </button>
+                    <button type="button" class="link-btn" (click)="ver.emit(item.subasta)">
+                      Ver pujas
+                    </button>
+                  }
+                  @case ('ACTIVA') {
+                    <button
+                      type="button"
+                      class="accion-btn"
+                      (click)="abrirSala.emit(item.subasta)"
+                    >
+                      Abrir Sala
+                    </button>
+                    <button type="button" class="link-btn" (click)="ver.emit(item.subasta)">
+                      Ver pujas
+                    </button>
+                  }
+                  @case ('ADJUDICADA') {
+                    @if (pedidosVinculados(item.subasta); as pedidos) {
+                      @if (pedidos.length > 0) {
+                        <button
+                          type="button"
+                          class="accion-btn"
+                          (click)="irPedido.emit(pedidos[0])"
+                        >
+                          Ir a Pedido
+                        </button>
+                      }
+                    }
+                    <button type="button" class="link-btn" (click)="ver.emit(item.subasta)">
+                      Ver pujas
+                    </button>
+                  }
+                  @case ('BORRADOR') {
+                    <button
+                      type="button"
+                      class="accion-btn"
+                      (click)="activar.emit(item.subasta)"
+                    >
+                      Activar
+                    </button>
+                    <button type="button" class="link-btn" (click)="editar.emit(item.subasta)">
+                      Editar
+                    </button>
+                  }
+                  @default {
+                    <button type="button" class="link-btn" (click)="ver.emit(item.subasta)">
+                      Ver pujas
+                    </button>
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="tabla__pager">
+      <span>{{ rango().desde }}–{{ rango().hasta }} de {{ rango().total }}</span>
+      <div class="tabla__pager-btns">
+        <button type="button" class="ghost" [disabled]="paginaActual() <= 1" (click)="paginaAnterior()">
+          Anterior
+        </button>
+        <span>Pág. {{ paginaActual() }} / {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="paginaActual() >= totalPages()"
+          (click)="paginaSiguiente()"
+        >
+          Siguiente
+        </button>
+      </div>
+    </footer>
+  }
+</section>

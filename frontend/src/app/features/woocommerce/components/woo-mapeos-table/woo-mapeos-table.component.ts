@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { WooCommerceApiService } from '../../data-access/woocommerce.service';
@@ -6,10 +6,11 @@ import {
   ETIQUETAS_MAPEO_WOO,
   EstadoMapeoWoo,
 } from '../../models/woocommerce.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-woo-mapeos-table',
-  imports: [CurrencyPipe, DatePipe],
+  imports: [SolesPipe, DatePipe],
   templateUrl: './woo-mapeos-table.component.html',
   styleUrl: './woo-mapeos-table.component.scss',
 })

@@ -58,7 +58,7 @@
       @if (pedido(); as pedido) {
         <p>
           Pedido <code>{{ pedido.codigo }}</code> ·
-          {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+          {{ pedido.total | soles }}
         </p>
       }
       @if (pagos().length === 0) {
@@ -78,7 +78,7 @@
               </div>
               <p>
                 Monto
-                <strong>{{ pago.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+                <strong>{{ pago.monto | soles }}</strong>
               </p>
               <p>
                 N° operación

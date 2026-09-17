@@ -1,4 +1,4 @@
-import { CurrencyPipe, NgClass } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 
 import { TablaPaginacionComponent } from '../../../../shared/ui/tabla-paginacion/tabla-paginacion.component';
@@ -10,8 +10,8 @@ import {
   ETIQUETAS_TIPO,
   ProductoTcg,
   estadoStockDe,
-  precioVigente,
 } from '../../models/producto-tcg.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 /** Silueta local para no romper el thumb si la URL falla o no es un archivo de imagen. */
 export const IMAGEN_PRODUCTO_PLACEHOLDER =
@@ -28,7 +28,7 @@ export type VistaCatalogo = 'tabla' | 'grid';
 
 @Component({
   selector: 'app-productos-tcg-table',
-  imports: [CurrencyPipe, NgClass, TablaPaginacionComponent],
+  imports: [SolesPipe, NgClass, TablaPaginacionComponent],
   templateUrl: './productos-tcg-table.component.html',
   styleUrl: './productos-tcg-table.component.scss',
 })
@@ -48,7 +48,6 @@ export class ProductosTcgTableComponent {
   readonly etiquetasSync = ETIQUETAS_SYNC;
 
   stockDe = estadoStockDe;
-  vigente = precioVigente;
   readonly placeholderImagen = IMAGEN_PRODUCTO_PLACEHOLDER;
 
   private readonly imagenesFallidas = new Set<string>();
@@ -76,8 +75,20 @@ export class ProductosTcgTableComponent {
     }
   }
 
-  tieneRebajo(producto: ProductoTcg): boolean {
+  /** Precio web efectivo (rebaja Woo si aplica). */
+  precioWeb(producto: ProductoTcg): number {
     const rebajado = producto.woo.precioRebajado;
-    return rebajado != null && rebajado > 0 && rebajado < producto.woo.precioNormal;
+    if (rebajado != null && rebajado > 0 && rebajado < producto.woo.precioNormal) {
+      return rebajado;
+    }
+    return producto.woo.precioNormal || 0;
+  }
+
+  /** Solo si está mapeado y el precio web difiere del de caja. */
+  mostrarPrecioWoo(producto: ProductoTcg): boolean {
+    if (producto.woo.wooCommerceId == null) {
+      return false;
+    }
+    return this.precioWeb(producto) !== producto.precioVenta;
   }
 }

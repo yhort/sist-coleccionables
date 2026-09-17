@@ -127,6 +127,148 @@ public sealed class PagosService(
         return (await ObtenerAsync(pago.Id, cancellationToken))!;
     }
 
+    public async Task<IReadOnlyList<PagoResponse>> RegistrarLoteAsync(
+        RegistrarPagoLoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ids = (request.PedidoDigitalIds ?? [])
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0)
+        {
+            throw new BusinessRuleException("Selecciona al menos un pedido pendiente de pago.");
+        }
+
+        var monto = IgvCalculo.Round2(request.Monto);
+        if (monto <= 0)
+        {
+            throw new BusinessRuleException("El monto debe ser mayor que cero.");
+        }
+
+        var codigoBase = NormalizarCodigo(request.CodigoOperacion);
+        if (EsOrigenDigital(request.Origen) && codigoBase is null)
+        {
+            if (request.Confirmar)
+            {
+                codigoBase = $"POS-{DateTimeOffset.UtcNow:yyMMddHHmmssfff}";
+            }
+            else
+            {
+                throw new BusinessRuleException("Indica el código de operación Yape, Plin, Izipay o tarjeta.");
+            }
+        }
+
+        var pedidos = await db.PedidosDigitales
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+        if (pedidos.Count != ids.Count)
+        {
+            throw new BusinessRuleException("Uno o más pedidos no existen o no pertenecen a la empresa.");
+        }
+
+        if (pedidos.Any(p => p.Estado != EstadoPedidoDigital.PendientePago))
+        {
+            throw new BusinessRuleException("Solo se cobran pedidos en Pendiente de pago.");
+        }
+
+        if (!MismoCliente(pedidos))
+        {
+            throw new BusinessRuleException("Solo puedes cobrar juntos pedidos del mismo cliente.");
+        }
+
+        var ordenados = ids
+            .Select(id => pedidos.First(p => p.Id == id))
+            .ToList();
+        var saldos = new List<(PedidoDigital Pedido, decimal Saldo)>(ordenados.Count);
+        foreach (var pedido in ordenados)
+        {
+            var cubierto = await MontoCubiertoAsync(
+                pedido.Id,
+                [EstadoPago.ASOCIADO, EstadoPago.CONFIRMADO],
+                null,
+                cancellationToken);
+            var saldo = IgvCalculo.Round2(Math.Max(0, pedido.Total - cubierto));
+            if (saldo <= 0)
+            {
+                throw new BusinessRuleException("Hay pedidos sin saldo pendiente de cobro.");
+            }
+
+            saldos.Add((pedido, saldo));
+        }
+
+        var sumaSaldos = IgvCalculo.Round2(saldos.Sum(s => s.Saldo));
+        if (Math.Abs(sumaSaldos - monto) > IgvCalculo.ToleranciaPago)
+        {
+            throw new BusinessRuleException(
+                $"El monto debe coincidir con el total de los pedidos (S/ {sumaSaldos:0.00}).");
+        }
+
+        var ahora = DateTimeOffset.UtcNow;
+        var codigos = saldos
+            .Select((_, i) => CodigoLote(codigoBase, i, saldos.Count))
+            .ToList();
+        foreach (var codigo in codigos.Where(c => c is not null).Distinct())
+        {
+            await AsegurarCodigoLibreAsync(codigo, null, cancellationToken);
+        }
+
+        var referencia = TextoOpcional(request.ReferenciaExterna, 120);
+        var notaBase = TextoOpcional(request.Observacion, 500);
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var pagos = new List<Pago>(saldos.Count);
+        for (var i = 0; i < saldos.Count; i++)
+        {
+            var (pedido, saldo) = saldos[i];
+            var pago = new Pago
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = tenant.EmpresaId,
+                Origen = request.Origen,
+                Estado = EstadoPago.ASOCIADO,
+                Monto = saldo,
+                CodigoOperacion = codigos[i],
+                ReferenciaExterna = referencia,
+                PedidoDigitalId = pedido.Id,
+                ClienteNombre = pedido.ClienteNombre,
+                FechaNotificacion = ahora,
+                UsuarioAsocioId = currentUser.UserId,
+                Observacion = NotaLote(notaBase, i, saldos.Count, codigoBase),
+                FechaCreacion = ahora
+            };
+            db.Pagos.Add(pago);
+            pagos.Add(pago);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (request.Confirmar)
+        {
+            foreach (var pago in pagos)
+            {
+                pago.Estado = EstadoPago.CONFIRMADO;
+                pago.FechaConfirmacion = DateTimeOffset.UtcNow;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            foreach (var pago in pagos)
+            {
+                await MarcarPedidoPagadoSiCubreAsync(pago, cancellationToken);
+            }
+        }
+
+        await tx.CommitAsync(cancellationToken);
+
+        var idsPagos = pagos.Select(p => p.Id).ToList();
+        var creados = await QueryBase()
+            .Where(p => idsPagos.Contains(p.Id))
+            .OrderBy(p => p.FechaCreacion)
+            .ThenBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+        return creados.Select(Map).ToList();
+    }
+
     public async Task<PagoResponse> AsociarAsync(
         Guid id,
         Guid pedidoDigitalId,
@@ -320,6 +462,75 @@ public sealed class PagosService(
         await db.Pagos.Include(p => p.UsuarioAsocio)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
         ?? throw new BusinessRuleException("No se encontró el pago.", StatusCodes.Status404NotFound);
+
+    private static bool MismoCliente(IReadOnlyList<PedidoDigital> pedidos)
+    {
+        if (pedidos.Count <= 1)
+        {
+            return true;
+        }
+
+        var nombres = pedidos
+            .Select(p => (p.ClienteNombre ?? string.Empty).Trim().ToUpperInvariant())
+            .Where(nombre => nombre.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (nombres.Count == 1)
+        {
+            return true;
+        }
+
+        var ids = pedidos
+            .Select(p => p.ClienteId)
+            .Where(id => id is { } valor && valor != Guid.Empty)
+            .Distinct()
+            .ToList();
+        return ids.Count == 1 && pedidos.All(p => p.ClienteId == ids[0]);
+    }
+
+    private static string? CodigoLote(string? codigoBase, int index, int total)
+    {
+        if (codigoBase is null)
+        {
+            return null;
+        }
+
+        if (total <= 1 || index == 0)
+        {
+            return codigoBase;
+        }
+
+        var sufijo = $"-{index + 1}";
+        var max = 80 - sufijo.Length;
+        var raiz = codigoBase.Length <= max ? codigoBase : codigoBase[..max];
+        return raiz + sufijo;
+    }
+
+    private static string? NotaLote(string? nota, int index, int total, string? codigoBase)
+    {
+        var partes = new List<string>();
+        if (total > 1)
+        {
+            partes.Add($"Pago conjunto live {index + 1}/{total}");
+            if (!string.IsNullOrEmpty(codigoBase) && index > 0)
+            {
+                partes.Add($"código {codigoBase}");
+            }
+        }
+
+        if (nota is not null)
+        {
+            partes.Add(nota);
+        }
+
+        if (partes.Count == 0)
+        {
+            return null;
+        }
+
+        var texto = string.Join(". ", partes);
+        return texto[..Math.Min(texto.Length, 500)];
+    }
 
     private static bool EsOrigenDigital(OrigenPago origen) =>
         origen is OrigenPago.YAPE or OrigenPago.PLIN or OrigenPago.IZIPAY or OrigenPago.TARJETA;

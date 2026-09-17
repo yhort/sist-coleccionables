@@ -1,0 +1,97 @@
+<div class="dialog-backdrop no-print" (click)="closed.emit()"></div>
+
+<section class="slip" role="dialog" aria-modal="true" aria-labelledby="etiqueta-title">
+  <header class="slip__toolbar no-print">
+    <div>
+      <h2 id="etiqueta-title">{{ titulo() }}</h2>
+      <p class="slip__hint">Plantilla con logo · {{ resumenHint() }} · impresión térmica / A4</p>
+    </div>
+    <div class="slip__actions">
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+      <button type="button" class="primary" (click)="imprimir()">Imprimir</button>
+    </div>
+  </header>
+
+  <div class="etiquetas">
+    @for (etiqueta of etiquetas(); track etiqueta.id) {
+      <article class="etiqueta" [class.etiqueta--consolidada]="etiqueta.consolidada">
+        <header class="etiqueta__cabecera">
+          <img class="etiqueta__logo" [src]="logoUrl" alt="TRUNQI TCG" />
+          <div class="etiqueta__pedido">
+            <span class="etiqueta__eyebrow">
+              {{ etiqueta.consolidada ? 'N° pedidos (consolidado)' : 'N° pedido' }}
+            </span>
+            <strong>{{ etiqueta.codigos }}</strong>
+            @if (etiqueta.subasta; as subasta) {
+              <span class="etiqueta__subasta">{{ subasta }}</span>
+            }
+          </div>
+        </header>
+
+        <section class="etiqueta__bloque">
+          <h3>Remitente</h3>
+          <p>
+            <strong>TRUNQI TCG</strong>
+            · {{ etiqueta.sedeNombre }}
+          </p>
+        </section>
+
+        <section class="etiqueta__bloque">
+          <h3>Destinatario</h3>
+          <dl>
+            <div>
+              <dt>Cliente</dt>
+              <dd>{{ etiqueta.clienteNombre }}</dd>
+            </div>
+            <div>
+              <dt>Teléfono</dt>
+              <dd>{{ etiqueta.telefono }}</dd>
+            </div>
+            <div>
+              <dt>Canal</dt>
+              <dd>{{ etiqueta.canal }}</dd>
+            </div>
+            <div>
+              <dt>Destinatario final</dt>
+              <dd>{{ etiqueta.destinatarioFinal }}</dd>
+            </div>
+            @if (etiqueta.referencia; as ref) {
+              <div>
+                <dt>Referencia</dt>
+                <dd>{{ ref }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        <section class="etiqueta__bloque">
+          <h3>Envío / recojo</h3>
+          <dl>
+            <div>
+              <dt>Punto / agencia</dt>
+              <dd>{{ etiqueta.metodoEnvio }}</dd>
+            </div>
+            <div>
+              <dt>Dirección</dt>
+              <dd>{{ etiqueta.direccion }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="etiqueta__bloque etiqueta__bloque--items">
+          <h3>Contenido{{ etiqueta.consolidada ? ' unificado' : '' }}</h3>
+          <ul>
+            @for (linea of etiqueta.lineas; track $index) {
+              <li>{{ linea }}</li>
+            }
+          </ul>
+        </section>
+
+        <footer class="etiqueta__footer">
+          <span>{{ etiqueta.fecha | date: 'dd/MM/yyyy HH:mm' }}</span>
+          <span>www.trunqitcg.com.pe</span>
+        </footer>
+      </article>
+    }
+  </div>
+</section>

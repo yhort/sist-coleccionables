@@ -36,7 +36,7 @@
               }
             </td>
             <td class="monto">
-              {{ fila.pago.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+              {{ fila.pago.monto | soles }}
             </td>
             <td>{{ fila.clienteNombre }}</td>
             <td>

@@ -26,7 +26,7 @@
     <section class="kpis" aria-label="KPIs principales">
       <a class="kpi" routerLink="/app/pedidos-digitales">
         <span>Ventas del día</span>
-        <strong>{{ data.ventasHoy.totalRecaudado | currency: 'PEN' : 'S/ ' : '1.2-2' }}</strong>
+        <strong>{{ data.ventasHoy.totalRecaudado | soles }}</strong>
         <small>
           {{ data.ventasHoy.comprobantesEmitidos | number: '1.0-0' }}
           comprobante{{ data.ventasHoy.comprobantesEmitidos === 1 ? '' : 's' }} emitido{{
@@ -60,7 +60,7 @@
         <strong>{{ data.pagosNotificados.pendientesAsociar | number: '1.0-0' }}</strong>
         <small>
           Izipay / Yape listos para asociar ·
-          {{ data.pagosNotificados.montoPendiente | currency: 'PEN' : 'S/ ' : '1.2-2' }}
+          {{ data.pagosNotificados.montoPendiente | soles }}
         </small>
       </a>
 
@@ -123,7 +123,7 @@
                   <strong>{{ item.clienteNombre }}</strong>
                   <small>{{ item.tipo === 'VENTA' ? 'Venta POS' : 'Pedido digital' }}</small>
                 </td>
-                <td>{{ item.monto | currency: 'PEN' : 'S/ ' : '1.2-2' }}</td>
+                <td>{{ item.monto | soles }}</td>
                 <td>
                   <span class="badge" [attr.data-tone]="claseEstado(item.estado)">{{ item.estado }}</span>
                 </td>

@@ -3,6 +3,10 @@ import { TipoProductoTcg } from '../../productos-tcg/models/producto-tcg.model';
 
 export type CanalSubastaTcg = 'FACEBOOK_SUBASTA' | 'WEB' | 'PRESENCIAL' | 'OTRO';
 
+export type ModoSubastaTcg = 'COMBO' | 'INDIVIDUALES';
+
+export type EstadoSubastaDetalle = 'PENDIENTE' | 'ADJUDICADO' | 'DESIERTA';
+
 export type EstadoSubastaTcg =
   | 'BORRADOR'
   | 'ACTIVA'
@@ -17,6 +21,7 @@ export type OrigenPagoCheckout = 'YAPE' | 'PLIN' | 'TRANSFERENCIA';
 export interface PujaTcg {
   id: string;
   subastaTcgId: string;
+  subastaDetalleId: string | null;
   clienteId: string | null;
   nombrePostor: string;
   monto: number;
@@ -28,10 +33,16 @@ export interface SubastaDetalle {
   id: string;
   productoId: string;
   productoNombre: string;
+  /** Nombre editable del ítem; si vacío se usa productoNombre. */
+  tituloPersonalizado: string | null;
   codigoSku: string;
   tipoProducto: TipoProductoTcg;
   cantidad: number;
   orden: number;
+  estado: EstadoSubastaDetalle;
+  pujaGanadoraId: string | null;
+  pedidoDigitalId: string | null;
+  pedidoCodigo: string | null;
 }
 
 export interface SubastaTcg {
@@ -46,6 +57,7 @@ export interface SubastaTcg {
   detalles: SubastaDetalle[];
   titulo: string;
   canal: CanalSubastaTcg;
+  modo: ModoSubastaTcg;
   precioBase: number;
   incrementoMinimo: number;
   precioReserva: number | null;
@@ -61,6 +73,7 @@ export interface SubastaTcg {
 }
 
 export interface SubastasTcgFiltros {
+  busqueda: string;
   canal: CanalSubastaTcg | 'TODOS';
   tipoProducto: TipoProductoTcg | 'TODOS';
   sedeId: string | 'TODAS';
@@ -69,6 +82,7 @@ export interface SubastasTcgFiltros {
 export interface SubastaDetalleInput {
   productoId: string;
   cantidad: number;
+  tituloPersonalizado?: string | null;
 }
 
 export interface CrearSubastaRequest {
@@ -78,6 +92,7 @@ export interface CrearSubastaRequest {
   detalles: SubastaDetalleInput[];
   titulo: string;
   canal: CanalSubastaTcg;
+  modo?: ModoSubastaTcg;
   precioBase: number;
   incrementoMinimo: number;
   precioReserva: number | null;
@@ -89,10 +104,16 @@ export interface CrearSubastaRequest {
 export interface RegistrarPujaRequest {
   nombrePostor: string;
   clienteId?: string | null;
+  subastaDetalleId?: string | null;
   monto: number;
 }
 
 export interface AdjudicarSubastaRequest {
+  subastaDetalleId?: string | null;
+  /** Adjudicación directa sin historial de pujas. */
+  nombrePostor?: string | null;
+  clienteId?: string | null;
+  montoAdjudicado?: number | null;
   metodoEnvio: MetodoEnvioCheckout;
   origenPagoPreferido: OrigenPagoCheckout;
   destinatarioNombre?: string | null;
@@ -116,6 +137,7 @@ export interface MargenSubasta {
 }
 
 export const FILTROS_SUBASTAS_VACIOS: SubastasTcgFiltros = {
+  busqueda: '',
   canal: 'TODOS',
   tipoProducto: 'TODOS',
   sedeId: 'TODAS',
@@ -156,6 +178,17 @@ export const ETIQUETAS_ESTADO_SUBASTA: Record<EstadoSubastaTcg, string> = {
   CANCELADA: 'Cancelada',
 };
 
+export const ETIQUETAS_MODO_SUBASTA: Record<ModoSubastaTcg, string> = {
+  COMBO: 'Combo / Lote único',
+  INDIVIDUALES: 'Evento · cartas individuales',
+};
+
+export const ETIQUETAS_ESTADO_DETALLE_SUBASTA: Record<EstadoSubastaDetalle, string> = {
+  PENDIENTE: 'Pendiente',
+  ADJUDICADO: 'Adjudicada',
+  DESIERTA: 'Desierta',
+};
+
 export const ETIQUETAS_CANAL_SUBASTA: Record<CanalSubastaTcg, string> = {
   FACEBOOK_SUBASTA: 'Facebook',
   WEB: 'Web',
@@ -175,18 +208,30 @@ export const ETIQUETAS_ORIGEN_PAGO_CHECKOUT: Record<OrigenPagoCheckout, string> 
   TRANSFERENCIA: 'Transferencia',
 };
 
-export function etiquetaLoteSubasta(subasta: Pick<SubastaTcg, 'detalles' | 'productoNombre'>): string {
+export function nombreVisibleLinea(
+  linea: Pick<SubastaDetalle, 'productoNombre' | 'tituloPersonalizado'>,
+): string {
+  const custom = linea.tituloPersonalizado?.trim();
+  return custom || linea.productoNombre;
+}
+
+export function etiquetaLoteSubasta(
+  subasta: Pick<SubastaTcg, 'detalles' | 'productoNombre' | 'modo'>,
+): string {
   const detalles = subasta.detalles ?? [];
   if (detalles.length === 0) {
     return subasta.productoNombre ?? 'Producto';
   }
   if (detalles.length === 1) {
     const linea = detalles[0];
-    return linea.cantidad > 1
-      ? `${linea.productoNombre} × ${linea.cantidad}`
-      : linea.productoNombre;
+    const nombre = nombreVisibleLinea(linea);
+    return linea.cantidad > 1 ? `${nombre} × ${linea.cantidad}` : nombre;
   }
   const unidades = detalles.reduce((sum, d) => sum + d.cantidad, 0);
+  if (subasta.modo === 'INDIVIDUALES') {
+    const pendientes = detalles.filter((d) => d.estado === 'PENDIENTE').length;
+    return `Evento · ${detalles.length} cartas · ${pendientes} pendientes`;
+  }
   return `Combo · ${detalles.length} SKUs · ${unidades} uds`;
 }
 
@@ -196,6 +241,10 @@ export function unidadesLote(subasta: Pick<SubastaTcg, 'detalles'>): number {
     return 1;
   }
   return detalles.reduce((sum, d) => sum + d.cantidad, 0);
+}
+
+export function esEventoIndividuales(subasta: Pick<SubastaTcg, 'modo'>): boolean {
+  return subasta.modo === 'INDIVIDUALES';
 }
 
 export function subastaVencida(subasta: Pick<SubastaTcg, 'fechaCierre'>, ahora = Date.now()): boolean {
@@ -230,24 +279,44 @@ export function pujasOrdenadas(pujas: readonly PujaTcg[]): PujaTcg[] {
   return [...pujas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 }
 
-export function ultimaPuja(subasta: SubastaTcg): PujaTcg | null {
-  const ordenadas = pujasOrdenadas(subasta.pujas);
+export function pujasDeDetalle(
+  subasta: Pick<SubastaTcg, 'pujas'>,
+  detalleId: string | null | undefined,
+): PujaTcg[] {
+  if (!detalleId) {
+    return pujasOrdenadas(subasta.pujas);
+  }
+  return pujasOrdenadas(subasta.pujas.filter((p) => p.subastaDetalleId === detalleId));
+}
+
+export function ultimaPuja(subasta: SubastaTcg, detalleId?: string | null): PujaTcg | null {
+  const ordenadas = detalleId
+    ? pujasDeDetalle(subasta, detalleId)
+    : pujasOrdenadas(subasta.pujas);
   return ordenadas.at(-1) ?? null;
 }
 
-export function pujaMaxima(subasta: SubastaTcg): PujaTcg | null {
-  if (subasta.pujas.length === 0) {
+export function pujaMaxima(subasta: SubastaTcg, detalleId?: string | null): PujaTcg | null {
+  const pujas = detalleId ? pujasDeDetalle(subasta, detalleId) : subasta.pujas;
+  if (pujas.length === 0) {
     return null;
   }
-  return subasta.pujas.reduce((mejor, actual) => (actual.monto > mejor.monto ? actual : mejor));
+  return pujas.reduce((mejor, actual) => (actual.monto > mejor.monto ? actual : mejor));
 }
 
-export function pujaGanadoraActual(subasta: SubastaTcg): PujaTcg | null {
+export function pujaGanadoraActual(subasta: SubastaTcg, detalleId?: string | null): PujaTcg | null {
+  if (detalleId && esEventoIndividuales(subasta)) {
+    const linea = subasta.detalles.find((d) => d.id === detalleId);
+    if (linea?.pujaGanadoraId) {
+      return subasta.pujas.find((p) => p.id === linea.pujaGanadoraId) ?? null;
+    }
+    return pujaMaxima(subasta, detalleId);
+  }
   return subasta.pujas.find((p) => p.id === subasta.pujaGanadoraId) ?? pujaMaxima(subasta);
 }
 
-export function montoMinimoSiguiente(subasta: SubastaTcg): number {
-  const ultima = ultimaPuja(subasta);
+export function montoMinimoSiguiente(subasta: SubastaTcg, detalleId?: string | null): number {
+  const ultima = ultimaPuja(subasta, detalleId);
   if (!ultima) {
     return round2(subasta.precioBase);
   }

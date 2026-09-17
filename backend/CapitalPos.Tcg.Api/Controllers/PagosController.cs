@@ -61,6 +61,16 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
         return CreatedAtAction(nameof(Obtener), new { id = creado.Id }, creado);
     }
 
+    [HttpPost("lote")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<IReadOnlyList<PagoResponse>>> RegistrarLote(
+        [FromBody] RegistrarPagoLoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var creados = await pagos.RegistrarLoteAsync(request, cancellationToken);
+        return Ok(creados);
+    }
+
     [AllowAnonymous]
     [HttpPost("izipay/ipn/{empresaId:guid}")]
     public async Task<IActionResult> IzipayIpn(Guid empresaId, CancellationToken cancellationToken)

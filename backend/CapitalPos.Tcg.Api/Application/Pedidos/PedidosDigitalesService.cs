@@ -276,6 +276,62 @@ public sealed class PedidosDigitalesService(
         return (await ObtenerAsync(id, cancellationToken))!;
     }
 
+    public async Task<IReadOnlyList<PedidoDigitalResponse>> CambiarEstadoLoteAsync(
+        CambiarEstadoLoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ids = (request.PedidoDigitalIds ?? [])
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0)
+        {
+            throw new BusinessRuleException("Selecciona al menos un pedido.");
+        }
+
+        var destino = request.Estado;
+        var origenEsperado = destino switch
+        {
+            EstadoPedidoDigital.Empaquetado => EstadoPedidoDigital.Pagado,
+            EstadoPedidoDigital.PendienteEntrega => EstadoPedidoDigital.Empaquetado,
+            EstadoPedidoDigital.Entregado => EstadoPedidoDigital.PendienteEntrega,
+            _ => throw new BusinessRuleException(
+                "El lote solo cubre Empaquetado, Pendiente de entrega o Entregado.")
+        };
+
+        var pedidos = await db.PedidosDigitales
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+        if (pedidos.Count != ids.Count)
+        {
+            throw new BusinessRuleException("Uno o más pedidos no existen o no pertenecen a la empresa.");
+        }
+
+        if (pedidos.Any(p => p.Estado != origenEsperado))
+        {
+            throw new BusinessRuleException(
+                $"Todos los pedidos deben estar en {origenEsperado} para pasar a {destino}.");
+        }
+
+        var nota = request.Observacion?.Trim();
+        if (string.IsNullOrEmpty(nota))
+        {
+            nota = destino == EstadoPedidoDigital.Empaquetado
+                ? "Empaque en lote."
+                : PedidoKanban.EtiquetaTransicion(destino);
+        }
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var actualizados = new List<PedidoDigitalResponse>(ids.Count);
+        foreach (var id in ids)
+        {
+            actualizados.Add(await CambiarEstadoAsync(id, destino, nota, cancellationToken));
+        }
+
+        await tx.CommitAsync(cancellationToken);
+        return actualizados;
+    }
+
     public async Task<PedidoDigitalResponse> CancelarAsync(
         Guid id,
         string? observacion,
@@ -308,6 +364,63 @@ public sealed class PedidosDigitalesService(
         await db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
         return (await ObtenerAsync(id, cancellationToken))!;
+    }
+
+    public async Task<PedidoDigitalResponse> ActualizarNotificacionAsync(
+        Guid id,
+        bool notificado,
+        CancellationToken cancellationToken)
+    {
+        var pedido = await CargarAsync(id, cancellationToken);
+        AplicarNotificacion(pedido, notificado);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await ObtenerAsync(id, cancellationToken))!;
+    }
+
+    public async Task<IReadOnlyList<PedidoDigitalResponse>> ActualizarNotificacionLoteAsync(
+        ActualizarNotificacionLoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ids = request.PedidoDigitalIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            throw new BusinessRuleException("Selecciona al menos un pedido.");
+        }
+
+        // Debe ser tracked (no QueryBase/AsNoTracking) para que SaveChanges persista.
+        var pedidos = await db.PedidosDigitales
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+
+        if (pedidos.Count != ids.Count)
+        {
+            throw new BusinessRuleException("Uno o más pedidos no existen o no están disponibles.");
+        }
+
+        foreach (var pedido in pedidos)
+        {
+            AplicarNotificacion(pedido, request.Notificado);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var actualizados = await QueryBase()
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+        return actualizados.Select(Map).ToList();
+    }
+
+    private static void AplicarNotificacion(PedidoDigital pedido, bool notificado)
+    {
+        if (notificado)
+        {
+            pedido.Notificado = true;
+            pedido.FechaNotificacion = DateTimeOffset.UtcNow;
+            return;
+        }
+
+        pedido.Notificado = false;
+        pedido.FechaNotificacion = null;
     }
 
     public async Task MarcarPagadoPorPagoAsync(
@@ -381,7 +494,10 @@ public sealed class PedidosDigitalesService(
                     : "La entrega se confirma desde Pendiente de entrega.");
         }
 
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var transaccionExterna = db.Database.CurrentTransaction is not null;
+        await using var tx = transaccionExterna
+            ? null
+            : await db.Database.BeginTransactionAsync(cancellationToken);
 
         var ahora = DateTimeOffset.UtcNow;
         var cliente = await ResolverClienteAsync(pedido, request, ahora, cancellationToken);
@@ -499,7 +615,10 @@ public sealed class PedidosDigitalesService(
             comprobante = await fiscal.EmitirDesdeVentaAsync(ventaId, tipo, null, cancellationToken);
         }
 
-        await tx.CommitAsync(cancellationToken);
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
+        }
 
         return new ConversionVentaResponse
         {
@@ -513,20 +632,179 @@ public sealed class PedidosDigitalesService(
         };
     }
 
+    public async Task<ComprobanteConsolidadoResponse> EmitirComprobanteConsolidadoAsync(
+        EmitirComprobanteConsolidadoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ids = (request.PedidoDigitalIds ?? [])
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0)
+        {
+            throw new BusinessRuleException("Selecciona al menos un pedido entregado.");
+        }
+
+        var pedidos = new List<PedidoDigital>(ids.Count);
+        foreach (var id in ids)
+        {
+            pedidos.Add(await CargarAsync(id, cancellationToken));
+        }
+
+        if (pedidos.Any(p => p.Estado != EstadoPedidoDigital.Entregado || p.VentaId is null))
+        {
+            throw new BusinessRuleException("Solo se emite comprobante consolidado de pedidos Entregados.");
+        }
+
+        if (!PedidoKanban.MismoCliente(pedidos.Select(p => (p.ClienteId, p.ClienteNombre)).ToList()))
+        {
+            throw new BusinessRuleException("Selecciona pedidos del mismo cliente para emitir un comprobante consolidado.");
+        }
+
+        var sedes = pedidos.Select(p => p.SedeId).Distinct().ToList();
+        if (sedes.Count > 1)
+        {
+            throw new BusinessRuleException("Los pedidos de un comprobante consolidado deben ser de la misma sede.");
+        }
+
+        var tipo = request.TipoComprobante switch
+        {
+            TipoComprobanteSunat.FACTURA => TipoComprobanteSunat.FACTURA,
+            TipoComprobanteSunat.NOTA_VENTA => TipoComprobanteSunat.NOTA_VENTA,
+            _ => TipoComprobanteSunat.BOLETA
+        };
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var venta = await UnificarVentasDePedidosAsync(pedidos, cancellationToken);
+        var comprobante = await fiscal.EmitirDesdeVentaAsync(venta.Id, tipo, null, cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        var actualizados = new List<PedidoDigitalResponse>(pedidos.Count);
+        foreach (var pedido in pedidos)
+        {
+            actualizados.Add((await ObtenerAsync(pedido.Id, cancellationToken))!);
+        }
+
+        return new ComprobanteConsolidadoResponse
+        {
+            VentaId = venta.Id,
+            Comprobante = comprobante,
+            Pedidos = actualizados
+        };
+    }
+
     public async Task<PedidoDigital> CargarAsync(Guid id, CancellationToken cancellationToken) =>
         await db.PedidosDigitales
             .Include(p => p.Sede)
+            .Include(p => p.Subasta)
             .Include(p => p.Detalles).ThenInclude(d => d.Producto)
             .Include(p => p.Historial).ThenInclude(h => h.Usuario)
             .Include(p => p.Entrega)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
         ?? throw new BusinessRuleException("No se encontró el pedido digital.", StatusCodes.Status404NotFound);
 
+    private async Task<Venta> UnificarVentasDePedidosAsync(
+        IReadOnlyList<PedidoDigital> pedidos,
+        CancellationToken cancellationToken)
+    {
+        var ventaIds = pedidos
+            .Select(p => p.VentaId)
+            .Where(id => id is { } valor && valor != Guid.Empty)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        if (ventaIds.Count == 0)
+        {
+            throw new BusinessRuleException("Los pedidos no tienen venta para emitir comprobante.");
+        }
+
+        var ventas = await db.Ventas
+            .Include(v => v.Detalles)
+            .Include(v => v.Pagos)
+            .Include(v => v.Comprobantes)
+            .Include(v => v.Cliente)
+            .Where(v => ventaIds.Contains(v.Id))
+            .ToListAsync(cancellationToken);
+        if (ventas.Count != ventaIds.Count)
+        {
+            throw new BusinessRuleException("No se encontraron todas las ventas de los pedidos.");
+        }
+
+        var conCpe = ventas
+            .Where(v => v.Comprobantes.Any(c =>
+                c.Tipo is TipoComprobanteSunat.BOLETA or TipoComprobanteSunat.FACTURA or TipoComprobanteSunat.NOTA_VENTA
+                && c.Estado is EstadoEmisionSunat.ACEPTADO
+                    or EstadoEmisionSunat.PENDIENTE_CONSOLIDAR
+                    or EstadoEmisionSunat.CONSOLIDADA))
+            .ToList();
+        if (conCpe.Count > 1)
+        {
+            throw new BusinessRuleException(
+                "Hay pedidos con comprobantes distintos. No se pueden unificar en una sola emisión.");
+        }
+
+        if (conCpe.Count == 1 && ventas.Count > 1)
+        {
+            throw new BusinessRuleException(
+                "Uno de los pedidos ya tiene comprobante. Deselecciónalo o emite por separado.");
+        }
+
+        var principal = conCpe.FirstOrDefault() ?? ventas[0];
+        if (ventas.Count == 1)
+        {
+            return principal;
+        }
+
+        foreach (var extra in ventas.Where(v => v.Id != principal.Id).ToList())
+        {
+            foreach (var detalle in extra.Detalles.ToList())
+            {
+                detalle.VentaId = principal.Id;
+            }
+
+            foreach (var pagoVenta in extra.Pagos.ToList())
+            {
+                pagoVenta.VentaId = principal.Id;
+            }
+
+            var pagos = await db.Pagos
+                .Where(p => p.VentaId == extra.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var pago in pagos)
+            {
+                pago.VentaId = principal.Id;
+            }
+
+            extra.PedidoDigitalId = null;
+            db.Ventas.Remove(extra);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var unificada = await db.Ventas
+            .Include(v => v.Detalles)
+            .Include(v => v.Cliente)
+            .Include(v => v.Comprobantes)
+            .FirstAsync(v => v.Id == principal.Id, cancellationToken);
+        unificada.Subtotal = IgvCalculo.Round2(unificada.Detalles.Sum(d => d.Subtotal));
+        unificada.Igv = IgvCalculo.Round2(unificada.Detalles.Sum(d => d.Igv));
+        unificada.Total = IgvCalculo.Round2(unificada.Detalles.Sum(d => d.Total));
+
+        foreach (var pedido in pedidos)
+        {
+            pedido.VentaId = unificada.Id;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return unificada;
+    }
+
     private IQueryable<PedidoDigital> QueryBase() =>
         db.PedidosDigitales
             .AsNoTracking()
             .Include(p => p.Sede)
             .Include(p => p.Cliente)
+            .Include(p => p.Subasta)
             .Include(p => p.Detalles).ThenInclude(d => d.Producto)
             .Include(p => p.Historial).ThenInclude(h => h.Usuario)
             .Include(p => p.Entrega);
@@ -821,6 +1099,11 @@ public sealed class PedidosDigitalesService(
             Observacion = pedido.Observacion,
             SubastaTcgId = pedido.SubastaTcgId,
             CodigoSubasta = CodigoAmigable.Subasta(pedido.SubastaTcgId),
+            TituloSubasta = string.IsNullOrWhiteSpace(pedido.Subasta?.Titulo)
+                ? null
+                : pedido.Subasta.Titulo.Trim(),
+            Notificado = pedido.Notificado,
+            FechaNotificacion = pedido.FechaNotificacion,
             VentaId = pedido.VentaId,
             CodigoVenta = CodigoAmigable.Venta(pedido.VentaId),
             EntregaId = pedido.Entrega?.Id,

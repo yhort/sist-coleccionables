@@ -1,7 +1,7 @@
 <section class="kpis" aria-label="Indicadores de pagos">
   <article>
     <span>Total recaudado hoy</span>
-    <strong>{{ kpis().recaudadoHoy | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <strong>{{ kpis().recaudadoHoy | soles }}</strong>
     <small>{{ kpis().cantidadHoy }} pago{{ kpis().cantidadHoy === 1 ? '' : 's' }} confirmado{{ kpis().cantidadHoy === 1 ? '' : 's' }}</small>
   </article>
   <article>
@@ -9,7 +9,7 @@
     <strong>{{ kpis().pendientesConciliar | number: '1.0-0' }}</strong>
     <small>
       Yape / Izipay sin pedido ·
-      {{ kpis().montoPendienteConciliar | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+      {{ kpis().montoPendienteConciliar | soles }}
     </small>
   </article>
   <article class="kpis__desglose">
@@ -19,7 +19,7 @@
         @if (origen !== 'OTRO' || kpis().desglose[origen] > 0) {
           <li>
             <em>{{ etiquetas[origen] }}</em>
-            <strong>{{ kpis().desglose[origen] | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+            <strong>{{ kpis().desglose[origen] | soles }}</strong>
           </li>
         }
       }

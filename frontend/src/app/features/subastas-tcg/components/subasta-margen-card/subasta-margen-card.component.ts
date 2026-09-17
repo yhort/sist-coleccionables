@@ -1,11 +1,12 @@
-import { CurrencyPipe, DecimalPipe, NgClass } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { Component, input } from '@angular/core';
 
 import { MargenSubasta } from '../../models/subasta-tcg.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-subasta-margen-card',
-  imports: [CurrencyPipe, DecimalPipe, NgClass],
+  imports: [SolesPipe, DecimalPipe, NgClass],
   templateUrl: './subasta-margen-card.component.html',
   styleUrl: './subasta-margen-card.component.scss',
 })

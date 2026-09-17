@@ -14,6 +14,7 @@ import {
   Pago,
   PagosFiltros,
   PagosKpis,
+  RegistrarPagoLoteRequest,
   RegistrarPagoRequest,
   esOrigenDigital,
   normalizarCodigoOperacion,
@@ -177,6 +178,36 @@ export class PagosApiService {
     }
 
     return { recaudadoHoy, cantidadHoy, pendientesConciliar, montoPendienteConciliar, desglose };
+  }
+
+  async registrarLote(request: RegistrarPagoLoteRequest): Promise<Pago[]> {
+    const ids = [...new Set(request.pedidoDigitalIds.filter((id) => id.trim().length > 0))];
+    if (ids.length === 0) {
+      throw new Error('Selecciona al menos un pedido pendiente de pago.');
+    }
+
+    try {
+      const items = await firstValueFrom(
+        this.http.post<PagoApi[]>(apiUrl('pagos/lote'), {
+          origen: request.origen,
+          monto: round2(Number(request.monto)),
+          codigoOperacion: textoOpcional(request.codigoOperacion, 80),
+          referenciaExterna: textoOpcional(request.referenciaExterna, 120),
+          observacion: textoOpcional(request.observacion, 500),
+          confirmar: request.confirmar ?? true,
+          pedidoDigitalIds: ids,
+        }),
+      );
+      const pagos = items.map(mapPagoApi);
+      this.pagosSignal.update((actuales) => [
+        ...pagos,
+        ...actuales.filter((pago) => pagos.every((creado) => creado.id !== pago.id)),
+      ]);
+      await this.pedidosApi.refrescar().catch(() => undefined);
+      return pagos;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   registrar(request: RegistrarPagoRequest): Pago {

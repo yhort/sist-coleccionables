@@ -127,6 +127,41 @@ public sealed class CambiarEstadoPedidoRequest
     public string? Observacion { get; set; }
 }
 
+public sealed class ActualizarNotificacionPedidoRequest
+{
+    public bool Notificado { get; set; }
+}
+
+public sealed class ActualizarNotificacionLoteRequest
+{
+    public bool Notificado { get; set; } = true;
+
+    [Required]
+    [MinLength(1)]
+    public List<Guid> PedidoDigitalIds { get; set; } = [];
+}
+
+public sealed class CambiarEstadoLoteRequest
+{
+    public EstadoPedidoDigital Estado { get; set; }
+
+    [MaxLength(500)]
+    public string? Observacion { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    public List<Guid> PedidoDigitalIds { get; set; } = [];
+}
+
+public sealed class EmitirComprobanteConsolidadoRequest
+{
+    public TipoComprobanteSunat TipoComprobante { get; set; } = TipoComprobanteSunat.BOLETA;
+
+    [Required]
+    [MinLength(1)]
+    public List<Guid> PedidoDigitalIds { get; set; } = [];
+}
+
 public sealed class ConvertirVentaRequest
 {
     [MaxLength(500)]
@@ -206,6 +241,9 @@ public sealed class PedidoDigitalResponse
     public string? Observacion { get; init; }
     public Guid? SubastaTcgId { get; init; }
     public string? CodigoSubasta { get; init; }
+    public string? TituloSubasta { get; init; }
+    public bool Notificado { get; init; }
+    public DateTimeOffset? FechaNotificacion { get; init; }
     public Guid? VentaId { get; init; }
     public string? CodigoVenta { get; init; }
     public Guid? EntregaId { get; init; }
@@ -223,4 +261,11 @@ public sealed class ConversionVentaResponse
     public required int Correlativo { get; init; }
     public required TipoComprobanteSunat TipoComprobante { get; init; }
     public required EstadoEmisionSunat EstadoEmision { get; init; }
+}
+
+public sealed class ComprobanteConsolidadoResponse
+{
+    public required Guid VentaId { get; init; }
+    public required Contracts.Cpe.ComprobanteResponse Comprobante { get; init; }
+    public required IReadOnlyList<PedidoDigitalResponse> Pedidos { get; init; }
 }

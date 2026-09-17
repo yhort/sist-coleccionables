@@ -11,14 +11,22 @@
     />
   </label>
 
-  @if (coincidencias().length && busqueda().trim().toLowerCase() !== (seleccionado()?.codigoSku.toLowerCase() ?? '')) {
+  @if (mostrarSugerencias()) {
     <ul class="sugerencias">
+      @if (opcionAgregarSet(); as setOpt) {
+        <li class="sugerencias__set">
+          <button type="button" class="sugerencias__set-btn" (click)="confirmarAgregarSet()">
+            <strong>+ Agregar todas las cartas de {{ setOpt.etiqueta }} ({{ setOpt.productos.length }} ítems)</strong>
+            <span>Carga masiva del set / prefijo coincidente</span>
+          </button>
+        </li>
+      }
       @for (producto of coincidencias(); track producto.id) {
         <li>
           <button type="button" (click)="elegirCoincidencia(producto)">
-            <strong>{{ producto.codigoSku }}</strong>
-            <span>
-              {{ producto.nombre }} · {{ etiquetasTipo[producto.tipoProducto] }}
+            <strong class="sugerencias__nombre">{{ producto.nombre }}</strong>
+            <span class="sugerencias__sku">
+              {{ producto.codigoSku }} · {{ etiquetasTipo[producto.tipoProducto] }}
               · libre {{ stockLibreFn()(producto.id) }}
             </span>
           </button>

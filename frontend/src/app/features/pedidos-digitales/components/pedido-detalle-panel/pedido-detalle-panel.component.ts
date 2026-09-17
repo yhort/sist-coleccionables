@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe, NgClass } from '@angular/common';
+import { DatePipe, NgClass } from '@angular/common';
 import { Component, HostListener, computed, effect, inject, input, output, signal } from '@angular/core';
 
 import { EcosistemaApiService } from '../../../ecosistema/data-access/ecosistema.service';
@@ -22,18 +22,21 @@ import {
   ETIQUETAS_ESTADO_PEDIDO,
   ETIQUETAS_ORIGEN_PEDIDO,
   EstadoPedidoDigital,
+  etiquetaAccionEstado,
   indicadorReservaDe,
   origenDeCanal,
   transicionesPermitidas,
 } from '../../models/pedido-digital.model';
 import { etiquetaCanalContacto } from '../../../../shared/models/contacto-entrega.model';
 import { PedidoAccionPreparadaDialogComponent } from '../pedido-accion-preparada-dialog/pedido-accion-preparada-dialog.component';
+import { RegistrarPagoLoteDialogComponent } from '../registrar-pago-lote-dialog/registrar-pago-lote-dialog.component';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
-export type PedidoDetalleAccion = 'pago' | 'pago-consulta' | 'cpe';
+export type PedidoDetalleAccion = 'pago-consulta' | 'cpe';
 
 @Component({
   selector: 'app-pedido-detalle-panel',
-  imports: [CurrencyPipe, DatePipe, NgClass, PedidoAccionPreparadaDialogComponent],
+  imports: [SolesPipe, DatePipe, NgClass, PedidoAccionPreparadaDialogComponent, RegistrarPagoLoteDialogComponent],
   templateUrl: './pedido-detalle-panel.component.html',
   styleUrl: './pedido-detalle-panel.component.scss',
 })
@@ -48,6 +51,7 @@ export class PedidoDetallePanelComponent {
 
   readonly error = signal('');
   readonly accion = signal<PedidoDetalleAccion | null>(null);
+  readonly cobrando = signal(false);
   readonly comprobante = signal<EmisionSimulada | null>(null);
   readonly pagosVinculados = signal<Pago[]>([]);
   readonly cargandoPagos = signal(false);
@@ -155,6 +159,7 @@ export class PedidoDetallePanelComponent {
   origenDe = origenDeCanal;
   reservaDe = indicadorReservaDe;
   transicionesDe = transicionesPermitidas;
+  etiquetaAccion = etiquetaAccionEstado;
 
   constructor() {
     effect(() => {
@@ -177,6 +182,10 @@ export class PedidoDetallePanelComponent {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.cobrando()) {
+      this.cobrando.set(false);
+      return;
+    }
     if (this.accion()) {
       this.cerrarAccion();
       return;
@@ -214,7 +223,15 @@ export class PedidoDetallePanelComponent {
     if (!this.puedeVincularPago()) {
       return;
     }
-    this.accion.set('pago');
+    this.cobrando.set(true);
+  }
+
+  onPagoRegistrado(): void {
+    this.cobrando.set(false);
+    const pedido = this.pedido();
+    if (pedido) {
+      void this.cargarPagos(pedido.id);
+    }
   }
 
   async abrirPagoConsulta(): Promise<void> {

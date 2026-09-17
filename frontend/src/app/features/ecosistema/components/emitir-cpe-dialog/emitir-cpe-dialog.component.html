@@ -28,7 +28,7 @@
         @for (doc of documentos(); track doc.id) {
           <option [value]="doc.id">
             {{ doc.etiqueta }}
-            ({{ doc.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }})
+            ({{ doc.total | soles }})
           </option>
         }
       </select>

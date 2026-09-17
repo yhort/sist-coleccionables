@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe, NgClass } from '@angular/common';
+import { DatePipe, NgClass } from '@angular/common';
 import {
   Component,
   DestroyRef,
@@ -14,31 +14,38 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { readApiError } from '../../../../core/http/api-error';
-
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
+import { ClientesApiService } from '../../../clientes/data-access/clientes.service';
+import { Cliente } from '../../../clientes/models/cliente.model';
 import { ETIQUETAS_MOVIMIENTO } from '../../../inventario/models/inventario.model';
 import { PedidosDigitalesApiService } from '../../../pedidos-digitales/data-access/pedidos-digitales.service';
 import { ETIQUETAS_ESTADO_PEDIDO } from '../../../pedidos-digitales/models/pedido-digital.model';
 import { ETIQUETAS_TIPO } from '../../../productos-tcg/models/producto-tcg.model';
-import { AdjudicarCheckoutDialogComponent } from '../adjudicar-checkout-dialog/adjudicar-checkout-dialog.component';
 import { SubastasTcgApiService } from '../../data-access/subastas-tcg.service';
 import {
   ETIQUETAS_CANAL_SUBASTA,
+  ETIQUETAS_ESTADO_DETALLE_SUBASTA,
   ETIQUETAS_ESTADO_SUBASTA,
+  ETIQUETAS_MODO_SUBASTA,
+  SubastaDetalle,
   calcularMargenSubasta,
   cuentaRegresiva,
+  esEventoIndividuales,
   etiquetaLoteSubasta,
   montoMinimoSiguiente,
+  nombreVisibleLinea,
   pujaGanadoraActual,
-  pujasOrdenadas,
+  pujasDeDetalle,
   subastaVencida,
   unidadesLote,
 } from '../../models/subasta-tcg.model';
+import { AdjudicarCheckoutDialogComponent } from '../adjudicar-checkout-dialog/adjudicar-checkout-dialog.component';
 import { SubastaMargenCardComponent } from '../subasta-margen-card/subasta-margen-card.component';
 
 @Component({
   selector: 'app-subasta-detalle-panel',
   imports: [
-    CurrencyPipe,
+    SolesPipe,
     DatePipe,
     NgClass,
     FormsModule,
@@ -55,6 +62,7 @@ import { SubastaMargenCardComponent } from '../subasta-margen-card/subasta-marge
 export class SubastaDetallePanelComponent {
   private readonly subastasApi = inject(SubastasTcgApiService);
   private readonly pedidosApi = inject(PedidosDigitalesApiService);
+  private readonly clientesApi = inject(ClientesApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly subastaId = input.required<string>();
@@ -64,15 +72,22 @@ export class SubastaDetallePanelComponent {
 
   readonly error = signal('');
   readonly nombrePostor = signal('');
+  readonly clienteId = signal<string | null>(null);
+  readonly sugerenciasCliente = signal<Cliente[]>([]);
+  readonly productoPujaId = signal<string | null>(null);
+  readonly detalleSeleccionadoId = signal<string | null>(null);
   readonly monto = signal(0);
   readonly ahora = signal(Date.now());
   readonly checkoutAbierto = signal(false);
 
   readonly etiquetasEstado = ETIQUETAS_ESTADO_SUBASTA;
   readonly etiquetasCanal = ETIQUETAS_CANAL_SUBASTA;
+  readonly etiquetasModo = ETIQUETAS_MODO_SUBASTA;
+  readonly etiquetasDetalle = ETIQUETAS_ESTADO_DETALLE_SUBASTA;
   readonly etiquetasTipo = ETIQUETAS_TIPO;
   readonly etiquetasPedido = ETIQUETAS_ESTADO_PEDIDO;
   readonly movimientoReserva = ETIQUETAS_MOVIMIENTO.PUJA_GANADORA_RESERVA;
+  readonly nombreLinea = nombreVisibleLinea;
 
   readonly subasta = computed(() => {
     this.subastasApi.subastas();
@@ -105,12 +120,20 @@ export class SubastaDetallePanelComponent {
 
   readonly pujas = computed(() => {
     const subasta = this.subasta();
-    return subasta ? [...pujasOrdenadas(subasta.pujas)].reverse() : [];
+    if (!subasta) {
+      return [];
+    }
+    const detalleId = esEventoIndividuales(subasta) ? this.detalleSeleccionadoId() : null;
+    return [...pujasDeDetalle(subasta, detalleId)].reverse();
   });
 
   readonly lider = computed(() => {
     const subasta = this.subasta();
-    return subasta ? pujaGanadoraActual(subasta) : null;
+    if (!subasta) {
+      return null;
+    }
+    const detalleId = esEventoIndividuales(subasta) ? this.detalleSeleccionadoId() : null;
+    return pujaGanadoraActual(subasta, detalleId);
   });
 
   readonly margen = computed(() => {
@@ -118,12 +141,17 @@ export class SubastaDetallePanelComponent {
     if (!subasta) {
       return calcularMargenSubasta(0, null);
     }
-    return this.subastasApi.margenDe(subasta);
+    const lider = this.lider();
+    return calcularMargenSubasta(subasta.precioBase, lider?.monto ?? null);
   });
 
   readonly minimoSiguiente = computed(() => {
     const subasta = this.subasta();
-    return subasta ? montoMinimoSiguiente(subasta) : 0;
+    if (!subasta) {
+      return 0;
+    }
+    const detalleId = esEventoIndividuales(subasta) ? this.detalleSeleccionadoId() : null;
+    return montoMinimoSiguiente(subasta, detalleId);
   });
 
   readonly cronometro = computed(() => {
@@ -143,24 +171,103 @@ export class SubastaDetallePanelComponent {
     () => this.subasta()?.estado === 'ACTIVA' && this.vencida(),
   );
 
-  readonly aceptaPujas = computed(() => this.subasta()?.estado === 'ACTIVA' && !this.vencida());
+  readonly aceptaPujas = computed(() => {
+    const subasta = this.subasta();
+    if (!subasta || subasta.estado !== 'ACTIVA' || this.vencida()) {
+      return false;
+    }
+    if (!esEventoIndividuales(subasta)) {
+      return true;
+    }
+    const linea = this.productoPujaSeleccionado();
+    return !!linea && linea.estado === 'PENDIENTE';
+  });
 
   readonly puedeAdjudicar = computed(() => {
-    const estado = this.subasta()?.estado;
-    return estado === 'ACTIVA' || estado === 'CERRADA';
+    const subasta = this.subasta();
+    if (!subasta) {
+      return false;
+    }
+    if (esEventoIndividuales(subasta)) {
+      const linea = this.productoPujaSeleccionado();
+      return (
+        (subasta.estado === 'ACTIVA' || subasta.estado === 'CERRADA') &&
+        !!linea &&
+        linea.estado === 'PENDIENTE'
+      );
+    }
+    return subasta.estado === 'ACTIVA' || subasta.estado === 'CERRADA';
+  });
+
+  readonly puedeDeclararDesierta = computed(() => {
+    const subasta = this.subasta();
+    if (!subasta) {
+      return false;
+    }
+    if (esEventoIndividuales(subasta)) {
+      const linea = this.productoPujaSeleccionado();
+      return (
+        (subasta.estado === 'ACTIVA' || subasta.estado === 'CERRADA') &&
+        !!linea &&
+        linea.estado === 'PENDIENTE'
+      );
+    }
+    return subasta.estado === 'ACTIVA';
+  });
+
+  readonly puedeAnularPuja = computed(() => {
+    const subasta = this.subasta();
+    if (!subasta) {
+      return false;
+    }
+    if (subasta.estado === 'ADJUDICADA' || subasta.estado === 'CANCELADA') {
+      return false;
+    }
+    if (esEventoIndividuales(subasta)) {
+      return this.productoPujaSeleccionado()?.estado === 'PENDIENTE';
+    }
+    return !subasta.pedidoDigitalId;
   });
 
   readonly pedido = computed(() => {
     this.pedidosApi.pedidos();
-    const id = this.subasta()?.pedidoDigitalId;
+    const subasta = this.subasta();
+    if (!subasta) {
+      return undefined;
+    }
+    if (esEventoIndividuales(subasta)) {
+      const linea = this.productoPujaSeleccionado();
+      const id = linea?.pedidoDigitalId;
+      return id ? this.pedidosApi.obtener(id) : undefined;
+    }
+    const id = subasta.pedidoDigitalId;
     return id ? this.pedidosApi.obtener(id) : undefined;
   });
 
   readonly etiquetaOferta = computed(() => {
     const estado = this.subasta()?.estado;
-    return estado === 'ADJUDICADA' || estado === 'CERRADA'
-      ? 'Oferta ganadora'
-      : 'Oferta líder';
+    const linea = this.productoPujaSeleccionado();
+    if (linea?.estado === 'ADJUDICADO' || estado === 'ADJUDICADA' || estado === 'CERRADA') {
+      return 'Oferta ganadora';
+    }
+    return 'Oferta líder';
+  });
+
+  readonly esEvento = computed(() => {
+    const subasta = this.subasta();
+    return subasta ? esEventoIndividuales(subasta) : false;
+  });
+
+  readonly esMultiItem = computed(
+    () => this.esEvento() || this.detalles().length > 1,
+  );
+
+  readonly productoPujaSeleccionado = computed(() => {
+    const id = this.detalleSeleccionadoId();
+    if (!id) {
+      return null;
+    }
+    return this.detalles().find((l) => l.id === id) ?? null;
   });
 
   constructor() {
@@ -174,6 +281,23 @@ export class SubastaDetallePanelComponent {
       }
     });
 
+    effect(() => {
+      const lineas = this.detalles();
+      const actual = this.detalleSeleccionadoId();
+      if (lineas.length === 0) {
+        this.detalleSeleccionadoId.set(null);
+        this.productoPujaId.set(null);
+        return;
+      }
+      if (actual && lineas.some((l) => l.id === actual)) {
+        return;
+      }
+      const preferida =
+        lineas.find((l) => l.estado === 'PENDIENTE') ?? lineas[0];
+      this.detalleSeleccionadoId.set(preferida.id);
+      this.productoPujaId.set(preferida.productoId);
+    });
+
     effect((onCleanup) => {
       const subasta = this.subasta();
       if (!subasta || subasta.estado !== 'ACTIVA' || !subastaVencida(subasta)) {
@@ -184,6 +308,45 @@ export class SubastaDetallePanelComponent {
       }, 20_000);
       onCleanup(() => globalThis.clearInterval(id));
     });
+  }
+
+  seleccionarProductoPuja(linea: SubastaDetalle): void {
+    if (!this.esMultiItem() && !this.esEvento()) {
+      return;
+    }
+    this.detalleSeleccionadoId.set(linea.id);
+    this.productoPujaId.set(linea.productoId);
+    this.sugerenciasCliente.set([]);
+  }
+
+  async buscarCliente(texto: string): Promise<void> {
+    this.clienteId.set(null);
+    this.nombrePostor.set(texto);
+    const query = texto.trim();
+    if (query.length < 2) {
+      this.sugerenciasCliente.set([]);
+      return;
+    }
+    try {
+      const hits = await this.clientesApi.buscar(query);
+      const q = query.toLowerCase();
+      this.sugerenciasCliente.set(
+        hits.filter(
+          (c) =>
+            c.nombre.toLowerCase().includes(q) ||
+            (c.telefono ?? '').includes(query) ||
+            (c.contactoReferencia ?? '').toLowerCase().includes(q),
+        ),
+      );
+    } catch {
+      this.sugerenciasCliente.set([]);
+    }
+  }
+
+  elegirCliente(cliente: Cliente): void {
+    this.clienteId.set(cliente.id);
+    this.nombrePostor.set(cliente.nombre);
+    this.sugerenciasCliente.set([]);
   }
 
   @HostListener('document:keydown.escape')
@@ -210,17 +373,32 @@ export class SubastaDetallePanelComponent {
       return;
     }
     if (!this.aceptaPujas()) {
-      this.error.set('La subasta ha finalizado y no acepta más pujas.');
+      this.error.set(
+        this.esEvento()
+          ? 'Selecciona una carta pendiente para registrar la puja.'
+          : 'La subasta ha finalizado y no acepta más pujas.',
+      );
+      return;
+    }
+    const detalleId = this.esEvento() ? this.detalleSeleccionadoId() : null;
+    if (this.esEvento() && !detalleId) {
+      this.error.set('Selecciona la carta a la que aplica la puja.');
       return;
     }
     this.error.set('');
     try {
       await this.subastasApi.registrarPuja(subasta.id, {
         nombrePostor: this.nombrePostor(),
+        clienteId: this.clienteId(),
+        subastaDetalleId: detalleId,
         monto: Number(this.monto()),
       });
       this.nombrePostor.set('');
-      this.monto.set(montoMinimoSiguiente(this.subasta() ?? subasta));
+      this.clienteId.set(null);
+      this.sugerenciasCliente.set([]);
+      this.monto.set(
+        montoMinimoSiguiente(this.subasta() ?? subasta, this.esEvento() ? detalleId : null),
+      );
       this.changed.emit();
     } catch (err) {
       this.error.set(readApiError(err));
@@ -231,12 +409,48 @@ export class SubastaDetallePanelComponent {
     this.ejecutar((id) => this.subastasApi.activar(id));
   }
 
-  cerrar(): void {
-    this.ejecutar((id) => this.subastasApi.cerrar(id));
+  declararDesierta(): void {
+    const subasta = this.subasta();
+    if (!subasta) {
+      return;
+    }
+    const detalleId = this.esEvento() ? this.detalleSeleccionadoId() : null;
+    if (this.esEvento() && !detalleId) {
+      this.error.set('Selecciona la carta a declarar desierta.');
+      return;
+    }
+    const etiqueta = this.esEvento()
+      ? this.productoPujaSeleccionado()
+        ? nombreVisibleLinea(this.productoPujaSeleccionado()!)
+        : 'esta carta'
+      : 'esta subasta';
+    if (!globalThis.confirm(`¿Declarar desierta ${etiqueta}? No se creará pedido.`)) {
+      return;
+    }
+    this.ejecutar((id) => this.subastasApi.declararDesierta(id, detalleId));
+  }
+
+  eliminarPuja(pujaId: string): void {
+    if (!globalThis.confirm('¿Anular esta puja del historial?')) {
+      return;
+    }
+    this.error.set('');
+    void this.subastasApi
+      .eliminarPuja(pujaId)
+      .then(() => this.changed.emit())
+      .catch((err) => this.error.set(readApiError(err)));
   }
 
   abrirCheckout(): void {
     this.error.set('');
+    if (this.esEvento() && !this.detalleSeleccionadoId()) {
+      this.error.set('Selecciona la carta a adjudicar.');
+      return;
+    }
+    if (this.esEvento() && this.productoPujaSeleccionado()?.estado === 'ADJUDICADO') {
+      this.error.set('Esa carta ya fue adjudicada; elige otra pendiente.');
+      return;
+    }
     this.checkoutAbierto.set(true);
   }
 
@@ -246,7 +460,7 @@ export class SubastaDetallePanelComponent {
   }
 
   cancelar(): void {
-    if (!globalThis.confirm('¿Cancelar esta subasta?')) {
+    if (!globalThis.confirm('¿Anular esta subasta por completo?')) {
       return;
     }
     this.ejecutar((id) => this.subastasApi.cancelar(id));

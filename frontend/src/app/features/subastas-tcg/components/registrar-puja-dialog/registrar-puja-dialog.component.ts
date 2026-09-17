@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import {
   Component,
   HostListener,
@@ -13,10 +12,11 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { readApiError } from '../../../../core/http/api-error';
 import { SubastasTcgApiService } from '../../data-access/subastas-tcg.service';
 import { SubastaTcg, montoMinimoSiguiente, subastaVencida } from '../../models/subasta-tcg.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-registrar-puja-dialog',
-  imports: [CurrencyPipe, ReactiveFormsModule],
+  imports: [SolesPipe, ReactiveFormsModule],
   templateUrl: './registrar-puja-dialog.component.html',
   styleUrl: './registrar-puja-dialog.component.scss',
 })

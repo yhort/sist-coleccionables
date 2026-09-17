@@ -9,8 +9,12 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
+import { startWith } from 'rxjs';
+
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 import { ClientesApiService } from '../../../clientes/data-access/clientes.service';
 import {
@@ -54,7 +58,7 @@ export interface CrearPedidoSavedEvent {
 
 @Component({
   selector: 'app-crear-pedido-digital-dialog',
-  imports: [ReactiveFormsModule, DecimalPipe, SelectorProductoCascadaComponent],
+  imports: [ReactiveFormsModule, DecimalPipe, SolesPipe, SelectorProductoCascadaComponent],
   templateUrl: './crear-pedido-digital-dialog.component.html',
   styleUrl: './crear-pedido-digital-dialog.component.scss',
 })
@@ -114,38 +118,71 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
     detalles: this.fb.array([this.nuevaLinea()]),
   });
 
+  /**
+   * Vincula valueChanges del formulario a un signal para que los `computed`
+   * (vuelto, esEfectivo, etc.) se reevalúen al editar montos o ítems.
+   */
+  private readonly formValue = toSignal(this.form.valueChanges.pipe(startWith(this.form.getRawValue())), {
+    initialValue: this.form.getRawValue(),
+  });
+
   get detalles(): FormArray {
     return this.form.controls.detalles;
   }
 
-  readonly totalEstimado = () =>
-    round2(
+  readonly totalEstimado = computed(() => {
+    this.formValue();
+    return round2(
       this.detalles.controls.reduce((sum, control) => {
         const cantidad = Number(control.get('cantidad')?.value) || 0;
         const precio = Number(control.get('precioUnitario')?.value) || 0;
         return sum + cantidad * precio;
       }, 0),
     );
+  });
 
-  readonly montos = () => desgloseIgvDesdeTotal(this.totalEstimado());
+  readonly montos = computed(() => desgloseIgvDesdeTotal(this.totalEstimado()));
 
-  readonly esEfectivo = computed(() => this.form.controls.metodoPago.value === 'EFECTIVO');
+  readonly esEfectivo = computed(() => {
+    this.formValue();
+    return this.form.controls.metodoPago.value === 'EFECTIVO';
+  });
 
+  /** Vuelto en efectivo: max(0, montoRecibido - total). 0 si falta monto o es insuficiente. */
   readonly vuelto = computed(() => {
+    this.formValue();
+    if (this.form.controls.metodoPago.value !== 'EFECTIVO') {
+      return 0;
+    }
     const recibido = Number(this.form.controls.montoRecibido.value);
     const total = this.totalEstimado();
     if (!Number.isFinite(recibido) || recibido <= 0) {
-      return null;
+      return 0;
     }
     return roundPago(Math.max(0, recibido - total));
   });
 
+  /** Bloquea cobro si en efectivo el monto recibido no cubre el total. */
+  readonly cobroInsuficiente = computed(() => {
+    this.formValue();
+    if (!this.form.controls.cobroInmediato.value) {
+      return false;
+    }
+    if (this.form.controls.metodoPago.value !== 'EFECTIVO') {
+      return false;
+    }
+    const recibido = Number(this.form.controls.montoRecibido.value);
+    return !Number.isFinite(recibido) || recibido + 0.001 < this.totalEstimado();
+  });
+
   readonly cajaAbierta = computed(() => {
+    this.formValue();
     const sedeId = this.form.controls.sedeId.value;
     return sedeId ? this.cajaApi.estaAbierta(sedeId) : false;
   });
 
   readonly alertaCaja = computed(() => {
+    this.formValue();
     if (!this.form.controls.cobroInmediato.value) {
       return '';
     }
@@ -306,8 +343,7 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
         return;
       }
       if (raw.metodoPago === 'EFECTIVO') {
-        const recibido = Number(raw.montoRecibido);
-        if (!Number.isFinite(recibido) || recibido + 0.001 < this.totalEstimado()) {
+        if (this.cobroInsuficiente()) {
           this.error.set('El monto recibido debe cubrir el total de la venta.');
           return;
         }

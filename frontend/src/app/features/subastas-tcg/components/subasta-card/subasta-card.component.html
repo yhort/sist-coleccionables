@@ -18,10 +18,10 @@
   <p class="card__bid">
     @if (ultima(item().subasta); as puja) {
       <span>Última oferta</span>
-      <strong>{{ puja.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      <strong>{{ puja.monto | soles }}</strong>
     } @else {
       <span>Precio base</span>
-      <strong>{{ item().subasta.precioBase | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      <strong>{{ item().subasta.precioBase | soles }}</strong>
     }
   </p>
   <p class="card__time">

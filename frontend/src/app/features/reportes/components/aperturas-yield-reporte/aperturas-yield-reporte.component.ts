@@ -1,11 +1,12 @@
-import { CurrencyPipe, DecimalPipe, NgClass } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { Component, input } from '@angular/core';
 
 import { ResumenYieldAperturas } from '../../models/reporte.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-aperturas-yield-reporte',
-  imports: [CurrencyPipe, DecimalPipe, NgClass],
+  imports: [SolesPipe, DecimalPipe, NgClass],
   templateUrl: './aperturas-yield-reporte.component.html',
   styleUrl: './aperturas-yield-reporte.component.scss',
 })

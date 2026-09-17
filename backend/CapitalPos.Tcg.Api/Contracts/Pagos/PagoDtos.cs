@@ -33,6 +33,33 @@ public sealed class AsociarPagoRequest
     public Guid PedidoDigitalId { get; set; }
 }
 
+/// <summary>
+/// Un voucher (Yape/Plin/transferencia) que cubre uno o varios pedidos del mismo cliente.
+/// El monto debe coincidir con la suma de saldos. Se genera un pago por pedido.
+/// </summary>
+public sealed class RegistrarPagoLoteRequest
+{
+    public OrigenPago Origen { get; set; }
+
+    [Range(typeof(decimal), "0.01", "999999999")]
+    public decimal Monto { get; set; }
+
+    [MaxLength(80)]
+    public string? CodigoOperacion { get; set; }
+
+    [MaxLength(120)]
+    public string? ReferenciaExterna { get; set; }
+
+    [MaxLength(500)]
+    public string? Observacion { get; set; }
+
+    public bool Confirmar { get; set; } = true;
+
+    [Required]
+    [MinLength(1)]
+    public List<Guid> PedidoDigitalIds { get; set; } = [];
+}
+
 public sealed class RechazarPagoRequest
 {
     [MaxLength(500)]

@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -15,10 +14,11 @@ import {
   puedeDescargarXml,
   puedeAbrirPdf,
 } from '../../models/ecosistema.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-emitir-cpe-dialog',
-  imports: [CurrencyPipe, ReactiveFormsModule],
+  imports: [SolesPipe, ReactiveFormsModule],
   templateUrl: './emitir-cpe-dialog.component.html',
   styleUrl: './emitir-cpe-dialog.component.scss',
 })

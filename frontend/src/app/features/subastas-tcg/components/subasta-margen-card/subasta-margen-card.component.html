@@ -1,7 +1,7 @@
 <section class="margen" [class.margen--compact]="compacto()" aria-label="Margen de la subasta">
   <article>
     <span>Precio base</span>
-    <strong>{{ margen().precioBase | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <strong>{{ margen().precioBase | soles }}</strong>
   </article>
   <article>
     <span>{{ etiquetaOferta() }}</span>
@@ -9,7 +9,7 @@
       @if (margen().ofertaReferencia === null) {
         —
       } @else {
-        {{ margen().ofertaReferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        {{ margen().ofertaReferencia | soles }}
       }
     </strong>
   </article>
@@ -19,7 +19,7 @@
       @if (margen().diferencia === null) {
         —
       } @else {
-        {{ margen().diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        {{ margen().diferencia | soles }}
       }
     </strong>
   </article>

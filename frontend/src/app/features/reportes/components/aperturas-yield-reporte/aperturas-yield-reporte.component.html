@@ -10,16 +10,16 @@
   <div class="summary">
     <article>
       <span>Costo de compra</span>
-      <strong>{{ resumen().costoCompra | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      <strong>{{ resumen().costoCompra | soles }}</strong>
     </article>
     <article>
       <span>Valor comercial cartas</span>
-      <strong>{{ resumen().valorComercial | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      <strong>{{ resumen().valorComercial | soles }}</strong>
     </article>
     <article>
       <span>Diferencia</span>
       <strong [ngClass]="'delta--' + signo(resumen().diferencia)">
-        {{ resumen().diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+        {{ resumen().diferencia | soles }}
       </strong>
     </article>
     <article>
@@ -63,8 +63,8 @@
               </td>
               <td>{{ fila.cartasObtenidas | number: '1.0-0' }}</td>
               <td>{{ fila.cartasIngresadasKardex | number: '1.0-0' }}</td>
-              <td>{{ fila.costoCompra | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
-              <td>{{ fila.valorComercial | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ fila.costoCompra | soles }}</td>
+              <td>{{ fila.valorComercial | soles }}</td>
               <td [ngClass]="'delta--' + signo(fila.diferencia)">
                 @if (fila.yieldPorcentaje === null) {
                   —

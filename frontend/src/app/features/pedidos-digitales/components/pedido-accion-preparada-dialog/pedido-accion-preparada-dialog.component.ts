@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, HostListener, effect, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
@@ -20,10 +20,11 @@ import {
   Pago,
 } from '../../../pagos/models/pago.model';
 import { PedidoDigital } from '../../models/pedido-digital.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-pedido-accion-preparada-dialog',
-  imports: [RouterLink, CurrencyPipe, DatePipe],
+  imports: [RouterLink, SolesPipe, DatePipe],
   templateUrl: './pedido-accion-preparada-dialog.component.html',
   styleUrl: './pedido-accion-preparada-dialog.component.scss',
 })

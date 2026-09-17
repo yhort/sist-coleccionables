@@ -24,24 +24,24 @@
       <section class="kpis" aria-label="Resumen de efectivo">
         <article>
           <span>Apertura</span>
-          <strong>{{ data.efectivo.montoApertura | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <strong>{{ data.efectivo.montoApertura | soles }}</strong>
         </article>
         <article>
           <span>Ventas en efectivo</span>
-          <strong>{{ data.efectivo.ventasEfectivo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <strong>{{ data.efectivo.ventasEfectivo | soles }}</strong>
         </article>
         <article>
           <span>Ingresos − egresos</span>
           <strong>
             {{
               data.efectivo.ingresos - data.efectivo.egresos
-                | currency: 'PEN' : 'symbol-narrow' : '1.2-2'
+                | soles
             }}
           </strong>
         </article>
         <article>
           <span>Efectivo teórico</span>
-          <strong>{{ teorico() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <strong>{{ teorico() | soles }}</strong>
         </article>
       </section>
 
@@ -62,7 +62,7 @@
                   <tr>
                     <td>{{ fila.etiqueta }}</td>
                     <td>{{ fila.cantidad }}</td>
-                    <td>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                    <td>{{ fila.monto | soles }}</td>
                   </tr>
                 }
               </tbody>
@@ -86,7 +86,7 @@
                   <tr>
                     <td>{{ fila.etiqueta }}</td>
                     <td>{{ fila.cantidad }}</td>
-                    <td>{{ fila.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                    <td>{{ fila.total | soles }}</td>
                   </tr>
                 } @empty {
                   <tr>
@@ -120,7 +120,7 @@
                       </span>
                     </td>
                     <td>{{ mov.concepto }}</td>
-                    <td>{{ mov.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                    <td>{{ mov.monto | soles }}</td>
                   </tr>
                 }
               </tbody>
@@ -154,7 +154,7 @@
         </label>
         <article class="diff" [attr.data-tipo]="tipoDiferencia()">
           <span>Diferencia</span>
-          <strong>{{ diferencia() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+          <strong>{{ diferencia() | soles }}</strong>
           <small>
             @if (tipoDiferencia(); as tipo) {
               {{ etiquetasDiferencia[tipo] }}

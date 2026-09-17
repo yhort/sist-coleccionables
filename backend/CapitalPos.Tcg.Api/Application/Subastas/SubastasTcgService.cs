@@ -69,6 +69,7 @@ public sealed class SubastasTcgService(
             ProductoId = principal.Producto.Id,
             Titulo = request.Titulo.Trim(),
             Canal = request.Canal,
+            Modo = request.Modo,
             PrecioBase = Round2(request.PrecioBase),
             IncrementoMinimo = Round2(request.IncrementoMinimo),
             PrecioReserva = request.PrecioReserva is null ? null : Round2(request.PrecioReserva.Value),
@@ -88,7 +89,9 @@ public sealed class SubastasTcgService(
                 SubastaTcgId = subasta.Id,
                 ProductoId = linea.Producto.Id,
                 Cantidad = linea.Cantidad,
-                Orden = i + 1
+                Orden = i + 1,
+                TituloPersonalizado = linea.TituloPersonalizado,
+                Estado = EstadoSubastaDetalle.PENDIENTE
             });
         }
 
@@ -137,8 +140,29 @@ public sealed class SubastasTcgService(
             throw new BusinessRuleException("Indica el nombre o alias del postor.");
         }
 
+        SubastaDetalle? linea = null;
+        if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES)
+        {
+            if (request.SubastaDetalleId is not { } detalleId || detalleId == Guid.Empty)
+            {
+                throw new BusinessRuleException("Selecciona la carta/producto a la que aplica la puja.");
+            }
+
+            linea = subasta.Detalles.FirstOrDefault(d => d.Id == detalleId)
+                ?? throw new BusinessRuleException("La carta seleccionada no pertenece a este evento.");
+
+            if (linea.Estado != EstadoSubastaDetalle.PENDIENTE)
+            {
+                throw new BusinessRuleException("Esa carta ya no acepta pujas; elige otra pendiente.");
+            }
+        }
+        else if (request.SubastaDetalleId is { } detalleCombo && detalleCombo != Guid.Empty)
+        {
+            throw new BusinessRuleException("En modo Combo la puja aplica al lote completo, no a una carta.");
+        }
+
         var monto = Round2(request.Monto);
-        var minimo = MontoMinimoSiguiente(subasta);
+        var minimo = MontoMinimoSiguiente(subasta, linea?.Id);
         if (monto < minimo)
         {
             throw new BusinessRuleException($"La puja debe ser de al menos {minimo:0.00}.");
@@ -149,6 +173,7 @@ public sealed class SubastasTcgService(
             Id = Guid.NewGuid(),
             EmpresaId = tenant.EmpresaId,
             SubastaTcgId = subasta.Id,
+            SubastaDetalleId = linea?.Id,
             ClienteId = request.ClienteId,
             NombrePostor = nombre,
             Monto = monto,
@@ -163,15 +188,129 @@ public sealed class SubastasTcgService(
 
     public async Task<SubastaTcgResponse> CerrarAsync(Guid id, CancellationToken cancellationToken)
     {
-        var subasta = await CargarAsync(id, cancellationToken);
-        if (subasta.Estado != EstadoSubastaTcg.ACTIVA)
-        {
-            throw new BusinessRuleException("Solo se puede cerrar una subasta activa.");
-        }
+        return await EjecutarConReintentoConcurrenciaAsync(
+            id,
+            async (subasta, ct) =>
+            {
+                if (subasta.Estado is EstadoSubastaTcg.CERRADA or EstadoSubastaTcg.ADJUDICADA)
+                {
+                    return;
+                }
 
-        MarcarCierre(subasta);
-        await db.SaveChangesAsync(cancellationToken);
-        return (await ObtenerAsync(id, cancellationToken))!;
+                if (subasta.Estado != EstadoSubastaTcg.ACTIVA)
+                {
+                    throw new BusinessRuleException("Solo se puede cerrar una subasta activa.");
+                }
+
+                MarcarCierre(subasta);
+                await GuardarCambiosAsync(ct);
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Cierra la puja sin ganador: en Individuales declara desierta la carta seleccionada;
+    /// en Combo cierra el lote sin asignar ganador ni pedido.
+    /// </summary>
+    public async Task<SubastaTcgResponse> DeclararDesiertaAsync(
+        Guid id,
+        Guid? subastaDetalleId,
+        CancellationToken cancellationToken)
+    {
+        return await EjecutarConReintentoConcurrenciaAsync(
+            id,
+            async (subasta, ct) =>
+            {
+                if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES)
+                {
+                    if (subastaDetalleId is not { } detalleId || detalleId == Guid.Empty)
+                    {
+                        throw new BusinessRuleException("Selecciona la carta a declarar desierta.");
+                    }
+
+                    var linea = subasta.Detalles.FirstOrDefault(d => d.Id == detalleId)
+                        ?? throw new BusinessRuleException("La carta seleccionada no pertenece a este evento.");
+
+                    if (linea.Estado != EstadoSubastaDetalle.PENDIENTE)
+                    {
+                        throw new BusinessRuleException("Solo se puede declarar desierta una carta pendiente.");
+                    }
+
+                    if (subasta.Estado is not (EstadoSubastaTcg.ACTIVA or EstadoSubastaTcg.CERRADA))
+                    {
+                        throw new BusinessRuleException("El evento debe estar activo o cerrado.");
+                    }
+
+                    foreach (var puja in PujasDeLinea(subasta, linea.Id))
+                    {
+                        puja.EsGanadora = false;
+                    }
+
+                    linea.Estado = EstadoSubastaDetalle.DESIERTA;
+                    linea.PujaGanadoraId = null;
+                    ActualizarEstadoEventoTrasLineas(subasta);
+                    await GuardarCambiosAsync(ct);
+                    return;
+                }
+
+                if (subasta.Estado != EstadoSubastaTcg.ACTIVA)
+                {
+                    throw new BusinessRuleException("Solo se puede declarar desierta una subasta activa.");
+                }
+
+                MarcarCierreSinGanador(subasta);
+                await GuardarCambiosAsync(ct);
+            },
+            cancellationToken);
+    }
+
+    public async Task<SubastaTcgResponse> EliminarPujaAsync(Guid pujaId, CancellationToken cancellationToken)
+    {
+        var puja = await db.Pujas
+            .FirstOrDefaultAsync(p => p.Id == pujaId, cancellationToken)
+            ?? throw new BusinessRuleException("No se encontró la puja.", StatusCodes.Status404NotFound);
+
+        var subastaId = puja.SubastaTcgId;
+        return await EjecutarConReintentoConcurrenciaAsync(
+            subastaId,
+            async (subasta, ct) =>
+            {
+                var actual = subasta.Pujas.FirstOrDefault(p => p.Id == pujaId)
+                    ?? throw new BusinessRuleException("No se encontró la puja.", StatusCodes.Status404NotFound);
+
+                if (subasta.Estado is EstadoSubastaTcg.ADJUDICADA or EstadoSubastaTcg.CANCELADA)
+                {
+                    throw new BusinessRuleException("No se pueden anular pujas de una subasta adjudicada o cancelada.");
+                }
+
+                if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES && actual.SubastaDetalleId is { } detalleId)
+                {
+                    var linea = subasta.Detalles.FirstOrDefault(d => d.Id == detalleId);
+                    if (linea?.Estado == EstadoSubastaDetalle.ADJUDICADO)
+                    {
+                        throw new BusinessRuleException("No se puede anular una puja de una carta ya adjudicada.");
+                    }
+                }
+                else if (subasta.PedidoDigitalId.HasValue)
+                {
+                    throw new BusinessRuleException("No se pueden anular pujas: el lote ya tiene pedido digital.");
+                }
+
+                db.Pujas.Remove(actual);
+                subasta.Pujas.Remove(actual);
+
+                if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES && actual.SubastaDetalleId is { } lineaId)
+                {
+                    RecalcularLiderLinea(subasta, lineaId);
+                }
+                else
+                {
+                    RecalcularLiderLote(subasta);
+                }
+
+                await GuardarCambiosAsync(ct);
+            },
+            cancellationToken);
     }
 
     public async Task<CierreVencidasResultado> CerrarVencidasAsync(CancellationToken cancellationToken)
@@ -180,6 +319,7 @@ public sealed class SubastasTcgService(
         var activas = await db.SubastasTcg
             .IgnoreQueryFilters()
             .Include(s => s.Pujas)
+            .Include(s => s.Detalles)
             .Where(s => s.Estado == EstadoSubastaTcg.ACTIVA)
             .ToListAsync(cancellationToken);
 
@@ -215,10 +355,31 @@ public sealed class SubastasTcgService(
 
         var subasta = await db.SubastasTcg
             .Include(s => s.Pujas)
+            .Include(s => s.Detalles)
             .FirstOrDefaultAsync(s => s.Id == subastaTcgId.Value, cancellationToken);
 
-        if (subasta is null
-            || subasta.Estado != EstadoSubastaTcg.ADJUDICADA
+        if (subasta is null)
+        {
+            return;
+        }
+
+        var linea = subasta.Detalles.FirstOrDefault(d => d.PedidoDigitalId == pedidoId);
+        if (linea is not null)
+        {
+            PromoverSiguienteGanadoraLinea(subasta, linea);
+            linea.PedidoDigitalId = null;
+            linea.Estado = EstadoSubastaDetalle.PENDIENTE;
+            if (subasta.Estado == EstadoSubastaTcg.ADJUDICADA)
+            {
+                subasta.Estado = EstadoSubastaTcg.ACTIVA;
+                subasta.PedidoDigitalId = null;
+                subasta.PujaGanadoraId = null;
+            }
+
+            return;
+        }
+
+        if (subasta.Estado != EstadoSubastaTcg.ADJUDICADA
             || subasta.PedidoDigitalId != pedidoId)
         {
             return;
@@ -234,46 +395,137 @@ public sealed class SubastasTcgService(
         AdjudicarSubastaRequest? checkout,
         CancellationToken cancellationToken)
     {
-        var subasta = await CargarAsync(id, cancellationToken);
-
-        if (subasta.Estado == EstadoSubastaTcg.ACTIVA)
-        {
-            var maxima = PujaMaxima(subasta);
-            if (!AlcanzaReserva(subasta, maxima))
+        return await EjecutarConReintentoConcurrenciaAsync(
+            id,
+            async (subasta, ct) =>
             {
-                throw new BusinessRuleException(MensajeSinGanadora(subasta));
-            }
+                if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES)
+                {
+                    await AdjudicarLineaIndividualCoreAsync(subasta, checkout, ct);
+                    return;
+                }
 
-            MarcarCierre(subasta);
+                if (subasta.Estado == EstadoSubastaTcg.ACTIVA)
+                {
+                    var maxima = await ResolverGanadoraLoteAsync(subasta, checkout, ct);
+                    if (!AlcanzaReserva(subasta, maxima))
+                    {
+                        throw new BusinessRuleException(MensajeSinGanadora(subasta));
+                    }
+
+                    MarcarCierre(subasta);
+                }
+
+                if (subasta.Estado != EstadoSubastaTcg.CERRADA)
+                {
+                    throw new BusinessRuleException("La subasta debe estar cerrada (o activa) para adjudicar.");
+                }
+
+                if (subasta.PedidoDigitalId.HasValue)
+                {
+                    throw new BusinessRuleException("Esta subasta ya tiene un pedido digital asociado.");
+                }
+
+                var ganadora = subasta.Pujas.FirstOrDefault(p => p.EsGanadora)
+                    ?? await ResolverGanadoraLoteAsync(subasta, checkout, ct)
+                    ?? throw new BusinessRuleException(MensajeSinGanadora(subasta));
+
+                var lineas = LineasOrdenadas(subasta);
+                if (lineas.Count == 0)
+                {
+                    throw new BusinessRuleException("La subasta no tiene productos para adjudicar.");
+                }
+
+                foreach (var linea in lineas)
+                {
+                    var libre = await kardex.LibreAsync(subasta.SedeId, linea.ProductoId, ct);
+                    if (libre < linea.Cantidad)
+                    {
+                        throw new BusinessRuleException(
+                            $"No hay stock libre en la sede para reservar {NombreVisibleLinea(linea)} (necesario: {linea.Cantidad}, libre: {libre}).");
+                    }
+                }
+
+                Cliente? clienteGanador = null;
+                if (ganadora.ClienteId is { } clienteId)
+                {
+                    clienteGanador = await db.Clientes.FirstOrDefaultAsync(c => c.Id == clienteId, ct);
+                }
+
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+                await kardex.AplicarMuchosAsync(
+                    lineas.Select(linea => new KardexComando(
+                        subasta.SedeId,
+                        linea.ProductoId,
+                        TipoMovimientoInventario.PUJA_GANADORA_RESERVA,
+                        linea.Cantidad,
+                        $"Puja ganadora {EtiquetaCanal(subasta.Canal)} · {NombreVisibleLinea(linea)}",
+                        "SUBASTA_TCG",
+                        subasta.Id)),
+                    ct);
+
+                var pedido = CrearPedidoDesdeSubasta(subasta, ganadora, lineas, checkout, clienteGanador);
+                db.PedidosDigitales.Add(pedido);
+                AplicarPreferenciasCliente(checkout, clienteGanador, pedido);
+
+                foreach (var linea in lineas)
+                {
+                    linea.Estado = EstadoSubastaDetalle.ADJUDICADO;
+                    linea.PujaGanadoraId = ganadora.Id;
+                    linea.PedidoDigitalId = pedido.Id;
+                }
+
+                foreach (var puja in subasta.Pujas)
+                {
+                    puja.EsGanadora = puja.Id == ganadora.Id;
+                }
+
+                subasta.PedidoDigitalId = pedido.Id;
+                subasta.PujaGanadoraId = ganadora.Id;
+                subasta.Estado = EstadoSubastaTcg.ADJUDICADA;
+
+                await GuardarCambiosAsync(ct);
+                await tx.CommitAsync(ct);
+            },
+            cancellationToken);
+    }
+
+    private async Task AdjudicarLineaIndividualCoreAsync(
+        SubastaTcg subasta,
+        AdjudicarSubastaRequest? checkout,
+        CancellationToken cancellationToken)
+    {
+        if (subasta.Estado is not (EstadoSubastaTcg.ACTIVA or EstadoSubastaTcg.CERRADA))
+        {
+            throw new BusinessRuleException("El evento debe estar activo o cerrado para adjudicar una carta.");
         }
 
-        if (subasta.Estado != EstadoSubastaTcg.CERRADA)
+        if (checkout?.SubastaDetalleId is not { } detalleId || detalleId == Guid.Empty)
         {
-            throw new BusinessRuleException("La subasta debe estar cerrada (o activa) para adjudicar.");
+            throw new BusinessRuleException("Selecciona la carta a adjudicar dentro del evento.");
         }
 
-        if (subasta.PedidoDigitalId.HasValue)
+        var linea = subasta.Detalles.FirstOrDefault(d => d.Id == detalleId)
+            ?? throw new BusinessRuleException("La carta seleccionada no pertenece a este evento.");
+
+        if (linea.Estado != EstadoSubastaDetalle.PENDIENTE || linea.PedidoDigitalId.HasValue)
         {
-            throw new BusinessRuleException("Esta subasta ya tiene un pedido digital asociado.");
+            throw new BusinessRuleException("Esa carta ya no está pendiente de adjudicación.");
         }
 
-        var ganadora = subasta.Pujas.FirstOrDefault(p => p.EsGanadora)
-            ?? throw new BusinessRuleException(MensajeSinGanadora(subasta));
+        var ganadora = await ResolverGanadoraLineaAsync(subasta, linea, checkout, cancellationToken);
 
-        var lineas = LineasOrdenadas(subasta);
-        if (lineas.Count == 0)
+        if (!AlcanzaReserva(subasta, ganadora))
         {
-            throw new BusinessRuleException("La subasta no tiene productos para adjudicar.");
+            throw new BusinessRuleException(MensajeSinGanadora(subasta));
         }
 
-        foreach (var linea in lineas)
+        var libre = await kardex.LibreAsync(subasta.SedeId, linea.ProductoId, cancellationToken);
+        if (libre < linea.Cantidad)
         {
-            var libre = await kardex.LibreAsync(subasta.SedeId, linea.ProductoId, cancellationToken);
-            if (libre < linea.Cantidad)
-            {
-                throw new BusinessRuleException(
-                    $"No hay stock libre en la sede para reservar {linea.Producto.Nombre} (necesario: {linea.Cantidad}, libre: {libre}).");
-            }
+            throw new BusinessRuleException(
+                $"No hay stock libre en la sede para reservar {NombreVisibleLinea(linea)} (necesario: {linea.Cantidad}, libre: {libre}).");
         }
 
         Cliente? clienteGanador = null;
@@ -285,50 +537,66 @@ public sealed class SubastasTcgService(
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
         await kardex.AplicarMuchosAsync(
-            lineas.Select(linea => new KardexComando(
-                subasta.SedeId,
-                linea.ProductoId,
-                TipoMovimientoInventario.PUJA_GANADORA_RESERVA,
-                linea.Cantidad,
-                $"Puja ganadora {EtiquetaCanal(subasta.Canal)} · {linea.Producto.Nombre}",
-                "SUBASTA_TCG",
-                subasta.Id)),
+            [
+                new KardexComando(
+                    subasta.SedeId,
+                    linea.ProductoId,
+                    TipoMovimientoInventario.PUJA_GANADORA_RESERVA,
+                    linea.Cantidad,
+                    $"Puja ganadora {EtiquetaCanal(subasta.Canal)} · {NombreVisibleLinea(linea)}",
+                    "SUBASTA_TCG",
+                    subasta.Id)
+            ],
             cancellationToken);
 
-        var pedido = CrearPedidoDesdeSubasta(subasta, ganadora, lineas, checkout, clienteGanador);
+        var pedido = CrearPedidoDesdeSubasta(subasta, ganadora, [linea], checkout, clienteGanador);
         db.PedidosDigitales.Add(pedido);
+        AplicarPreferenciasCliente(checkout, clienteGanador, pedido);
 
-        if (checkout?.GuardarPuntoEnCliente == true && clienteGanador is not null)
+        foreach (var puja in PujasDeLinea(subasta, linea.Id))
         {
-            if (!string.IsNullOrWhiteSpace(pedido.ClienteTelefono))
-            {
-                clienteGanador.Telefono = pedido.ClienteTelefono;
-            }
-
-            if (!string.IsNullOrWhiteSpace(pedido.PuntoEntrega))
-            {
-                clienteGanador.PuntoEntregaPreferido = pedido.PuntoEntrega;
-            }
-
-            if (pedido.CanalContacto.HasValue)
-            {
-                clienteGanador.CanalContacto = pedido.CanalContacto;
-            }
-
-            if (!string.IsNullOrWhiteSpace(pedido.ContactoReferencia))
-            {
-                clienteGanador.ContactoReferencia = pedido.ContactoReferencia;
-            }
+            puja.EsGanadora = puja.Id == ganadora.Id;
         }
 
-        subasta.PedidoDigitalId = pedido.Id;
-        subasta.PujaGanadoraId = ganadora.Id;
-        subasta.Estado = EstadoSubastaTcg.ADJUDICADA;
+        linea.Estado = EstadoSubastaDetalle.ADJUDICADO;
+        linea.PujaGanadoraId = ganadora.Id;
+        linea.PedidoDigitalId = pedido.Id;
 
-        await db.SaveChangesAsync(cancellationToken);
+        ActualizarEstadoEventoTrasLineas(subasta, pedido.Id, ganadora.Id);
+
+        await GuardarCambiosAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
+    }
 
-        return (await ObtenerAsync(id, cancellationToken))!;
+    private static void AplicarPreferenciasCliente(
+        AdjudicarSubastaRequest? checkout,
+        Cliente? clienteGanador,
+        PedidoDigital pedido)
+    {
+        if (checkout?.GuardarPuntoEnCliente != true || clienteGanador is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pedido.ClienteTelefono))
+        {
+            clienteGanador.Telefono = pedido.ClienteTelefono;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pedido.PuntoEntrega))
+        {
+            clienteGanador.PuntoEntregaPreferido = pedido.PuntoEntrega;
+        }
+
+        if (pedido.CanalContacto.HasValue)
+        {
+            clienteGanador.CanalContacto = pedido.CanalContacto;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pedido.ContactoReferencia))
+        {
+            clienteGanador.ContactoReferencia = pedido.ContactoReferencia;
+        }
     }
 
     public async Task<SubastaTcgResponse> CancelarAsync(Guid id, CancellationToken cancellationToken)
@@ -341,10 +609,64 @@ public sealed class SubastasTcgService(
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        if (subasta.Estado == EstadoSubastaTcg.ADJUDICADA && subasta.PedidoDigitalId is { } pedidoId)
+        if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES)
+        {
+            var pedidosLinea = subasta.Detalles
+                .Where(d => d.PedidoDigitalId.HasValue)
+                .Select(d => d.PedidoDigitalId!.Value)
+                .Distinct()
+                .ToList();
+
+            foreach (var pedidoId in pedidosLinea)
+            {
+                var pedido = await db.PedidosDigitales
+                    .FirstOrDefaultAsync(p => p.Id == pedidoId, cancellationToken);
+
+                if (pedido is not null
+                    && pedido.Estado != EstadoPedidoDigital.PendientePago
+                    && pedido.Estado != EstadoPedidoDigital.Cancelado)
+                {
+                    throw new BusinessRuleException(
+                        "No se puede cancelar: hay pedidos asociados que ya avanzaron en el Kanban.");
+                }
+
+                if (pedido is { Estado: EstadoPedidoDigital.PendientePago })
+                {
+                    var linea = subasta.Detalles.First(d => d.PedidoDigitalId == pedidoId);
+                    await kardex.AplicarMuchosAsync(
+                        [
+                            new KardexComando(
+                                subasta.SedeId,
+                                linea.ProductoId,
+                                TipoMovimientoInventario.LIBERACION_RESERVA,
+                                linea.Cantidad,
+                                $"Cancelación de evento · {linea.Producto.Nombre}",
+                                "SUBASTA_TCG",
+                                subasta.Id)
+                        ],
+                        cancellationToken);
+
+                    var anterior = pedido.Estado;
+                    pedido.Estado = EstadoPedidoDigital.Cancelado;
+                    pedido.IndicadorReserva = IndicadorReservaPedido.Liberado;
+                    pedido.Historial.Add(new PedidoDigitalHistorialEstado
+                    {
+                        Id = Guid.NewGuid(),
+                        PedidoDigitalId = pedido.Id,
+                        EmpresaId = tenant.EmpresaId,
+                        EstadoAnterior = anterior,
+                        EstadoNuevo = EstadoPedidoDigital.Cancelado,
+                        UsuarioId = currentUser.UserId,
+                        Fecha = DateTimeOffset.UtcNow,
+                        Observacion = "Cancelación de evento de subasta."
+                    });
+                }
+            }
+        }
+        else if (subasta.Estado == EstadoSubastaTcg.ADJUDICADA && subasta.PedidoDigitalId is { } pedidoCabeceraId)
         {
             var pedido = await db.PedidosDigitales
-                .FirstOrDefaultAsync(p => p.Id == pedidoId, cancellationToken);
+                .FirstOrDefaultAsync(p => p.Id == pedidoCabeceraId, cancellationToken);
 
             if (pedido is not null
                 && pedido.Estado != EstadoPedidoDigital.PendientePago
@@ -449,6 +771,7 @@ public sealed class SubastasTcgService(
 
         var lineas = new List<LineaValidada>();
         var vistos = new HashSet<Guid>();
+        var esIndividuales = request.Modo == ModoSubastaTcg.INDIVIDUALES;
 
         foreach (var input in inputs)
         {
@@ -457,7 +780,7 @@ public sealed class SubastasTcgService(
                 throw new BusinessRuleException("Cada cantidad debe ser un entero mayor o igual a 1.");
             }
 
-            if (!vistos.Add(input.ProductoId))
+            if (!esIndividuales && !vistos.Add(input.ProductoId))
             {
                 throw new BusinessRuleException("No repitas el mismo producto en las líneas; suma la cantidad en una sola línea.");
             }
@@ -469,7 +792,20 @@ public sealed class SubastasTcgService(
                 throw new BusinessRuleException("Selecciona un producto activo del catálogo.");
             }
 
-            lineas.Add(new LineaValidada(producto, Round3(input.Cantidad)));
+            var titulo = TextoOpcional(input.TituloPersonalizado, 200);
+            if (esIndividuales)
+            {
+                // Cada unidad física = fila independiente (cantidad 1) para su propio ganador/pedido.
+                var unidades = (int)input.Cantidad;
+                for (var i = 0; i < unidades; i++)
+                {
+                    lineas.Add(new LineaValidada(producto, 1m, titulo));
+                }
+            }
+            else
+            {
+                lineas.Add(new LineaValidada(producto, Round3(input.Cantidad), titulo));
+            }
         }
 
         return lineas;
@@ -519,7 +855,9 @@ public sealed class SubastasTcgService(
             " · ",
             new[]
             {
-                $"Adjudicación subasta · {subasta.Titulo}",
+                lineas.Count == 1
+                    ? $"Adjudicación · {NombreVisibleLinea(lineas[0])} · {subasta.Titulo}"
+                    : $"Adjudicación subasta · {subasta.Titulo}",
                 preferenciaPago
             }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
@@ -566,7 +904,7 @@ public sealed class SubastasTcgService(
                 PedidoDigitalId = pedidoId,
                 EmpresaId = tenant.EmpresaId,
                 ProductoId = linea.ProductoId,
-                Descripcion = linea.Producto.Nombre,
+                Descripcion = NombreVisibleLinea(linea),
                 Cantidad = linea.Cantidad,
                 PrecioUnitario = precioUnitario,
                 Total = totalLinea
@@ -630,14 +968,253 @@ public sealed class SubastasTcgService(
 
     private static void MarcarCierre(SubastaTcg subasta)
     {
-        var maxima = PujaMaxima(subasta);
-        var alcanza = AlcanzaReserva(subasta, maxima);
         subasta.Estado = EstadoSubastaTcg.CERRADA;
         subasta.FechaCierreReal ??= DateTimeOffset.UtcNow;
-        subasta.PujaGanadoraId = alcanza && maxima is not null ? maxima.Id : null;
+
+        if (subasta.Modo == ModoSubastaTcg.INDIVIDUALES)
+        {
+            foreach (var linea in LineasOrdenadas(subasta).Where(d => d.Estado == EstadoSubastaDetalle.PENDIENTE))
+            {
+                var maxima = PujaMaximaDeLinea(subasta, linea.Id);
+                var alcanza = AlcanzaReserva(subasta, maxima);
+                linea.PujaGanadoraId = alcanza && maxima is not null ? maxima.Id : null;
+                foreach (var puja in PujasDeLinea(subasta, linea.Id))
+                {
+                    puja.EsGanadora = alcanza && maxima is not null && puja.Id == maxima.Id;
+                }
+            }
+
+            return;
+        }
+
+        var maximaLote = PujaMaxima(subasta);
+        var alcanzaLote = AlcanzaReserva(subasta, maximaLote);
+        subasta.PujaGanadoraId = alcanzaLote && maximaLote is not null ? maximaLote.Id : null;
         foreach (var puja in subasta.Pujas)
         {
-            puja.EsGanadora = alcanza && maxima is not null && puja.Id == maxima.Id;
+            puja.EsGanadora = alcanzaLote && maximaLote is not null && puja.Id == maximaLote.Id;
+        }
+    }
+
+    private static void MarcarCierreSinGanador(SubastaTcg subasta)
+    {
+        subasta.Estado = EstadoSubastaTcg.CERRADA;
+        subasta.FechaCierreReal ??= DateTimeOffset.UtcNow;
+        subasta.PujaGanadoraId = null;
+        foreach (var puja in subasta.Pujas)
+        {
+            puja.EsGanadora = false;
+        }
+
+        foreach (var linea in subasta.Detalles.Where(d => d.Estado == EstadoSubastaDetalle.PENDIENTE))
+        {
+            linea.PujaGanadoraId = null;
+            linea.Estado = EstadoSubastaDetalle.DESIERTA;
+        }
+    }
+
+    private static void RecalcularLiderLote(SubastaTcg subasta)
+    {
+        foreach (var puja in subasta.Pujas)
+        {
+            puja.EsGanadora = false;
+        }
+
+        var lider = PujaMaxima(subasta);
+        if (lider is null)
+        {
+            subasta.PujaGanadoraId = null;
+            return;
+        }
+
+        lider.EsGanadora = true;
+        subasta.PujaGanadoraId = lider.Id;
+    }
+
+    private static void RecalcularLiderLinea(SubastaTcg subasta, Guid detalleId)
+    {
+        foreach (var puja in PujasDeLinea(subasta, detalleId))
+        {
+            puja.EsGanadora = false;
+        }
+
+        var linea = subasta.Detalles.FirstOrDefault(d => d.Id == detalleId);
+        var lider = PujaMaximaDeLinea(subasta, detalleId);
+        if (linea is not null)
+        {
+            linea.PujaGanadoraId = lider?.Id;
+        }
+
+        if (lider is null)
+        {
+            if (subasta.PujaGanadoraId is { } id &&
+                !subasta.Pujas.Any(p => p.Id == id))
+            {
+                subasta.PujaGanadoraId = null;
+            }
+
+            return;
+        }
+
+        lider.EsGanadora = true;
+    }
+
+    private static void ActualizarEstadoEventoTrasLineas(
+        SubastaTcg subasta,
+        Guid? ultimoPedidoId = null,
+        Guid? ultimaPujaId = null)
+    {
+        var pendientes = subasta.Detalles.Count(d => d.Estado == EstadoSubastaDetalle.PENDIENTE);
+        if (pendientes > 0)
+        {
+            if (subasta.Estado != EstadoSubastaTcg.CERRADA)
+            {
+                subasta.Estado = EstadoSubastaTcg.ACTIVA;
+            }
+
+            return;
+        }
+
+        subasta.FechaCierreReal ??= DateTimeOffset.UtcNow;
+        var huboAdjudicacion = subasta.Detalles.Any(d => d.Estado == EstadoSubastaDetalle.ADJUDICADO);
+        subasta.Estado = huboAdjudicacion ? EstadoSubastaTcg.ADJUDICADA : EstadoSubastaTcg.CERRADA;
+        if (ultimoPedidoId is { } pedidoId)
+        {
+            subasta.PedidoDigitalId = pedidoId;
+        }
+
+        if (ultimaPujaId is { } pujaId)
+        {
+            subasta.PujaGanadoraId = pujaId;
+        }
+    }
+
+    private async Task<Puja> ResolverGanadoraLineaAsync(
+        SubastaTcg subasta,
+        SubastaDetalle linea,
+        AdjudicarSubastaRequest? checkout,
+        CancellationToken cancellationToken)
+    {
+        var existente = PujaMaximaDeLinea(subasta, linea.Id);
+        if (existente is not null)
+        {
+            return existente;
+        }
+
+        return await CrearPujaDirectaAsync(subasta, linea.Id, checkout, cancellationToken);
+    }
+
+    private async Task<Puja?> ResolverGanadoraLoteAsync(
+        SubastaTcg subasta,
+        AdjudicarSubastaRequest? checkout,
+        CancellationToken cancellationToken)
+    {
+        var existente = PujaMaxima(subasta);
+        if (existente is not null)
+        {
+            return existente;
+        }
+
+        if (checkout?.MontoAdjudicado is null && string.IsNullOrWhiteSpace(checkout?.NombrePostor))
+        {
+            return null;
+        }
+
+        return await CrearPujaDirectaAsync(subasta, null, checkout, cancellationToken);
+    }
+
+    private async Task<Puja> CrearPujaDirectaAsync(
+        SubastaTcg subasta,
+        Guid? subastaDetalleId,
+        AdjudicarSubastaRequest? checkout,
+        CancellationToken cancellationToken)
+    {
+        var nombre = checkout?.NombrePostor?.Trim()
+            ?? checkout?.DestinatarioNombre?.Trim()
+            ?? string.Empty;
+        if (nombre.Length < 2)
+        {
+            throw new BusinessRuleException(
+                "Sin pujas previas: indica el ganador y el monto para adjudicar directamente.");
+        }
+
+        var monto = checkout?.MontoAdjudicado is { } m && m > 0
+            ? Round2(m)
+            : throw new BusinessRuleException(
+                "Sin pujas previas: indica el monto adjudicado.");
+
+        if (monto < subasta.PrecioBase)
+        {
+            throw new BusinessRuleException(
+                $"El monto adjudicado debe ser al menos el precio base ({subasta.PrecioBase:0.00}).");
+        }
+
+        Guid? clienteId = checkout?.ClienteId;
+        if (clienteId is { } cid)
+        {
+            var existe = await db.Clientes.AsNoTracking().AnyAsync(c => c.Id == cid, cancellationToken);
+            if (!existe)
+            {
+                throw new BusinessRuleException("El cliente indicado no existe.");
+            }
+        }
+
+        var puja = new Puja
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = tenant.EmpresaId,
+            SubastaTcgId = subasta.Id,
+            SubastaDetalleId = subastaDetalleId,
+            ClienteId = clienteId,
+            NombrePostor = nombre,
+            Monto = monto,
+            Fecha = DateTimeOffset.UtcNow,
+            EsGanadora = true
+        };
+        db.Pujas.Add(puja);
+        subasta.Pujas.Add(puja);
+        return puja;
+    }
+
+    private async Task<SubastaTcgResponse> EjecutarConReintentoConcurrenciaAsync(
+        Guid id,
+        Func<SubastaTcg, CancellationToken, Task> accion,
+        CancellationToken cancellationToken,
+        int maxIntentos = 3)
+    {
+        for (var intento = 1; intento <= maxIntentos; intento++)
+        {
+            try
+            {
+                db.ChangeTracker.Clear();
+                var subasta = await CargarAsync(id, cancellationToken);
+                await accion(subasta, cancellationToken);
+                return (await ObtenerAsync(id, cancellationToken))!;
+            }
+            catch (DbUpdateConcurrencyException) when (intento < maxIntentos)
+            {
+                db.ChangeTracker.Clear();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new BusinessRuleException(
+                    "No se pudo guardar: otro proceso actualizó la subasta. Recarga e intenta de nuevo.");
+            }
+        }
+
+        throw new BusinessRuleException(
+            "No se pudo guardar: otro proceso actualizó la subasta. Recarga e intenta de nuevo.");
+    }
+
+    private async Task GuardarCambiosAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw;
         }
     }
 
@@ -677,6 +1254,42 @@ public sealed class SubastasTcgService(
         subasta.PujaGanadoraId = null;
     }
 
+    private static void PromoverSiguienteGanadoraLinea(SubastaTcg subasta, SubastaDetalle linea)
+    {
+        var anterior = PujasDeLinea(subasta, linea.Id).FirstOrDefault(p => p.Id == linea.PujaGanadoraId)
+            ?? PujasDeLinea(subasta, linea.Id).FirstOrDefault(p => p.EsGanadora);
+
+        foreach (var puja in PujasDeLinea(subasta, linea.Id))
+        {
+            puja.EsGanadora = false;
+        }
+
+        IEnumerable<Puja> candidatas = PujasDeLinea(subasta, linea.Id);
+        if (anterior is not null)
+        {
+            candidatas = candidatas.Where(p => p.Id != anterior.Id);
+            if (anterior.ClienteId is { } clienteId)
+            {
+                candidatas = candidatas.Where(p => p.ClienteId != clienteId);
+            }
+            else
+            {
+                candidatas = candidatas.Where(p =>
+                    !string.Equals(p.NombrePostor, anterior.NombrePostor, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        var siguiente = candidatas.MaxBy(p => p.Monto);
+        if (AlcanzaReserva(subasta, siguiente) && siguiente is not null)
+        {
+            siguiente.EsGanadora = true;
+            linea.PujaGanadoraId = siguiente.Id;
+            return;
+        }
+
+        linea.PujaGanadoraId = null;
+    }
+
     private static bool AlcanzaReserva(SubastaTcg subasta, Puja? maxima) =>
         maxima is not null && (subasta.PrecioReserva is null || maxima.Monto >= subasta.PrecioReserva);
 
@@ -685,12 +1298,24 @@ public sealed class SubastasTcgService(
             ? $"No se alcanzó el precio reserva (S/ {reserva:0.00})."
             : "No hay una puja ganadora para adjudicar.";
 
+    private static IEnumerable<Puja> PujasDeLinea(SubastaTcg subasta, Guid detalleId) =>
+        subasta.Pujas.Where(p => p.SubastaDetalleId == detalleId);
+
     private static Puja? PujaMaxima(SubastaTcg subasta) =>
         subasta.Pujas.Count == 0 ? null : subasta.Pujas.MaxBy(p => p.Monto);
 
-    private static decimal MontoMinimoSiguiente(SubastaTcg subasta)
+    private static Puja? PujaMaximaDeLinea(SubastaTcg subasta, Guid detalleId)
     {
-        var ultima = subasta.Pujas.OrderBy(p => p.Fecha).LastOrDefault();
+        var pujas = PujasDeLinea(subasta, detalleId).ToList();
+        return pujas.Count == 0 ? null : pujas.MaxBy(p => p.Monto);
+    }
+
+    private static decimal MontoMinimoSiguiente(SubastaTcg subasta, Guid? detalleId = null)
+    {
+        IEnumerable<Puja> universo = detalleId is { } id
+            ? PujasDeLinea(subasta, id)
+            : subasta.Pujas;
+        var ultima = universo.OrderBy(p => p.Fecha).LastOrDefault();
         return ultima is null ? Round2(subasta.PrecioBase) : Round2(ultima.Monto + subasta.IncrementoMinimo);
     }
 
@@ -744,10 +1369,15 @@ public sealed class SubastasTcgService(
                 Id = d.Id,
                 ProductoId = d.ProductoId,
                 ProductoNombre = d.Producto.Nombre,
+                TituloPersonalizado = d.TituloPersonalizado,
                 CodigoSku = d.Producto.CodigoSku,
                 TipoProducto = d.Producto.TipoProducto,
                 Cantidad = d.Cantidad,
-                Orden = d.Orden
+                Orden = d.Orden,
+                Estado = d.Estado,
+                PujaGanadoraId = d.PujaGanadoraId,
+                PedidoDigitalId = d.PedidoDigitalId,
+                PedidoCodigo = CodigoAmigable.Pedido(d.PedidoDigitalId)
             })
             .ToList();
 
@@ -763,10 +1393,15 @@ public sealed class SubastasTcgService(
                 Id = Guid.Empty,
                 ProductoId = subasta.ProductoId,
                 ProductoNombre = productoPrincipal.Nombre,
+                TituloPersonalizado = null,
                 CodigoSku = productoPrincipal.CodigoSku,
                 TipoProducto = productoPrincipal.TipoProducto,
                 Cantidad = 1,
-                Orden = 1
+                Orden = 1,
+                Estado = EstadoSubastaDetalle.PENDIENTE,
+                PujaGanadoraId = null,
+                PedidoDigitalId = null,
+                PedidoCodigo = null
             });
         }
 
@@ -777,12 +1412,15 @@ public sealed class SubastasTcgService(
             SedeId = subasta.SedeId,
             SedeNombre = subasta.Sede.Nombre,
             ProductoId = subasta.ProductoId,
-            ProductoNombre = productoPrincipal.Nombre,
+            ProductoNombre = lineaPrincipal is null
+                ? productoPrincipal.Nombre
+                : NombreVisibleLinea(lineaPrincipal),
             CodigoSku = productoPrincipal.CodigoSku,
             TipoProducto = productoPrincipal.TipoProducto,
             Detalles = detalles,
             Titulo = subasta.Titulo,
             Canal = subasta.Canal,
+            Modo = subasta.Modo,
             PrecioBase = subasta.PrecioBase,
             IncrementoMinimo = subasta.IncrementoMinimo,
             PrecioReserva = subasta.PrecioReserva,
@@ -798,6 +1436,7 @@ public sealed class SubastasTcgService(
             {
                 Id = p.Id,
                 SubastaTcgId = p.SubastaTcgId,
+                SubastaDetalleId = p.SubastaDetalleId,
                 ClienteId = p.ClienteId,
                 NombrePostor = p.NombrePostor,
                 Monto = p.Monto,
@@ -816,7 +1455,12 @@ public sealed class SubastasTcgService(
         };
     }
 
-    private readonly record struct LineaValidada(Producto Producto, decimal Cantidad);
+    private readonly record struct LineaValidada(Producto Producto, decimal Cantidad, string? TituloPersonalizado);
+
+    private static string NombreVisibleLinea(SubastaDetalle linea) =>
+        string.IsNullOrWhiteSpace(linea.TituloPersonalizado)
+            ? linea.Producto.Nombre
+            : linea.TituloPersonalizado.Trim();
 }
 
 public readonly record struct CierreVencidasResultado(int Cerradas);

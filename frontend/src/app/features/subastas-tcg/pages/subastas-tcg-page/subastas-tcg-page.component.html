@@ -7,7 +7,25 @@
         Pendiente de pago.
       </p>
     </div>
-    <button type="button" class="subastas__add" (click)="formAbierta.set(true)">Nueva subasta</button>
+    <div class="subastas__header-actions">
+      <div class="vista-toggle" role="group" aria-label="Selector de vista">
+        <button
+          type="button"
+          [class.vista-toggle__btn--active]="vista() === 'tabla'"
+          (click)="setVista('tabla')"
+        >
+          Tabla
+        </button>
+        <button
+          type="button"
+          [class.vista-toggle__btn--active]="vista() === 'kanban'"
+          (click)="setVista('kanban')"
+        >
+          Kanban
+        </button>
+      </div>
+      <button type="button" class="subastas__add" (click)="formAbierta.set(true)">Nueva subasta</button>
+    </div>
   </header>
 
   <app-subasta-margen-card
@@ -35,6 +53,15 @@
   </section>
 
   <section class="toolbar" aria-label="Filtros de subastas">
+    <label class="toolbar__busqueda">
+      <span>Carta, SKU, código o ofertante</span>
+      <input
+        type="search"
+        placeholder="Ej. #SUB-956E, Charizard, VINTAGE…"
+        [ngModel]="filtros().busqueda"
+        (ngModelChange)="actualizarFiltro('busqueda', $event)"
+      />
+    </label>
     <label>
       <span>Canal</span>
       <select [ngModel]="filtros().canal" (ngModelChange)="actualizarFiltro('canal', $event)">
@@ -72,7 +99,20 @@
     <p class="error">{{ error() }}</p>
   }
 
-  <app-subastas-tablero [items]="items()" (ver)="abrirDetalle($event)" (pujar)="abrirPuja($event)" />
+  @if (vista() === 'kanban') {
+    <app-subastas-tablero [items]="items()" (ver)="abrirDetalle($event)" (pujar)="abrirPuja($event)" />
+  } @else {
+    <app-subastas-tabla
+      [items]="items()"
+      (ver)="abrirDetalle($event)"
+      (adjudicar)="abrirAdjudicar($event)"
+      (desierta)="declararDesierta($event)"
+      (activar)="activarSubasta($event)"
+      (editar)="editarSubasta($event)"
+      (abrirSala)="abrirSala($event)"
+      (irPedido)="irAPedido($event)"
+    />
+  }
 </section>
 
 @if (seleccionadaId(); as id) {

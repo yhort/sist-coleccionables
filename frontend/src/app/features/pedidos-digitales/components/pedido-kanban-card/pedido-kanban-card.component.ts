@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 
 import { ETIQUETAS_TIPO, TipoProductoTcg } from '../../../productos-tcg/models/producto-tcg.model';
@@ -7,10 +6,15 @@ import {
   ETIQUETAS_ORIGEN_PEDIDO,
   EstadoPedidoDigital,
   PedidoDigital,
+  etiquetaAccionEstado,
   indicadorReservaDe,
   origenDeCanal,
+  puedeDespachar,
+  puedeEmpaquetar,
+  puedeEntregarRapido,
   transicionesPermitidas,
 } from '../../models/pedido-digital.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 export interface PedidoKanbanItem {
   pedido: PedidoDigital;
@@ -20,7 +24,7 @@ export interface PedidoKanbanItem {
 
 @Component({
   selector: 'app-pedido-kanban-card',
-  imports: [CurrencyPipe],
+  imports: [SolesPipe],
   templateUrl: './pedido-kanban-card.component.html',
   styleUrl: './pedido-kanban-card.component.scss',
 })
@@ -36,6 +40,10 @@ export class PedidoKanbanCardComponent {
   origenDe = origenDeCanal;
   transicionesDe = transicionesPermitidas;
   reservaDe = indicadorReservaDe;
+  etiquetaAccion = etiquetaAccionEstado;
+  puedeEmpaquetar = puedeEmpaquetar;
+  puedeDespachar = puedeDespachar;
+  puedeEntregarRapido = puedeEntregarRapido;
 
   tiposEtiqueta(tipos: TipoProductoTcg[]): string {
     const unicos = [...new Set(tipos)];
@@ -49,16 +57,8 @@ export class PedidoKanbanCardComponent {
     this.transicionar.emit({ pedido, estado: valor as EstadoPedidoDigital });
   }
 
-  /** Recojo en mostrador: 1 clic a Entregado cuando el flujo lo permite. */
-  puedeEntregarRapido(pedido: PedidoDigital): boolean {
-    return (
-      pedido.entrega.esRecojoTienda &&
-      this.transicionesDe(pedido).includes('Entregado')
-    );
-  }
-
-  entregar(pedido: PedidoDigital, event: Event): void {
+  accionRapida(pedido: PedidoDigital, estado: EstadoPedidoDigital, event: Event): void {
     event.stopPropagation();
-    this.transicionar.emit({ pedido, estado: 'Entregado' });
+    this.transicionar.emit({ pedido, estado });
   }
 }

@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 
 import { ETIQUETAS_TIPO, TipoProductoTcg } from '../../../productos-tcg/models/producto-tcg.model';
@@ -8,6 +8,7 @@ import {
   subastaVencida,
   ultimaPuja,
 } from '../../models/subasta-tcg.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 export interface SubastaTableroItem {
   subasta: SubastaTcg;
@@ -19,7 +20,7 @@ export interface SubastaTableroItem {
 
 @Component({
   selector: 'app-subasta-card',
-  imports: [CurrencyPipe, DatePipe],
+  imports: [SolesPipe, DatePipe],
   templateUrl: './subasta-card.component.html',
   styleUrl: './subasta-card.component.scss',
 })

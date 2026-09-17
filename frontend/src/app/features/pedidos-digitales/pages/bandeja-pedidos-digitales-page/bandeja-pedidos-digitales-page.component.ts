@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -20,16 +19,22 @@ import { PedidoDetallePanelComponent } from '../../components/pedido-detalle-pan
 import { PedidoKanbanItem } from '../../components/pedido-kanban-card/pedido-kanban-card.component';
 import { PedidosKanbanComponent } from '../../components/pedidos-kanban/pedidos-kanban.component';
 import { PedidosTablaComponent } from '../../components/pedidos-tabla/pedidos-tabla.component';
+import { EmitirCpeLoteDialogComponent } from '../../components/emitir-cpe-lote-dialog/emitir-cpe-lote-dialog.component';
+import { PedidoEtiquetaDialogComponent } from '../../components/pedido-etiqueta-dialog/pedido-etiqueta-dialog.component';
+import { RegistrarPagoLoteDialogComponent } from '../../components/registrar-pago-lote-dialog/registrar-pago-lote-dialog.component';
 import { PedidosDigitalesApiService } from '../../data-access/pedidos-digitales.service';
 import {
+  ETIQUETAS_ESTADO_PEDIDO,
   ETIQUETAS_ORIGEN_PEDIDO,
   FILTROS_PEDIDOS_VACIOS,
   ORIGENES_PEDIDO,
   PedidoDigital,
   PedidosDigitalesFiltros,
   EstadoPedidoDigital,
+  etiquetaCantidadPedidos,
   origenDeCanal,
 } from '../../models/pedido-digital.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 const VISTA_STORAGE_KEY = 'pedidos-digitales.vista';
 
@@ -47,7 +52,7 @@ function leerVistaPreferida(): PedidosVistaMode {
 @Component({
   selector: 'app-bandeja-pedidos-digitales-page',
   imports: [
-    CurrencyPipe,
+    SolesPipe,
     FormsModule,
     CajaTurnoBannerComponent,
     CrearPedidoDigitalDialogComponent,
@@ -55,6 +60,9 @@ function leerVistaPreferida(): PedidosVistaMode {
     PedidosKanbanComponent,
     PedidosTablaComponent,
     PackingSlipDialogComponent,
+    RegistrarPagoLoteDialogComponent,
+    EmitirCpeLoteDialogComponent,
+    PedidoEtiquetaDialogComponent,
   ],
   templateUrl: './bandeja-pedidos-digitales-page.component.html',
   styleUrl: './bandeja-pedidos-digitales-page.component.scss',
@@ -78,7 +86,11 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
   readonly seleccionadoId = signal<string | null>(null);
   readonly formAbierta = signal(false);
   readonly ticketFila = signal<EntregaFila | null>(null);
+  readonly pagoLote = signal<PedidoDigital[] | null>(null);
+  readonly cpeLote = signal<PedidoDigital[] | null>(null);
+  readonly etiquetasLote = signal<PedidoDigital[] | null>(null);
   readonly error = signal('');
+  readonly aviso = signal('');
 
   readonly sedeCajaId = computed(() => this.sedesApi.sedes()[0]?.id ?? '');
 
@@ -92,7 +104,14 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
-    if (this.formAbierta() || this.seleccionadoId() || this.ticketFila()) {
+    if (
+      this.formAbierta() ||
+      this.seleccionadoId() ||
+      this.ticketFila() ||
+      this.pagoLote() ||
+      this.cpeLote() ||
+      this.etiquetasLote()
+    ) {
       return;
     }
     const target = event.target as HTMLElement | null;
@@ -185,6 +204,26 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     ) as Record<(typeof ORIGENES_PEDIDO)[number], number>;
   });
 
+  readonly opcionesSubasta = computed(() => {
+    this.pedidosApi.pedidos();
+    const mapa = new Map<string, string>();
+    for (const pedido of this.pedidosApi.pedidos()) {
+      if (!pedido.subastaTcgId) {
+        continue;
+      }
+      const label =
+        pedido.tituloSubasta?.trim() ||
+        pedido.codigoSubasta?.trim() ||
+        pedido.subastaTcgId;
+      if (!mapa.has(pedido.subastaTcgId)) {
+        mapa.set(pedido.subastaTcgId, label);
+      }
+    }
+    return [...mapa.entries()]
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  });
+
   actualizarFiltro<K extends keyof PedidosDigitalesFiltros>(
     clave: K,
     valor: PedidosDigitalesFiltros[K],
@@ -204,6 +243,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
 
   abrirDetalle(pedido: PedidoDigital): void {
     this.error.set('');
+    this.aviso.set('');
     this.seleccionadoId.set(pedido.id);
   }
 
@@ -214,6 +254,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
   onPedidoCreado(evento: CrearPedidoSavedEvent): void {
     this.formAbierta.set(false);
     this.error.set('');
+    this.aviso.set('');
     if (evento.imprimirTicket) {
       this.ticketFila.set(this.entregasApi.filaDesdePedido(evento.pedido));
       return;
@@ -228,6 +269,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
 
   async transicionar(evento: { pedido: PedidoDigital; estado: EstadoPedidoDigital }): Promise<void> {
     this.error.set('');
+    this.aviso.set('');
     if (evento.estado === 'Entregado' && !(await this.asegurarCaja(evento.pedido.sedeId))) {
       return;
     }
@@ -236,6 +278,141 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo actualizar el pedido.');
     }
+  }
+
+  async transicionarLote(evento: {
+    pedidos: PedidoDigital[];
+    estado: EstadoPedidoDigital;
+  }): Promise<void> {
+    this.error.set('');
+    this.aviso.set('');
+    if (evento.pedidos.length === 0) {
+      return;
+    }
+    if (evento.estado === 'Entregado') {
+      const sedes = [...new Set(evento.pedidos.map((pedido) => pedido.sedeId))];
+      for (const sedeId of sedes) {
+        if (!(await this.asegurarCaja(sedeId))) {
+          return;
+        }
+      }
+    }
+    try {
+      await this.pedidosApi.cambiarEstadoLote(
+        evento.pedidos.map((pedido) => pedido.id),
+        evento.estado,
+      );
+      this.aviso.set(
+        `${etiquetaCantidadPedidos(evento.pedidos.length)} pasaron a ${ETIQUETAS_ESTADO_PEDIDO[evento.estado]}.`,
+      );
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'No se pudo actualizar el lote.');
+    }
+  }
+
+  abrirPagoLote(pedidos: PedidoDigital[]): void {
+    this.error.set('');
+    this.aviso.set('');
+    this.pagoLote.set(pedidos);
+  }
+
+  onPagoLoteGuardado(): void {
+    const cuantos = this.pagoLote()?.length ?? 0;
+    this.pagoLote.set(null);
+    this.aviso.set(
+      cuantos <= 1
+        ? 'Pago registrado. El pedido pasó a Pagado.'
+        : `Pago registrado. ${cuantos} pedidos pasaron a Pagado.`,
+    );
+  }
+
+  abrirCpeLote(pedidos: PedidoDigital[]): void {
+    this.error.set('');
+    this.aviso.set('');
+    this.cpeLote.set(pedidos);
+  }
+
+  onCpeLoteGuardado(): void {
+    const cuantos = this.cpeLote()?.length ?? 0;
+    this.aviso.set(
+      cuantos <= 1
+        ? 'Comprobante consolidado emitido.'
+        : `Comprobante consolidado emitido para ${cuantos} pedidos.`,
+    );
+  }
+
+  abrirEtiquetas(pedidos: PedidoDigital[]): void {
+    this.error.set('');
+    this.aviso.set('');
+    if (pedidos.length === 0) {
+      return;
+    }
+    this.etiquetasLote.set(pedidos);
+  }
+
+  cerrarEtiquetas(): void {
+    this.etiquetasLote.set(null);
+  }
+
+  async anular(pedido: PedidoDigital): Promise<void> {
+    this.error.set('');
+    this.aviso.set('');
+    const ok = globalThis.confirm(
+      `¿Anular el pedido ${pedido.codigo} de ${pedido.clienteNombre}? Se cancelará y se liberará la reserva de inventario.`,
+    );
+    if (!ok) {
+      return;
+    }
+    try {
+      await this.pedidosApi.cancelar(pedido.id, 'Anulado desde Pedidos Digitales.');
+      this.aviso.set(`Pedido ${pedido.codigo} anulado. Reserva liberada.`);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'No se pudo anular el pedido.');
+    }
+  }
+
+  async onMarcarNotificados(pedidos: PedidoDigital[]): Promise<void> {
+    if (pedidos.length === 0) {
+      return;
+    }
+    this.error.set('');
+    try {
+      await this.pedidosApi.marcarNotificados(pedidos.map((p) => p.id));
+      this.aviso.set(
+        pedidos.length === 1
+          ? 'Resumen de WhatsApp copiado · marcado como notificado.'
+          : `Resumen de WhatsApp copiado · ${pedidos.length} pedidos marcados como notificados.`,
+      );
+    } catch (err) {
+      this.error.set(
+        readApiError(err) ||
+          'El resumen se copió, pero no se pudo marcar como notificado. Revisa la conexión e inténtalo de nuevo.',
+      );
+    }
+  }
+
+  async onToggleNotificacion(pedido: PedidoDigital): Promise<void> {
+    this.error.set('');
+    try {
+      const actualizado = await this.pedidosApi.actualizarNotificacion(pedido.id, !pedido.notificado);
+      this.aviso.set(
+        actualizado.notificado
+          ? `${actualizado.codigo} marcado como notificado.`
+          : `${actualizado.codigo} marcado como sin notificar.`,
+      );
+    } catch (err) {
+      this.error.set(readApiError(err));
+    }
+  }
+
+  onAviso(mensaje: string): void {
+    this.error.set('');
+    this.aviso.set(mensaje);
+  }
+
+  onErrorAccion(mensaje: string): void {
+    this.aviso.set('');
+    this.error.set(mensaje);
   }
 
   onCajaChanged(): void {

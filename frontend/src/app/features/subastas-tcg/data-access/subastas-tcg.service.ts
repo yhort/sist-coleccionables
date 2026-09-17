@@ -15,8 +15,10 @@ import {
   AdjudicarSubastaRequest,
   CanalSubastaTcg,
   CrearSubastaRequest,
+  EstadoSubastaDetalle,
   EstadoSubastaTcg,
   MargenSubasta,
+  ModoSubastaTcg,
   PujaTcg,
   RegistrarPujaRequest,
   SubastaDetalle,
@@ -31,10 +33,15 @@ interface SubastaDetalleApi {
   id: string;
   productoId: string;
   productoNombre: string;
+  tituloPersonalizado?: string | null;
   codigoSku: string;
   tipoProducto: TipoProductoTcg;
   cantidad: number;
   orden: number;
+  estado?: EstadoSubastaDetalle | null;
+  pujaGanadoraId?: string | null;
+  pedidoDigitalId?: string | null;
+  pedidoCodigo?: string | null;
 }
 
 interface SubastaApi {
@@ -49,6 +56,7 @@ interface SubastaApi {
   detalles?: SubastaDetalleApi[] | null;
   titulo: string;
   canal: CanalSubastaTcg;
+  modo?: ModoSubastaTcg | null;
   precioBase: number;
   incrementoMinimo: number;
   precioReserva?: number | null;
@@ -60,7 +68,7 @@ interface SubastaApi {
   pedidoDigitalId?: string | null;
   pedidoCodigo?: string | null;
   observacion?: string | null;
-  pujas: PujaTcg[];
+  pujas: Array<PujaTcg & { subastaDetalleId?: string | null }>;
   margen: MargenSubasta;
 }
 
@@ -89,6 +97,9 @@ export class SubastasTcgApiService {
   }
 
   listar(filtros: SubastasTcgFiltros): SubastaTcg[] {
+    const q = filtros.busqueda.trim().toLowerCase();
+    const qNorm = q.replace(/^#/, '');
+
     return this.subastasSignal()
       .filter((subasta) => {
         if (filtros.canal !== 'TODOS' && subasta.canal !== filtros.canal) {
@@ -105,6 +116,27 @@ export class SubastasTcgApiService {
             ).filter(Boolean),
           );
           if (!tipos.has(filtros.tipoProducto)) {
+            return false;
+          }
+        }
+        if (q) {
+          const haystack = [
+            subasta.codigo,
+            subasta.titulo,
+            subasta.productoNombre,
+            subasta.codigoSku,
+            ...(subasta.detalles ?? []).flatMap((d) => [
+              d.productoNombre,
+              d.tituloPersonalizado,
+              d.codigoSku,
+            ]),
+            ...subasta.pujas.map((p) => p.nombrePostor),
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          const codigoNorm = subasta.codigo.toLowerCase().replace(/^#/, '');
+          if (!haystack.includes(q) && !codigoNorm.includes(qNorm)) {
             return false;
           }
         }
@@ -152,9 +184,11 @@ export class SubastasTcgApiService {
       detalles: request.detalles.map((d) => ({
         productoId: d.productoId,
         cantidad: d.cantidad,
+        tituloPersonalizado: d.tituloPersonalizado?.trim() || null,
       })),
       titulo: request.titulo.trim(),
       canal: request.canal,
+      modo: request.modo ?? 'COMBO',
       precioBase: request.precioBase,
       incrementoMinimo: request.incrementoMinimo,
       precioReserva: request.precioReserva,
@@ -172,6 +206,7 @@ export class SubastasTcgApiService {
     return this.enviar('POST', apiUrl(`subastas-tcg/${id}/pujas`), {
       nombrePostor: request.nombrePostor,
       clienteId: request.clienteId || null,
+      subastaDetalleId: request.subastaDetalleId || null,
       monto: request.monto,
     });
   }
@@ -180,12 +215,36 @@ export class SubastasTcgApiService {
     return this.enviar('POST', apiUrl(`subastas-tcg/${id}/cerrar`));
   }
 
+  declararDesierta(id: string, subastaDetalleId?: string | null): Promise<SubastaTcg> {
+    return this.enviar('POST', apiUrl(`subastas-tcg/${id}/declarar-desierta`), {
+      subastaDetalleId: subastaDetalleId || null,
+    });
+  }
+
+  eliminarPuja(pujaId: string): Promise<SubastaTcg> {
+    return this.enviar('DELETE', apiUrl(`subastas-tcg/pujas/${pujaId}`));
+  }
+
   async adjudicar(id: string, checkout?: AdjudicarSubastaRequest): Promise<SubastaTcg> {
-    const subasta = await this.enviar(
-      'POST',
-      apiUrl(`subastas-tcg/${id}/adjudicar`),
-      checkout ?? {},
-    );
+    const subasta = await this.enviar('POST', apiUrl(`subastas-tcg/${id}/adjudicar`), {
+      subastaDetalleId: checkout?.subastaDetalleId ?? null,
+      nombrePostor: checkout?.nombrePostor ?? null,
+      clienteId: checkout?.clienteId ?? null,
+      montoAdjudicado: checkout?.montoAdjudicado ?? null,
+      metodoEnvio: checkout?.metodoEnvio ?? 'RECOJO_TIENDA',
+      origenPagoPreferido: checkout?.origenPagoPreferido ?? 'YAPE',
+      destinatarioNombre: checkout?.destinatarioNombre ?? null,
+      destinatarioTelefono: checkout?.destinatarioTelefono ?? null,
+      entregaDireccion: checkout?.entregaDireccion ?? null,
+      entregaDistrito: checkout?.entregaDistrito ?? null,
+      entregaProvincia: checkout?.entregaProvincia ?? null,
+      entregaDepartamento: checkout?.entregaDepartamento ?? null,
+      agencia: checkout?.agencia ?? null,
+      puntoEntrega: checkout?.puntoEntrega ?? null,
+      canalContacto: checkout?.canalContacto ?? null,
+      contactoReferencia: checkout?.contactoReferencia ?? null,
+      guardarPuntoEnCliente: checkout?.guardarPuntoEnCliente ?? false,
+    });
     await Promise.all([
       this.stockApi.refrescarSede(subasta.sedeId).catch(() => undefined),
       this.pedidosApi.refrescar().catch(() => undefined),
@@ -202,9 +261,17 @@ export class SubastasTcgApiService {
     return subasta;
   }
 
-  private async enviar(method: 'POST', url: string, body?: unknown): Promise<SubastaTcg> {
+  private async enviar(
+    method: 'POST' | 'DELETE',
+    url: string,
+    body?: unknown,
+  ): Promise<SubastaTcg> {
     try {
-      const dto = await firstValueFrom(this.http.post<SubastaApi>(url, body ?? {}));
+      const request$ =
+        method === 'DELETE'
+          ? this.http.delete<SubastaApi>(url)
+          : this.http.post<SubastaApi>(url, body ?? {});
+      const dto = await firstValueFrom(request$);
       const subasta = mapSubasta(dto);
       this.upsert(subasta);
       return clonar(subasta);
@@ -232,10 +299,21 @@ function mapDetalles(dto: SubastaApi): SubastaDetalle[] {
         id: d.id,
         productoId: d.productoId,
         productoNombre: d.productoNombre,
+        tituloPersonalizado: d.tituloPersonalizado?.trim() || null,
         codigoSku: d.codigoSku,
         tipoProducto: d.tipoProducto,
         cantidad: d.cantidad,
         orden: d.orden,
+        estado:
+          d.estado === 'ADJUDICADO'
+            ? 'ADJUDICADO'
+            : d.estado === 'DESIERTA'
+              ? 'DESIERTA'
+              : 'PENDIENTE',
+        pujaGanadoraId: d.pujaGanadoraId ?? null,
+        pedidoDigitalId: d.pedidoDigitalId ?? null,
+        pedidoCodigo:
+          d.pedidoCodigo?.trim() || (d.pedidoDigitalId ? codigoPedido(d.pedidoDigitalId) : null),
       }));
   }
   return [
@@ -243,10 +321,15 @@ function mapDetalles(dto: SubastaApi): SubastaDetalle[] {
       id: '',
       productoId: dto.productoId,
       productoNombre: dto.productoNombre,
+      tituloPersonalizado: null,
       codigoSku: dto.codigoSku ?? '',
       tipoProducto: dto.tipoProducto,
       cantidad: 1,
       orden: 1,
+      estado: 'PENDIENTE',
+      pujaGanadoraId: null,
+      pedidoDigitalId: null,
+      pedidoCodigo: null,
     },
   ];
 }
@@ -265,6 +348,7 @@ function mapSubasta(dto: SubastaApi): SubastaTcg {
     detalles,
     titulo: dto.titulo,
     canal: dto.canal,
+    modo: dto.modo === 'INDIVIDUALES' ? 'INDIVIDUALES' : 'COMBO',
     precioBase: dto.precioBase,
     incrementoMinimo: dto.incrementoMinimo,
     precioReserva: dto.precioReserva ?? null,
@@ -279,6 +363,7 @@ function mapSubasta(dto: SubastaApi): SubastaTcg {
     pujas: (dto.pujas ?? []).map((puja) => ({
       id: puja.id,
       subastaTcgId: puja.subastaTcgId,
+      subastaDetalleId: puja.subastaDetalleId ?? null,
       clienteId: puja.clienteId ?? null,
       nombrePostor: puja.nombrePostor,
       monto: puja.monto,

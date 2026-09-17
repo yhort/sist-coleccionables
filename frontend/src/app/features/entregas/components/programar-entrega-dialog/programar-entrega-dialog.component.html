@@ -27,7 +27,7 @@
 
   <p class="pedido-hint">
     {{ fila().pedido.codigo }} · {{ fila().pedido.clienteNombre }} ·
-    {{ fila().pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+    {{ fila().pedido.total | soles }}
   </p>
 
   <form [formGroup]="form" (ngSubmit)="guardar()">

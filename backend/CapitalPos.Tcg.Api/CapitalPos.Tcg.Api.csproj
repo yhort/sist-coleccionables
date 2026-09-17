@@ -26,4 +26,10 @@
     <PackageReference Include="QuestPDF" Version="2026.8.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Assets\logo-trunqi.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

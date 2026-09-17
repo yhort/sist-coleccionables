@@ -10,6 +10,8 @@ public class SubastaTcg : IEmpresaScoped
     public Guid ProductoId { get; set; }
     public string Titulo { get; set; } = string.Empty;
     public CanalSubastaTcg Canal { get; set; }
+    /// <summary>COMBO = un ganador para todo el lote; INDIVIDUALES = evento con adjudicación por carta.</summary>
+    public ModoSubastaTcg Modo { get; set; } = ModoSubastaTcg.COMBO;
     public decimal PrecioBase { get; set; }
     public decimal IncrementoMinimo { get; set; }
     public decimal? PrecioReserva { get; set; }

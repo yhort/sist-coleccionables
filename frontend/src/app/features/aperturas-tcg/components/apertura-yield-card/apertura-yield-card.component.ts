@@ -1,11 +1,12 @@
-import { CurrencyPipe, DecimalPipe, NgClass } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { Component, input } from '@angular/core';
 
 import { RendimientoApertura } from '../../models/apertura-tcg.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-apertura-yield-card',
-  imports: [CurrencyPipe, DecimalPipe, NgClass],
+  imports: [SolesPipe, DecimalPipe, NgClass],
   templateUrl: './apertura-yield-card.component.html',
   styleUrl: './apertura-yield-card.component.scss',
 })

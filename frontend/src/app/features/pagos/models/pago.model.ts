@@ -47,6 +47,16 @@ export interface RegistrarPagoRequest {
   confirmar?: boolean;
 }
 
+export interface RegistrarPagoLoteRequest {
+  origen: OrigenPago;
+  monto: number;
+  codigoOperacion?: string | null;
+  referenciaExterna?: string | null;
+  observacion?: string | null;
+  confirmar?: boolean;
+  pedidoDigitalIds: string[];
+}
+
 export interface PagosKpis {
   recaudadoHoy: number;
   cantidadHoy: number;

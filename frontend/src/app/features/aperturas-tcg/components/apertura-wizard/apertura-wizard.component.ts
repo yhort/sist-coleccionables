@@ -1,4 +1,4 @@
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import {
   Component,
   HostListener,
@@ -30,6 +30,7 @@ import {
   valorEstimadoCartas,
 } from '../../models/apertura-tcg.model';
 import { AperturaYieldCardComponent } from '../apertura-yield-card/apertura-yield-card.component';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 interface LineaWizard {
   id: string;
@@ -41,7 +42,7 @@ interface LineaWizard {
 
 @Component({
   selector: 'app-apertura-wizard',
-  imports: [CurrencyPipe, DecimalPipe, FormsModule, ReactiveFormsModule, AperturaYieldCardComponent],
+  imports: [SolesPipe, DecimalPipe, FormsModule, ReactiveFormsModule, AperturaYieldCardComponent],
   templateUrl: './apertura-wizard.component.html',
   styleUrl: './apertura-wizard.component.scss',
 })

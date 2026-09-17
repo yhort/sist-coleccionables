@@ -1,4 +1,4 @@
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { Component, input } from '@angular/core';
 
 import {
@@ -6,10 +6,11 @@ import {
   ORIGENES_PAGO,
   PagosKpis,
 } from '../../models/pago.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-pagos-kpis',
-  imports: [CurrencyPipe, DecimalPipe],
+  imports: [SolesPipe, DecimalPipe],
   templateUrl: './pagos-kpis.component.html',
   styleUrl: './pagos-kpis.component.scss',
 })

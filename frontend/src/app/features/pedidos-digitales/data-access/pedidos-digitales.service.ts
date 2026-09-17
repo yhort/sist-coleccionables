@@ -45,12 +45,36 @@ interface PedidoApi {
   observacion?: string | null;
   subastaTcgId?: string | null;
   codigoSubasta?: string | null;
+  tituloSubasta?: string | null;
+  notificado?: boolean;
+  fechaNotificacion?: string | null;
   ventaId?: string | null;
   codigoVenta?: string | null;
   entregaId?: string | null;
   entrega: PedidoDigitalEntrega;
   detalles: Array<PedidoDigitalDetalle & { codigoSku?: string | null; codigo?: string | null }>;
   historialEstados: PedidoDigitalHistorialEstado[];
+}
+
+export interface ComprobanteConsolidadoApi {
+  ventaId: string;
+  comprobante: {
+    id: string;
+    ventaId: string;
+    tipo: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA';
+    serie: string;
+    correlativo: number;
+    estado: string;
+    mensaje?: string | null;
+    fechaEmision: string;
+    clienteNombre?: string | null;
+    total?: number | null;
+    hashFirma?: string | null;
+    tieneXml?: boolean;
+    tieneCdr?: boolean;
+    tienePdf?: boolean;
+  };
+  pedidos: PedidoApi[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -79,6 +103,7 @@ export class PedidosDigitalesApiService {
 
   listar(filtros: PedidosDigitalesFiltros): PedidoDigital[] {
     const busqueda = filtros.busqueda.trim().toLowerCase();
+    const clienteQ = filtros.cliente.trim().toLowerCase();
     const desde = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00`) : null;
     const hasta = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999`) : null;
 
@@ -87,15 +112,43 @@ export class PedidosDigitalesApiService {
         if (filtros.origen !== 'TODOS' && origenDeCanal(pedido.canalPedido) !== filtros.origen) {
           return false;
         }
+        if (filtros.subastaTcgId !== 'TODAS') {
+          if ((pedido.subastaTcgId ?? '') !== filtros.subastaTcgId) {
+            return false;
+          }
+        }
+        if (clienteQ) {
+          const clienteHaystack = [
+            pedido.clienteNombre,
+            pedido.clienteTelefono ?? '',
+            pedido.entrega.destinatarioNombre ?? '',
+            pedido.entrega.contactoReferencia ?? '',
+          ]
+            .join(' ')
+            .toLowerCase();
+          if (!clienteHaystack.includes(clienteQ)) {
+            return false;
+          }
+        }
+        if (filtros.notificacion === 'NOTIFICADOS' && !pedido.notificado) {
+          return false;
+        }
+        if (filtros.notificacion === 'SIN_NOTIFICAR' && pedido.notificado) {
+          return false;
+        }
         if (busqueda) {
           const haystack = [
             pedido.codigo,
             pedido.id,
             pedido.clienteNombre,
+            pedido.clienteTelefono ?? '',
             pedido.referenciaExterna ?? '',
             pedido.entrega.numeroTracking ?? '',
+            pedido.entrega.destinatarioNombre ?? '',
             pedido.codigoSubasta ?? '',
+            pedido.tituloSubasta ?? '',
             pedido.codigoVenta ?? '',
+            ...pedido.detalles.map((detalle) => detalle.descripcion),
           ]
             .join(' ')
             .toLowerCase();
@@ -252,6 +305,93 @@ export class PedidosDigitalesApiService {
     }
   }
 
+  async cambiarEstadoLote(
+    ids: readonly string[],
+    estadoNuevo: EstadoPedidoDigital,
+    observacion?: string,
+  ): Promise<PedidoDigital[]> {
+    if (ids.length === 0) {
+      throw new Error('Selecciona al menos un pedido.');
+    }
+    try {
+      const actualizados = await firstValueFrom(
+        this.http.post<PedidoApi[]>(apiUrl('pedidos-digitales/estado-lote'), {
+          estado: estadoNuevo,
+          observacion: observacion?.trim() || null,
+          pedidoDigitalIds: [...ids],
+        }),
+      );
+      const pedidos = actualizados.map(mapPedido);
+      for (const pedido of pedidos) {
+        this.reemplazar(pedido);
+      }
+      if (estadoNuevo === 'Entregado') {
+        const sedes = [...new Set(pedidos.map((pedido) => pedido.sedeId))];
+        await Promise.all(sedes.map((sedeId) => this.stockApi.refrescarSede(sedeId).catch(() => undefined)));
+      }
+      return pedidos.map(clonarPedido);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async actualizarNotificacion(id: string, notificado: boolean): Promise<PedidoDigital> {
+    try {
+      const actualizado = await firstValueFrom(
+        this.http.put<PedidoApi>(apiUrl(`pedidos-digitales/${id}/notificacion`), { notificado }),
+      );
+      const pedido = mapPedido(actualizado);
+      this.reemplazar(pedido);
+      return clonarPedido(pedido);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async marcarNotificados(ids: readonly string[]): Promise<PedidoDigital[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    try {
+      const actualizados = await firstValueFrom(
+        this.http.post<PedidoApi[]>(apiUrl('pedidos-digitales/notificacion-lote'), {
+          notificado: true,
+          pedidoDigitalIds: [...ids],
+        }),
+      );
+      const pedidos = actualizados.map(mapPedido);
+      for (const pedido of pedidos) {
+        this.reemplazar(pedido);
+      }
+      return pedidos.map(clonarPedido);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async emitirComprobanteConsolidado(
+    ids: readonly string[],
+    tipo: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA',
+  ): Promise<ComprobanteConsolidadoApi> {
+    if (ids.length === 0) {
+      throw new Error('Selecciona al menos un pedido entregado.');
+    }
+    try {
+      const resultado = await firstValueFrom(
+        this.http.post<ComprobanteConsolidadoApi>(apiUrl('pedidos-digitales/comprobante-consolidado'), {
+          tipoComprobante: tipo,
+          pedidoDigitalIds: [...ids],
+        }),
+      );
+      for (const pedido of resultado.pedidos.map(mapPedido)) {
+        this.reemplazar(pedido);
+      }
+      return resultado;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
   async cancelar(id: string, observacion?: string): Promise<PedidoDigital> {
     try {
       const cancelado = await firstValueFrom(
@@ -340,6 +480,9 @@ function mapPedido(dto: PedidoApi): PedidoDigital {
     observacion: dto.observacion ?? null,
     subastaTcgId: dto.subastaTcgId ?? null,
     codigoSubasta: dto.codigoSubasta?.trim() || (dto.subastaTcgId ? codigoSubasta(dto.subastaTcgId) : null),
+    tituloSubasta: dto.tituloSubasta?.trim() || null,
+    notificado: !!dto.notificado,
+    fechaNotificacion: dto.fechaNotificacion ?? null,
     ventaId: dto.ventaId ?? null,
     codigoVenta: dto.codigoVenta?.trim() || (dto.ventaId ? codigoVenta(dto.ventaId) : null),
     detalles: dto.detalles.map((detalle) => ({

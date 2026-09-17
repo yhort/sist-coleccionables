@@ -42,7 +42,7 @@
         <strong>
           {{
             (caja.sesion?.montoEfectivoTeorico ?? 0)
-              | currency: 'PEN' : 'symbol-narrow' : '1.2-2'
+              | soles
           }}
         </strong>
       </article>
@@ -53,7 +53,7 @@
       <article>
         <span>Total vendido</span>
         <strong>
-          {{ (caja.sesion?.totalVentas ?? 0) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+          {{ (caja.sesion?.totalVentas ?? 0) | soles }}
         </strong>
       </article>
     </section>
@@ -77,7 +77,7 @@
                 <tr>
                   <td>{{ fila.etiqueta }}</td>
                   <td>{{ fila.cantidad }}</td>
-                  <td>{{ fila.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  <td>{{ fila.monto | soles }}</td>
                 </tr>
               }
             </tbody>
@@ -101,7 +101,7 @@
                 <tr>
                   <td>{{ fila.etiqueta }}</td>
                   <td>{{ fila.cantidad }}</td>
-                  <td>{{ fila.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  <td>{{ fila.total | soles }}</td>
                 </tr>
               } @empty {
                 <tr>
@@ -134,7 +134,7 @@
                 <td>{{ venta.clienteNombre || '—' }}</td>
                 <td>{{ venta.comprobante || 'Pendiente' }}</td>
                 <td>{{ venta.mediosPago || '—' }}</td>
-                <td>{{ venta.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                <td>{{ venta.total | soles }}</td>
               </tr>
             } @empty {
               <tr>
@@ -167,7 +167,7 @@
                   </td>
                   <td>{{ mov.concepto }}</td>
                   <td>{{ mov.usuarioNombre || '—' }}</td>
-                  <td>{{ mov.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  <td>{{ mov.monto | soles }}</td>
                 </tr>
               }
             </tbody>
@@ -205,12 +205,12 @@
                   {{ etiquetasEstado[sesion.estado] }}
                 </span>
               </td>
-              <td>{{ sesion.montoEfectivoTeorico | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+              <td>{{ sesion.montoEfectivoTeorico | soles }}</td>
               <td>
                 @if (sesion.tipoDiferencia; as tipo) {
                   <span class="pill" [attr.data-diff]="tipo">
                     {{ etiquetasDiferencia[tipo] }}
-                    {{ sesion.diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                    {{ sesion.diferencia | soles }}
                   </span>
                 } @else {
                   —

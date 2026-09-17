@@ -179,7 +179,7 @@
                 </td>
                 <td>{{ nota.clienteNombre || 'Sin cliente' }}</td>
                 <td>{{ nota.fechaEmision | date: 'dd/MM/yyyy HH:mm' }}</td>
-                <td>{{ nota.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                <td>{{ nota.total | soles }}</td>
               </tr>
             }
           </tbody>
@@ -189,7 +189,7 @@
       <div class="consolidar__resumen">
         <p>
           {{ idsAConsolidar().length }} notas ·
-          {{ totalSeleccionado() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+          {{ totalSeleccionado() | soles }}
         </p>
         <button
           type="button"
@@ -288,7 +288,7 @@
                   <td>
                     <strong>{{ emision.clienteNombre || 'Sin cliente' }}</strong>
                   </td>
-                  <td class="monto">{{ emision.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                  <td class="monto">{{ emision.total | soles }}</td>
                   <td>
                     <span class="estado" [attr.data-estado]="emision.estado">
                       {{ etiquetasEstado[emision.estado] }}

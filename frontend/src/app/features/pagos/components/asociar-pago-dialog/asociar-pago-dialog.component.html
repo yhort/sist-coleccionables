@@ -88,8 +88,8 @@
       @if (pedidoSeleccionado(); as pedido) {
         <p class="pedido-hint">
           {{ pedido.clienteNombre }} · total
-          {{ pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
-          · saldo {{ saldoDe(pedido) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+          {{ pedido.total | soles }}
+          · saldo {{ saldoDe(pedido) | soles }}
         </p>
       }
       <label class="wide">

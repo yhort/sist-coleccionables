@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import {
   Component,
   HostListener,
@@ -21,10 +20,11 @@ import {
   tipoDiferenciaDe,
 } from '../../models/caja.model';
 import { CajaTicketPrintComponent } from '../caja-ticket-print/caja-ticket-print.component';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-caja-arqueo-dialog',
-  imports: [CurrencyPipe, FormsModule, CajaTicketPrintComponent],
+  imports: [SolesPipe, FormsModule, CajaTicketPrintComponent],
   templateUrl: './caja-arqueo-dialog.component.html',
   styleUrl: './caja-arqueo-dialog.component.scss',
 })

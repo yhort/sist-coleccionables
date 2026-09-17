@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, output, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 
@@ -23,12 +23,13 @@ import {
   puedeDescargarXml,
   puedeAbrirPdf,
 } from '../../models/ecosistema.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 type VistaFiscal = 'config' | 'notas';
 
 @Component({
   selector: 'app-fiscal-sunat-panel',
-  imports: [CurrencyPipe, DatePipe, FormsModule, ReactiveFormsModule],
+  imports: [SolesPipe, DatePipe, FormsModule, ReactiveFormsModule],
   templateUrl: './fiscal-sunat-panel.component.html',
   styleUrl: './fiscal-sunat-panel.component.scss',
 })

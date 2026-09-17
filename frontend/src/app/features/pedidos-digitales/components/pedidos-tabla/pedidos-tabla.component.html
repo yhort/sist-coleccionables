@@ -16,6 +16,82 @@
     }
   </div>
 
+  @if (seleccionados().size > 0) {
+    <div class="tabla__lote" role="region" aria-label="Acciones en lote">
+      @if (lote(); as lote) {
+        <div class="tabla__lote-info">
+          @switch (lote.tipo) {
+            @case ('cobro') {
+              <strong>{{ etiquetaCantidad(lote.pedidos.length) }}</strong>
+              · {{ lote.clienteNombre }} · {{ lote.total | soles }}
+            }
+            @case ('empaquetar') {
+              <strong>{{ etiquetaCantidad(lote.count) }}</strong>
+              listos para empaque.
+            }
+            @case ('despachar') {
+              <strong>{{ etiquetaCantidad(lote.count) }}</strong>
+              listos para despacho.
+            }
+            @case ('entregar') {
+              <strong>{{ etiquetaCantidad(lote.count) }}</strong>
+              listos para marcar entregados.
+            }
+            @case ('cpe') {
+              <strong>{{ etiquetaCantidad(lote.pedidos.length) }}</strong>
+              · {{ lote.clienteNombre }} · {{ lote.total | soles }}
+            }
+            @case ('invalido') {
+              <strong>{{ etiquetaCantidad(seleccionados().size) }}</strong>
+              <span class="tabla__lote-warn">{{ lote.mensaje }}</span>
+            }
+          }
+        </div>
+        <div class="tabla__lote-acciones">
+          @switch (lote.tipo) {
+            @case ('cobro') {
+              <button type="button" class="ghost" (click)="copiarResumen()">
+                Copiar Resumen WhatsApp
+              </button>
+              <button type="button" class="primary" (click)="abrirPago()">
+                Registrar Pago ({{ lote.total | soles }})
+              </button>
+            }
+            @case ('empaquetar') {
+              <button type="button" class="primary" (click)="ejecutarLoteLogistico('Empaquetado')">
+                Mover a Empaquetado ({{ etiquetaCantidad(lote.count) }})
+              </button>
+            }
+            @case ('despachar') {
+              <button type="button" class="primary" (click)="ejecutarLoteLogistico('PendienteEntrega')">
+                Despachar / Enviar a Entrega ({{ etiquetaCantidad(lote.count) }})
+              </button>
+              <button type="button" class="ghost" (click)="imprimirEtiquetasLote()">
+                Imprimir Etiquetas ({{ lote.count }})
+              </button>
+            }
+            @case ('entregar') {
+              <button type="button" class="primary" (click)="ejecutarLoteLogistico('Entregado')">
+                Marcar como Entregados ({{ etiquetaCantidad(lote.count) }})
+              </button>
+            }
+            @case ('cpe') {
+              <button type="button" class="primary" (click)="abrirCpe()">
+                Emitir Comprobante Consolidado ({{ lote.total | soles }})
+              </button>
+            }
+            @case ('invalido') {
+              <button type="button" class="primary" disabled>
+                Acción en lote
+              </button>
+            }
+          }
+          <button type="button" class="ghost" (click)="limpiarSeleccion()">Quitar selección</button>
+        </div>
+      }
+    </div>
+  }
+
   @if (filtrados().length === 0) {
     <div class="tabla__empty">No hay pedidos con esos filtros.</div>
   } @else {
@@ -23,6 +99,16 @@
       <table class="tabla__grid">
         <thead>
           <tr>
+            <th class="check">
+              <input
+                type="checkbox"
+                aria-label="Seleccionar pedidos de esta página"
+                [checked]="todosPaginaSeleccionados()"
+                [indeterminate]="paginaParcial()"
+                [disabled]="seleccionablesPagina().length === 0"
+                (change)="toggleTodosPagina($any($event.target).checked)"
+              />
+            </th>
             <th>
               <button type="button" class="sort" (click)="ordenar('codigo')">
                 N° pedido{{ sortMark('codigo') }}
@@ -55,7 +141,19 @@
         </thead>
         <tbody>
           @for (item of pageItems(); track item.pedido.id) {
-            <tr [attr.data-estado]="item.pedido.estado">
+            <tr
+              [attr.data-estado]="item.pedido.estado"
+              [class.tabla__row--selected]="estaSeleccionado(item.pedido.id)"
+            >
+              <td class="check">
+                <input
+                  type="checkbox"
+                  [attr.aria-label]="'Seleccionar ' + item.pedido.codigo"
+                  [checked]="estaSeleccionado(item.pedido.id)"
+                  [disabled]="!puedeSeleccionar(item.pedido)"
+                  (change)="toggleFila(item.pedido, $any($event.target).checked)"
+                />
+              </td>
               <td>
                 <button type="button" class="codigo" (click)="abrir.emit(item.pedido)">
                   {{ item.pedido.codigo }}
@@ -69,17 +167,45 @@
                 @if (item.pedido.entrega.contactoReferencia; as ref) {
                   <small>{{ ref }}</small>
                 }
+                <button
+                  type="button"
+                  class="notif"
+                  [class.notif--on]="item.pedido.notificado"
+                  [class.notif--off]="!item.pedido.notificado"
+                  [attr.aria-pressed]="item.pedido.notificado"
+                  [title]="
+                    item.pedido.notificado
+                      ? '✓ Notificado' +
+                        (item.pedido.fechaNotificacion
+                          ? ' · ' + (item.pedido.fechaNotificacion | date: 'dd/MM/yyyy HH:mm')
+                          : '') +
+                        ' — clic para marcar Sin notificar'
+                      : 'Sin notificar — clic para marcar Notificado'
+                  "
+                  (click)="toggleNotificacion.emit(item.pedido); $event.stopPropagation()"
+                >
+                  @if (item.pedido.notificado) {
+                    ✓ Notificado
+                  } @else {
+                    Sin notificar
+                  }
+                </button>
               </td>
               <td>
-                <span class="origen" [attr.data-origen]="origenDe(item.pedido.canalPedido)">
-                  {{ etiquetasOrigen[origenDe(item.pedido.canalPedido)] }}
-                </span>
+                <div class="origen-cell">
+                  <span class="origen" [attr.data-origen]="origenDe(item.pedido.canalPedido)">
+                    {{ etiquetasOrigen[origenDe(item.pedido.canalPedido)] }}
+                  </span>
+                  @if (etiquetaSubasta(item.pedido); as subasta) {
+                    <span class="subasta" [title]="subasta">{{ subasta }}</span>
+                  }
+                </div>
               </td>
               <td>
                 <span class="punto">{{ puntoEntrega(item) }}</span>
               </td>
               <td class="total">
-                {{ item.pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                {{ item.pedido.total | soles }}
               </td>
               <td>
                 <span class="estado" [attr.data-estado]="item.pedido.estado">
@@ -90,6 +216,42 @@
                 <button type="button" class="link-btn" (click)="abrir.emit(item.pedido)">
                   Ver detalle
                 </button>
+                @if (puedeAnular(item.pedido)) {
+                  <button
+                    type="button"
+                    class="link-btn link-btn--danger"
+                    (click)="anular.emit(item.pedido)"
+                  >
+                    Anular
+                  </button>
+                }
+                @if (puedeEtiqueta(item.pedido)) {
+                  <button
+                    type="button"
+                    class="accion-btn"
+                    (click)="abrirEtiqueta(item.pedido)"
+                  >
+                    Etiqueta
+                  </button>
+                }
+                @if (puedeEmpaquetar(item.pedido)) {
+                  <button
+                    type="button"
+                    class="accion-btn"
+                    (click)="transicionar.emit({ pedido: item.pedido, estado: 'Empaquetado' })"
+                  >
+                    Empaquetar
+                  </button>
+                }
+                @if (puedeDespachar(item.pedido)) {
+                  <button
+                    type="button"
+                    class="accion-btn"
+                    (click)="transicionar.emit({ pedido: item.pedido, estado: 'PendienteEntrega' })"
+                  >
+                    Despachar
+                  </button>
+                }
                 @if (puedeEntregarRapido(item.pedido)) {
                   <button
                     type="button"

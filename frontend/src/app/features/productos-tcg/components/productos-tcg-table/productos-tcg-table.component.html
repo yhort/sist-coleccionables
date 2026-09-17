@@ -11,7 +11,7 @@
               <th>SKU</th>
               <th>Tipo</th>
               <th>Juego</th>
-              <th>Precio Woo</th>
+              <th>Precio venta</th>
               <th>Inventario</th>
               <th>WooCommerce</th>
               <th></th>
@@ -57,11 +57,11 @@
                 </td>
                 <td>
                   <div class="price">
-                    @if (tieneRebajo(producto)) {
-                      <s>{{ producto.woo.precioNormal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</s>
-                      <strong>{{ producto.woo.precioRebajado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
-                    } @else {
-                      <strong>{{ vigente(producto) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+                    <strong>{{ producto.precioVenta | soles }}</strong>
+                    @if (mostrarPrecioWoo(producto)) {
+                      <small class="muted">
+                        Woo: {{ precioWeb(producto) | soles }}
+                      </small>
                     }
                   </div>
                 </td>
@@ -130,11 +130,11 @@
             </p>
             <code>{{ producto.codigoSku }}</code>
             <div class="price">
-              @if (tieneRebajo(producto)) {
-                <s>{{ producto.woo.precioNormal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</s>
-                <strong>{{ producto.woo.precioRebajado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
-              } @else {
-                <strong>{{ vigente(producto) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+              <strong>{{ producto.precioVenta | soles }}</strong>
+              @if (mostrarPrecioWoo(producto)) {
+                <small class="muted">
+                  Woo: {{ precioWeb(producto) | soles }}
+                </small>
               }
             </div>
             <span class="badge" [ngClass]="'badge--stock-' + stockDe(producto.stockLocal)">

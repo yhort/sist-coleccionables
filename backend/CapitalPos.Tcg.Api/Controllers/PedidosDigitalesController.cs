@@ -51,6 +51,47 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
         return Ok(actualizado);
     }
 
+    [HttpPost("estado-lote")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<IReadOnlyList<PedidoDigitalResponse>>> CambiarEstadoLote(
+        [FromBody] CambiarEstadoLoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actualizados = await pedidos.CambiarEstadoLoteAsync(request, cancellationToken);
+        return Ok(actualizados);
+    }
+
+    [HttpPost("comprobante-consolidado")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<ComprobanteConsolidadoResponse>> EmitirComprobanteConsolidado(
+        [FromBody] EmitirComprobanteConsolidadoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await pedidos.EmitirComprobanteConsolidadoAsync(request, cancellationToken);
+        return Ok(resultado);
+    }
+
+    [HttpPut("{id:guid}/notificacion")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<PedidoDigitalResponse>> ActualizarNotificacion(
+        Guid id,
+        [FromBody] ActualizarNotificacionPedidoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actualizado = await pedidos.ActualizarNotificacionAsync(id, request.Notificado, cancellationToken);
+        return Ok(actualizado);
+    }
+
+    [HttpPost("notificacion-lote")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<IReadOnlyList<PedidoDigitalResponse>>> ActualizarNotificacionLote(
+        [FromBody] ActualizarNotificacionLoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actualizados = await pedidos.ActualizarNotificacionLoteAsync(request, cancellationToken);
+        return Ok(actualizados);
+    }
+
     [HttpPost("{id:guid}/cancelar")]
     [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PedidoDigitalResponse>> Cancelar(

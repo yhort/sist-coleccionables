@@ -63,14 +63,14 @@
               </td>
               <td><code>{{ fila.sku }}</code></td>
               <td>
-                {{ fila.precioLocal | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                {{ fila.precioLocal | soles }}
                 @if (fila.precioNormalWoo !== fila.precioLocal) {
-                  <small>Woo {{ fila.precioNormalWoo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</small>
+                  <small>Woo {{ fila.precioNormalWoo | soles }}</small>
                 }
               </td>
               <td>
                 @if (fila.precioRebajadoWoo != null) {
-                  {{ fila.precioRebajadoWoo | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+                  {{ fila.precioRebajadoWoo | soles }}
                 } @else {
                   —
                 }

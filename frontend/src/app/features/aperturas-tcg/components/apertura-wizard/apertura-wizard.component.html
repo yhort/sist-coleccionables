@@ -266,7 +266,7 @@
                 <td>{{ linea.cantidad }}</td>
                 <td>{{ linea.estado }}</td>
                 <td>{{ linea.esFoil ? 'Sí' : 'No' }}</td>
-                <td>{{ valorCarta(linea) | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</td>
+                <td>{{ valorCarta(linea) | soles }}</td>
               </tr>
             }
           </tbody>

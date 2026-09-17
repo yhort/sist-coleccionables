@@ -1,18 +1,18 @@
 <section class="yield" [class.yield--compact]="compacto()" aria-label="Rendimiento de la apertura">
   <article>
     <span>Costo del sellado</span>
-    <strong>{{ rendimiento().costoSellado | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <strong>{{ rendimiento().costoSellado | soles }}</strong>
   </article>
   <article>
     <span>Valor estimado de cartas</span>
     <strong>{{
-      rendimiento().valorEstimadoCartas | currency: 'PEN' : 'symbol-narrow' : '1.2-2'
+      rendimiento().valorEstimadoCartas | soles
     }}</strong>
   </article>
   <article>
     <span>Diferencia</span>
     <strong [ngClass]="'yield__delta--' + signo(rendimiento().diferencia)">
-      {{ rendimiento().diferencia | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}
+      {{ rendimiento().diferencia | soles }}
     </strong>
   </article>
   <article>

@@ -86,6 +86,11 @@ export interface PedidoDigital {
   observacion: string | null;
   subastaTcgId: string | null;
   codigoSubasta: string | null;
+  /** Título del live / evento de subasta (si aplica). */
+  tituloSubasta: string | null;
+  /** Resumen WhatsApp copiado/enviado al cliente. */
+  notificado: boolean;
+  fechaNotificacion: string | null;
   ventaId: string | null;
   codigoVenta: string | null;
   detalles: PedidoDigitalDetalle[];
@@ -93,10 +98,17 @@ export interface PedidoDigital {
   entrega: PedidoDigitalEntrega;
 }
 
+export type FiltroNotificacionPedido = 'TODOS' | 'SIN_NOTIFICAR' | 'NOTIFICADOS';
+
 export interface PedidosDigitalesFiltros {
   origen: OrigenPedidoDigital | 'TODOS';
-  /** Búsqueda unificada: N° pedido, cliente o tracking */
+  /** Búsqueda: N° pedido, tracking, carta/producto… */
   busqueda: string;
+  /** Filtro dedicado por subasta/evento (id o 'TODAS'). */
+  subastaTcgId: string | 'TODAS';
+  /** Filtro dedicado por nombre de cliente. */
+  cliente: string;
+  notificacion: FiltroNotificacionPedido;
   desde: string;
   hasta: string;
   montoMin: number | null;
@@ -185,6 +197,9 @@ export const ORIGENES_PEDIDO: readonly OrigenPedidoDigital[] = [
 export const FILTROS_PEDIDOS_VACIOS: PedidosDigitalesFiltros = {
   origen: 'TODOS',
   busqueda: '',
+  subastaTcgId: 'TODAS',
+  cliente: '',
+  notificacion: 'TODOS',
   desde: '',
   hasta: '',
   montoMin: null,
@@ -217,6 +232,20 @@ export const ETIQUETAS_ESTADO_PEDIDO: Record<EstadoPedidoDigital, string> = {
   Entregado: 'Entregado',
   Cancelado: 'Cancelado',
 };
+
+/** Etiqueta de acción operativa (botones Empaquetar / Despachar / Entregar). */
+export const ETIQUETAS_ACCION_ESTADO_PEDIDO: Record<EstadoPedidoDigital, string> = {
+  PendientePago: 'Marcar pendiente de pago',
+  Pagado: 'Marcar pagado',
+  Empaquetado: 'Empaquetar',
+  PendienteEntrega: 'Despachar',
+  Entregado: 'Entregar',
+  Cancelado: 'Cancelar',
+};
+
+export function etiquetaAccionEstado(destino: EstadoPedidoDigital): string {
+  return ETIQUETAS_ACCION_ESTADO_PEDIDO[destino];
+}
 
 export function round2(valor: number): number {
   return Math.round(valor * 100) / 100;
@@ -301,11 +330,94 @@ export function transicionesPermitidas(
   return siguientes;
 }
 
+/**
+ * Acceso directo "Entregar":
+ * - Recojo: desde Pagado / Empaquetado / PendienteEntrega (mostrador).
+ * - Envío: solo desde PendienteEntrega (tras Empaquetar → Despachar).
+ */
+export function puedeEntregarRapido(
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+): boolean {
+  return transicionesPermitidas(pedido).includes('Entregado');
+}
+
+export function puedeEmpaquetar(
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+): boolean {
+  return pedido.estado === 'Pagado' && transicionesPermitidas(pedido).includes('Empaquetado');
+}
+
+export function puedeDespachar(
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+): boolean {
+  return (
+    pedido.estado === 'Empaquetado' &&
+    transicionesPermitidas(pedido).includes('PendienteEntrega')
+  );
+}
+
 export function puedeTransicionarA(
   pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
   destino: EstadoPedidoDigital,
 ): boolean {
   return transicionesPermitidas(pedido).includes(destino);
+}
+
+export function puedeAnularPedido(pedido: Pick<PedidoDigital, 'estado'>): boolean {
+  return pedido.estado === 'PendientePago';
+}
+
+export function puedeImprimirEtiqueta(
+  pedido: Pick<PedidoDigital, 'estado'>,
+): boolean {
+  return (
+    pedido.estado === 'Pagado' ||
+    pedido.estado === 'Empaquetado' ||
+    pedido.estado === 'PendienteEntrega'
+  );
+}
+
+export function puedeSeleccionarParaCobro(pedido: Pick<PedidoDigital, 'estado'>): boolean {
+  return pedido.estado === 'PendientePago';
+}
+
+export function puedeSeleccionarEnLote(
+  pedido: Pick<PedidoDigital, 'estado'>,
+  tab: EstadoPedidoDigital | 'TODOS',
+): boolean {
+  if (pedido.estado === 'Cancelado') {
+    return false;
+  }
+  if (tab === 'TODOS') {
+    return true;
+  }
+  return pedido.estado === tab;
+}
+
+export function etiquetaCantidadPedidos(cantidad: number): string {
+  return cantidad === 1 ? '1 pedido' : `${cantidad} pedidos`;
+}
+
+export function mismoClienteCobro(
+  pedidos: ReadonlyArray<Pick<PedidoDigital, 'clienteId' | 'clienteNombre'>>,
+): boolean {
+  if (pedidos.length <= 1) {
+    return true;
+  }
+  const nombres = [
+    ...new Set(
+      pedidos
+        .map((pedido) => pedido.clienteNombre.trim().toLowerCase())
+        .filter((nombre) => nombre.length > 0),
+    ),
+  ];
+  if (nombres.length === 1) {
+    return true;
+  }
+  const ids = [
+    ...new Set(pedidos.map((pedido) => pedido.clienteId).filter((id): id is string => !!id?.trim())),
+  ];
+  return ids.length === 1 && pedidos.every((pedido) => pedido.clienteId === ids[0]);
 }
 
 export function entregaRecojo(destinatarioNombre: string): PedidoDigitalEntrega {

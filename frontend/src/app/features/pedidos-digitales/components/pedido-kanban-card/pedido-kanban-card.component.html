@@ -22,22 +22,44 @@
       · recojo en tienda
     } @else if (item().pedido.entrega.distrito) {
       · {{ item().pedido.entrega.distrito }}
+    } @else {
+      · envío / delivery
     }
   </p>
   <p class="card__total">
     <span>Total</span>
-    <strong>{{ item().pedido.total | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+    <strong>{{ item().pedido.total | soles }}</strong>
   </p>
 
   <footer>
     <button type="button" class="link-btn" (click)="abrir.emit(item().pedido); $event.stopPropagation()">
       Ver detalle
     </button>
+    @if (puedeEmpaquetar(item().pedido)) {
+      <button
+        type="button"
+        class="accion-btn"
+        (click)="accionRapida(item().pedido, 'Empaquetado', $event)"
+        (pointerdown)="$event.stopPropagation()"
+      >
+        Empaquetar
+      </button>
+    }
+    @if (puedeDespachar(item().pedido)) {
+      <button
+        type="button"
+        class="accion-btn"
+        (click)="accionRapida(item().pedido, 'PendienteEntrega', $event)"
+        (pointerdown)="$event.stopPropagation()"
+      >
+        Despachar
+      </button>
+    }
     @if (puedeEntregarRapido(item().pedido)) {
       <button
         type="button"
         class="entregar-btn"
-        (click)="entregar(item().pedido, $event)"
+        (click)="accionRapida(item().pedido, 'Entregado', $event)"
         (pointerdown)="$event.stopPropagation()"
       >
         Entregar
@@ -49,7 +71,7 @@
         <select (change)="onMenu(item().pedido, $any($event.target).value); $any($event.target).value = ''">
           <option value="">Mover a…</option>
           @for (estado of transicionesDe(item().pedido); track estado) {
-            <option [value]="estado">{{ etiquetasEstado[estado] }}</option>
+            <option [value]="estado">{{ etiquetaAccion(estado) }}</option>
           }
         </select>
       </label>

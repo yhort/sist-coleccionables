@@ -11,8 +11,13 @@
     <div>
       <h2 id="checkout-title">Checkout del ganador</h2>
       <p>
-        Se reserva el lote y se crea el pedido en <strong>Pendiente de pago</strong>. El cobro se
-        concilia después en Pagos.
+        @if (lineaSeleccionada(); as carta) {
+          Se reserva <strong>{{ nombreVisibleLinea(carta) }}</strong> y se crea su pedido en
+          <strong>Pendiente de pago</strong>. El evento permanece abierto para el resto de cartas.
+        } @else {
+          Se reserva el lote y se crea el pedido en <strong>Pendiente de pago</strong>. El cobro se
+          concilia después en Pagos.
+        }
       </p>
     </div>
     <button
@@ -27,9 +32,13 @@
   </header>
 
   <div class="dialog__resumen">
+    <p class="dialog__resumen-titulo">
+      <span>Subasta / Evento</span>
+      <strong>{{ subasta().titulo }}</strong>
+    </p>
     <p>
       <span>Lote</span>
-      <strong>{{ lote() }}</strong>
+      <strong>{{ resumenLote() }}</strong>
     </p>
     <p>
       <span>Unidades</span>
@@ -42,13 +51,65 @@
       </p>
       <p>
         <span>Monto</span>
-        <strong>{{ ganadora.monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+        <strong>{{ ganadora.monto | soles }}</strong>
+      </p>
+    } @else {
+      <p class="dialog__resumen-titulo">
+        <span>Adjudicación directa</span>
+        <strong>Sin pujas previas · indica ganador y monto</strong>
       </p>
     }
   </div>
 
   <form [formGroup]="form" (ngSubmit)="confirmar()">
     <div class="dialog__grid">
+      @if (requiereAdjudicacionDirecta()) {
+        <div class="ganador-busca wide">
+          <label>
+            Ganador (nombre / alias)
+            <input
+              type="text"
+              maxlength="160"
+              autocomplete="off"
+              [value]="nombrePostorDirecto()"
+              (input)="buscarGanador($any($event.target).value)"
+              placeholder="Buscar cliente o escribir alias (ej. GERARDO FB)"
+            />
+          </label>
+          @if (sugerenciasCliente().length) {
+            <ul class="sugerencias" role="listbox">
+              @for (cliente of sugerenciasCliente(); track cliente.id) {
+                <li>
+                  <button type="button" (click)="elegirClienteGanador(cliente)">
+                    <strong>{{ cliente.nombre }}</strong>
+                    <span>
+                      @if (cliente.telefono) {
+                        {{ cliente.telefono }}
+                      } @else {
+                        Sin teléfono
+                      }
+                      @if (cliente.canalContacto; as canal) {
+                        · {{ etiquetasCanalContacto[canal] }}
+                      }
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+        <label>
+          Monto adjudicado
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            [value]="montoDirecto()"
+            (input)="montoDirecto.set($any($event.target).value)"
+          />
+        </label>
+      }
+
       <fieldset class="wide">
         <legend>Método de pago local</legend>
         <div class="chips">

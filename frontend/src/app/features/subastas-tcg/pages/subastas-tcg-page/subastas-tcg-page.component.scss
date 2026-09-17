@@ -37,6 +37,13 @@
     }
   }
 
+  &__header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
   &__add {
     min-height: 40px;
     padding: 0 1rem;
@@ -49,6 +56,36 @@
     &:hover {
       background: var(--color-primary-hover);
     }
+  }
+}
+
+.vista-toggle {
+  display: inline-flex;
+  padding: 0.2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-container);
+
+  button {
+    min-height: 34px;
+    padding: 0 0.9rem;
+    color: var(--color-text-secondary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: calc(var(--radius-md) - 2px);
+
+    &:hover {
+      color: var(--color-text-primary);
+    }
+  }
+
+  &__btn--active {
+    color: #fff !important;
+    background: var(--color-primary);
   }
 }
 
@@ -88,7 +125,7 @@ app-subasta-margen-card {
 .toolbar {
   display: grid;
   flex-shrink: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(0, 1fr)) auto;
   gap: 0.75rem;
   align-items: end;
   padding: var(--spacing-md) var(--spacing-lg);
@@ -106,7 +143,8 @@ app-subasta-margen-card {
     font-weight: 600;
   }
 
-  select {
+  select,
+  input {
     min-height: 40px;
     padding: 0 0.75rem;
     color: var(--color-text-primary);
@@ -119,6 +157,10 @@ app-subasta-margen-card {
       border-color: var(--color-primary);
       box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
     }
+  }
+
+  &__busqueda input {
+    font-weight: 600;
   }
 
   &__clear {
@@ -144,7 +186,8 @@ app-subasta-margen-card {
   flex-shrink: 0;
 }
 
-app-subastas-tablero {
+app-subastas-tablero,
+app-subastas-tabla {
   flex: 1 1 auto;
   min-height: 0;
 }

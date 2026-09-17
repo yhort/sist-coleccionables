@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import {
   Component,
   HostListener,
@@ -18,10 +17,11 @@ import {
   METODOS_ENVIO,
   MetodoEnvio,
 } from '../../models/entrega.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-programar-entrega-dialog',
-  imports: [CurrencyPipe, ReactiveFormsModule],
+  imports: [SolesPipe, ReactiveFormsModule],
   templateUrl: './programar-entrega-dialog.component.html',
   styleUrl: './programar-entrega-dialog.component.scss',
 })

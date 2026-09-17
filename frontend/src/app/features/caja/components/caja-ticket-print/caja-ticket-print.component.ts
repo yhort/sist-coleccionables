@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import { Component, HostListener, input, output } from '@angular/core';
 
 import {
@@ -6,10 +5,11 @@ import {
   ETIQUETAS_ESTADO_CAJA,
   ETIQUETAS_MOVIMIENTO_CAJA,
 } from '../../models/caja.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-caja-ticket-print',
-  imports: [CurrencyPipe],
+  imports: [SolesPipe],
   templateUrl: './caja-ticket-print.component.html',
   styleUrl: './caja-ticket-print.component.scss',
 })

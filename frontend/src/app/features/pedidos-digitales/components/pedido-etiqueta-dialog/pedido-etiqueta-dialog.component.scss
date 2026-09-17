@@ -1,0 +1,249 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: start center;
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(17 24 39 / 40%);
+}
+
+.slip {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  padding: 1rem 1.1rem 1.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-md);
+
+  &__toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+
+    h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+  }
+
+  &__hint {
+    margin: 0.2rem 0 0;
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+}
+
+.etiquetas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.etiqueta {
+  width: 100%;
+  max-width: 100mm;
+  margin-inline: auto;
+  padding: 0.85rem 0.9rem 0.7rem;
+  color: #111827;
+  background: #fff;
+  border: 2px solid #1e4fad;
+  border-radius: 10px;
+  font-family: 'Segoe UI', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+
+  &__cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px dashed #94a3b8;
+  }
+
+  &__logo {
+    width: min(118px, 48%);
+    height: auto;
+    object-fit: contain;
+  }
+
+  &__pedido {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    min-width: 0;
+
+    strong {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+  }
+
+  &--consolidada &__pedido strong {
+    font-size: 0.92rem;
+  }
+
+  &__eyebrow {
+    color: #64748b;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__subasta {
+    margin-top: 0.2rem;
+    padding: 0.1rem 0.4rem;
+    color: #1d4ed8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: #dbeafe;
+    border-radius: 999px;
+  }
+
+  &__bloque {
+    margin-top: 0.65rem;
+
+    h3 {
+      margin: 0 0 0.25rem;
+      color: #1e4fad;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
+    dl {
+      display: grid;
+      gap: 0.28rem;
+      margin: 0;
+    }
+
+    dt {
+      color: #64748b;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      margin: 0.05rem 0 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+  }
+
+  &__bloque--items ul {
+    margin: 0;
+    padding-left: 1rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+
+    li + li {
+      margin-top: 0.15rem;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed #94a3b8;
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 600;
+  }
+}
+
+.ghost,
+.primary {
+  min-height: 36px;
+  padding: 0 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.ghost {
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.primary {
+  color: #fff;
+  background: var(--color-primary);
+  border: 0;
+
+  &:hover {
+    background: var(--color-primary-hover);
+  }
+}
+
+@media print {
+  :host {
+    position: static;
+    display: block;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .dialog-backdrop,
+  .no-print {
+    display: none !important;
+  }
+
+  .slip {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .etiqueta {
+    max-width: 100mm;
+    page-break-after: always;
+    break-after: page;
+
+    &:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+  }
+}

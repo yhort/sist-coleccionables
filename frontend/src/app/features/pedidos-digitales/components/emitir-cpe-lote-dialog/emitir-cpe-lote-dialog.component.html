@@ -1,0 +1,102 @@
+<div class="dialog-backdrop" (click)="enviando() ? null : cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="cpe-lote-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="cpe-lote-title">Emitir comprobante consolidado</h2>
+      <p>
+        Boleta, factura o nota de venta de
+        <strong>{{ clienteNombre() }}</strong>
+        por
+        <strong>{{ total() | soles }}</strong>
+        · {{ etiquetaCantidad(pedidos().length) }}. Los ítems se combinan en una sola venta.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="dialog__close"
+      aria-label="Cerrar"
+      [disabled]="enviando()"
+      (click)="cancelled.emit()"
+    >
+      ×
+    </button>
+  </header>
+
+  <ul class="lineas" aria-label="Ítems a emitir">
+    @for (linea of lineas(); track $index) {
+      <li>
+        <span>
+          <strong>{{ linea.descripcion }}</strong>
+          <small>{{ linea.pedidoCodigo }}</small>
+        </span>
+        <span>{{ linea.total | soles }}</span>
+      </li>
+    }
+    <li class="lineas__total">
+      <span>Total a emitir</span>
+      <strong>{{ total() | soles }}</strong>
+    </li>
+  </ul>
+
+  <div class="dialog__body">
+    <label class="dialog__tipo">
+      Tipo de comprobante
+      <select
+        [value]="tipoSeleccionado()"
+        [disabled]="enviando() || !!emision()"
+        (change)="setTipo($any($event.target).value)"
+      >
+        @for (tipo of tipos; track tipo) {
+          <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+        }
+      </select>
+    </label>
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    @if (emision(); as emision) {
+      <div class="dialog__resultado" [attr.data-estado]="emision.estado">
+        <p>
+          <strong>{{ numeroDe(emision) }}</strong>
+          <span>{{ etiquetasEstado[emision.estado] }}</span>
+        </p>
+        <p>{{ emision.mensaje }}</p>
+      </div>
+    }
+  </div>
+
+  <footer class="dialog__footer">
+    <button type="button" class="ghost" [disabled]="enviando()" (click)="cancelled.emit()">
+      Cerrar
+    </button>
+    @if (emision(); as emision) {
+      <button type="button" class="ghost" [disabled]="!puedeXml(emision)" (click)="descargarXml()">
+        XML
+      </button>
+      <button type="button" class="ghost" [disabled]="!puedeCdr(emision)" (click)="descargarCdr()">
+        CDR
+      </button>
+      <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('a4')">
+        PDF
+      </button>
+      <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('ticket')">
+        Ticket
+      </button>
+    } @else {
+      <button type="button" class="primary" [disabled]="enviando()" (click)="emitir()">
+        @if (enviando()) {
+          Emitiendo…
+        } @else {
+          Emitir {{ etiquetas[tipoSeleccionado()].toLowerCase() }} {{ total() | soles }}
+        }
+      </button>
+    }
+  </footer>
+</section>

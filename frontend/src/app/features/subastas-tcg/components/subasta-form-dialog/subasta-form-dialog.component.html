@@ -1,4 +1,4 @@
-<div class="dialog-backdrop" (click)="cancelled.emit()"></div>
+<div class="dialog-backdrop" (click)="!enviando() && cancelled.emit()"></div>
 
 <section
   class="dialog"
@@ -11,11 +11,17 @@
     <div>
       <h2 id="subasta-form-title">Nueva subasta</h2>
       <p>
-        Single Hit (1×1), Bulk (1×N) o Combo Multi-SKU. Se crea en borrador; actívala cuando el live
-        esté listo.
+        Acumula productos en el lote temporal. Combo = 1 ganador del paquete; Individuales = 1 evento
+        en el tablero con N cartas adjudicables una a una. Se crea en borrador.
       </p>
     </div>
-    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
+    <button
+      type="button"
+      class="dialog__close"
+      aria-label="Cerrar"
+      [disabled]="enviando()"
+      (click)="cancelled.emit()"
+    >
       ×
     </button>
   </header>
@@ -43,6 +49,38 @@
         </select>
       </label>
 
+      <fieldset class="wide modo">
+        <legend>Modo de subasta</legend>
+        <div class="modo__opciones">
+          <label class="modo__chip" [class.modo__chip--on]="modoCreacion() === 'COMBO'">
+            <input
+              type="radio"
+              name="modoCreacion"
+              value="COMBO"
+              [checked]="modoCreacion() === 'COMBO'"
+              (change)="setModoCreacion('COMBO')"
+            />
+            <span>
+              <strong>Combo / Lote único</strong>
+              <small>1 subasta con todos los SKUs para un solo ganador</small>
+            </span>
+          </label>
+          <label class="modo__chip" [class.modo__chip--on]="modoCreacion() === 'INDIVIDUALES'">
+            <input
+              type="radio"
+              name="modoCreacion"
+              value="INDIVIDUALES"
+              [checked]="modoCreacion() === 'INDIVIDUALES'"
+              (change)="setModoCreacion('INDIVIDUALES')"
+            />
+            <span>
+              <strong>Subastas individuales masivas</strong>
+              <small>1 evento/sala en el Kanban; N cartas independientes en el Live</small>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
       <section class="wide lote" aria-label="Productos del lote">
         <div class="lote__head">
           <h3>Productos del lote</h3>
@@ -55,7 +93,9 @@
               [sedeId]="sedeActual"
               [productoId]="productoPendienteId()"
               [stockLibreFn]="stockLibreFn"
+              [permitirAgregarSet]="modoCreacion() === 'INDIVIDUALES'"
               (productoChange)="onProductoSeleccionado($event)"
+              (agregarSet)="agregarSetAlLote($event)"
             />
             <label class="lote__qty">
               Cantidad
@@ -66,13 +106,18 @@
                 [ngModel]="cantidadPendiente()"
                 (ngModelChange)="cantidadPendiente.set($event)"
                 [ngModelOptions]="{ standalone: true }"
+                [attr.title]="
+                  modoCreacion() === 'INDIVIDUALES'
+                    ? 'En Individuales, cantidad > 1 se desglosa en filas de 1'
+                    : null
+                "
               />
             </label>
             <button type="button" class="ghost" (click)="agregarLinea()">Agregar al lote</button>
           </div>
         }
 
-        @if (lineas().length > 0) {
+        @if (loteItems().length > 0) {
           <table class="lote__tabla">
             <thead>
               <tr>
@@ -84,11 +129,23 @@
               </tr>
             </thead>
             <tbody>
-              @for (linea of lineas(); track linea.productoId) {
+              @for (linea of loteItems(); track linea.id) {
                 <tr>
-                  <td>
+                  <td class="lote__producto">
                     <strong>{{ linea.nombre }}</strong>
                     <small>{{ linea.codigoSku }}</small>
+                    <label class="lote__titulo-custom">
+                      Título / Nombre personalizado
+                      <input
+                        type="text"
+                        maxlength="200"
+                        [value]="linea.tituloPersonalizado"
+                        (input)="
+                          actualizarTituloPersonalizado(linea.id, $any($event.target).value)
+                        "
+                        placeholder="Ej. Charizard Base Set 1999"
+                      />
+                    </label>
                   </td>
                   <td>{{ etiquetasTipo[linea.tipoProducto] }}</td>
                   <td>
@@ -97,16 +154,12 @@
                       min="1"
                       step="1"
                       [value]="linea.cantidad"
-                      (change)="actualizarCantidad(linea.productoId, $any($event.target).value)"
+                      (change)="actualizarCantidad(linea.id, $any($event.target).value)"
                     />
                   </td>
                   <td>{{ linea.stockLibre }}</td>
                   <td>
-                    <button
-                      type="button"
-                      class="link-btn"
-                      (click)="quitarLinea(linea.productoId)"
-                    >
+                    <button type="button" class="link-btn" (click)="quitarLinea(linea.id)">
                       Quitar
                     </button>
                   </td>
@@ -150,8 +203,18 @@
     }
 
     <footer class="dialog__footer">
-      <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
-      <button type="submit" class="primary">Crear borrador</button>
+      <button type="button" class="ghost" [disabled]="enviando()" (click)="cancelled.emit()">
+        Cancelar
+      </button>
+      <button type="submit" class="primary" [disabled]="enviando()">
+        {{ enviando() ? 'Creando…' : 'Crear borrador' }}
+      </button>
     </footer>
   </form>
 </section>
+
+@if (toastInfo()) {
+  <div class="form-toast" role="status" aria-live="polite">
+    {{ toastInfo() }}
+  </div>
+}

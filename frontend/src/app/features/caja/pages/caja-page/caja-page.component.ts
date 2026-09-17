@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -15,11 +15,12 @@ import {
   ETIQUETAS_ESTADO_CAJA,
   ETIQUETAS_MOVIMIENTO_CAJA,
 } from '../../models/caja.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-caja-page',
   imports: [
-    CurrencyPipe,
+    SolesPipe,
     DatePipe,
     FormsModule,
     CajaAperturaDialogComponent,

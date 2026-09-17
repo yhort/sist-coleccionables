@@ -4,7 +4,7 @@
       <h2>Pedidos Digitales</h2>
       <p>
         Flujo operativo: Pendiente de pago → Pagado → Empaquetado → Pendiente de entrega →
-        Entregado. Cambia entre Kanban y Tabla según la operación.
+        Entregado. Cobra, resume por WhatsApp y anula subastas desde la tabla, sin salir a Pagos.
       </p>
     </div>
     <div class="pedidos__header-actions">
@@ -51,7 +51,7 @@
     </article>
     <article>
       <span>Monto operativo</span>
-      <strong>{{ resumen().monto | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</strong>
+      <strong>{{ resumen().monto | soles }}</strong>
     </article>
   </section>
 
@@ -79,14 +79,46 @@
 
   <section class="toolbar" aria-label="Filtros de pedidos">
     <label class="toolbar__busqueda">
-      <span>N° de pedido, cliente o tracking</span>
+      <span>Pedido, tracking o carta</span>
       <input
         #busquedaInput
         type="search"
-        placeholder="Ej. #PED-7B0DE0, Juan, tracking…"
+        placeholder="Ej. #PED-…, Charizard, tracking…"
         [ngModel]="filtros().busqueda"
         (ngModelChange)="actualizarFiltro('busqueda', $event)"
       />
+    </label>
+    <label>
+      <span>Subasta / Evento</span>
+      <select
+        [ngModel]="filtros().subastaTcgId"
+        (ngModelChange)="actualizarFiltro('subastaTcgId', $event)"
+      >
+        <option value="TODAS">Todas</option>
+        @for (opcion of opcionesSubasta(); track opcion.id) {
+          <option [value]="opcion.id">{{ opcion.label }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Cliente</span>
+      <input
+        type="search"
+        placeholder="Nombre o alias…"
+        [ngModel]="filtros().cliente"
+        (ngModelChange)="actualizarFiltro('cliente', $event)"
+      />
+    </label>
+    <label>
+      <span>Notificación</span>
+      <select
+        [ngModel]="filtros().notificacion"
+        (ngModelChange)="actualizarFiltro('notificacion', $event)"
+      >
+        <option value="TODOS">Todos</option>
+        <option value="SIN_NOTIFICAR">Sin notificar</option>
+        <option value="NOTIFICADOS">Notificados</option>
+      </select>
     </label>
     <label>
       <span>Desde</span>
@@ -129,6 +161,10 @@
     <button type="button" class="toolbar__clear" (click)="limpiarFiltros()">Limpiar</button>
   </section>
 
+  @if (aviso()) {
+    <p class="aviso">{{ aviso() }}</p>
+  }
+
   @if (error()) {
     <p class="error">{{ error() }}</p>
   }
@@ -144,6 +180,15 @@
       [items]="items()"
       (abrir)="abrirDetalle($event)"
       (transicionar)="transicionar($event)"
+      (transicionarLote)="transicionarLote($event)"
+      (registrarPago)="abrirPagoLote($event)"
+      (emitirCpe)="abrirCpeLote($event)"
+      (imprimirEtiquetas)="abrirEtiquetas($event)"
+      (anular)="anular($event)"
+      (marcarNotificados)="onMarcarNotificados($event)"
+      (toggleNotificacion)="onToggleNotificacion($event)"
+      (aviso)="onAviso($event)"
+      (errorAccion)="onErrorAccion($event)"
     />
   }
 </section>
@@ -161,4 +206,24 @@
 
 @if (ticketFila(); as fila) {
   <app-packing-slip-dialog [fila]="fila" [autoPrint]="true" (closed)="cerrarTicket()" />
+}
+
+@if (pagoLote(); as pedidos) {
+  <app-registrar-pago-lote-dialog
+    [pedidos]="pedidos"
+    (saved)="onPagoLoteGuardado()"
+    (cancelled)="pagoLote.set(null)"
+  />
+}
+
+@if (cpeLote(); as pedidos) {
+  <app-emitir-cpe-lote-dialog
+    [pedidos]="pedidos"
+    (saved)="onCpeLoteGuardado()"
+    (cancelled)="cpeLote.set(null)"
+  />
+}
+
+@if (etiquetasLote(); as pedidos) {
+  <app-pedido-etiqueta-dialog [pedidos]="pedidos" (closed)="cerrarEtiquetas()" />
 }

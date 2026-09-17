@@ -1,4 +1,3 @@
-import { CurrencyPipe } from '@angular/common';
 import {
   Component,
   HostListener,
@@ -23,10 +22,12 @@ import {
   Pago,
   round2,
 } from '../../models/pago.model';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
+import { formatearSoles } from '../../../../shared/utils/moneda';
 
 @Component({
   selector: 'app-asociar-pago-dialog',
-  imports: [CurrencyPipe, ReactiveFormsModule],
+  imports: [SolesPipe, ReactiveFormsModule],
   templateUrl: './asociar-pago-dialog.component.html',
   styleUrl: './asociar-pago-dialog.component.scss',
 })
@@ -129,7 +130,7 @@ export class AsociarPagoDialogComponent implements OnInit {
   }
 
   etiquetaPedido(pedido: PedidoDigital): string {
-    return `${pedido.clienteNombre} - ${pedido.codigo} - saldo PEN${this.saldoDe(pedido).toFixed(2)}`;
+    return `${pedido.clienteNombre} - ${pedido.codigo} - saldo ${formatearSoles(this.saldoDe(pedido))}`;
   }
 
   guardar(): void {

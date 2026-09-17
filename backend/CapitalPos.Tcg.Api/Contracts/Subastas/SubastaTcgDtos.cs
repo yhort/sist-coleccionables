@@ -10,6 +10,10 @@ public sealed class SubastaDetalleInput
 
     [Range(typeof(decimal), "1", "999999")]
     public decimal Cantidad { get; set; } = 1;
+
+    /// <summary>Título / nombre personalizado para Live y pedido. Si vacío, se usa el del catálogo.</summary>
+    [MaxLength(200)]
+    public string? TituloPersonalizado { get; set; }
 }
 
 public sealed class CrearSubastaTcgRequest
@@ -23,7 +27,7 @@ public sealed class CrearSubastaTcgRequest
     public Guid? ProductoId { get; set; }
 
     /// <summary>
-    /// 1..N líneas (Single Hit, Bulk o Combo Multi-SKU). Si está vacío, se deriva de <see cref="ProductoId"/>.
+    /// 1..N líneas (Single Hit, Bulk, Combo o Evento individuales). Si está vacío, se deriva de <see cref="ProductoId"/>.
     /// </summary>
     public List<SubastaDetalleInput> Detalles { get; set; } = [];
 
@@ -33,6 +37,9 @@ public sealed class CrearSubastaTcgRequest
     public string Titulo { get; set; } = string.Empty;
 
     public CanalSubastaTcg Canal { get; set; }
+
+    /// <summary>COMBO (default) o INDIVIDUALES (1 evento / sala con N cartas independientes).</summary>
+    public ModoSubastaTcg Modo { get; set; } = ModoSubastaTcg.COMBO;
 
     [Range(typeof(decimal), "0.01", "999999999")]
     public decimal PrecioBase { get; set; }
@@ -61,12 +68,31 @@ public sealed class RegistrarPujaRequest
 
     public Guid? ClienteId { get; set; }
 
+    /// <summary>Obligatorio en modo INDIVIDUALES: carta/línea a la que aplica la puja.</summary>
+    public Guid? SubastaDetalleId { get; set; }
+
     [Range(typeof(decimal), "0.01", "999999999")]
     public decimal Monto { get; set; }
 }
 
 public sealed class AdjudicarSubastaRequest
 {
+    /// <summary>Obligatorio en modo INDIVIDUALES: adjudica solo esa carta y genera su pedido.</summary>
+    public Guid? SubastaDetalleId { get; set; }
+
+    /// <summary>
+    /// Adjudicación directa sin historial: nombre del ganador. Si hay pujas, se ignora y se usa la líder.
+    /// </summary>
+    [MaxLength(160)]
+    public string? NombrePostor { get; set; }
+
+    /// <summary>Cliente opcional en adjudicación directa.</summary>
+    public Guid? ClienteId { get; set; }
+
+    /// <summary>Monto adjudicado en adjudicación directa (sin pujas previas).</summary>
+    [Range(typeof(decimal), "0.01", "999999999")]
+    public decimal? MontoAdjudicado { get; set; }
+
     public MetodoEnvio MetodoEnvio { get; set; } = MetodoEnvio.RECOJO_TIENDA;
 
     /// <summary>Preferencia de cobro local al generar el pedido en PendientePago.</summary>
@@ -105,6 +131,12 @@ public sealed class AdjudicarSubastaRequest
     public bool GuardarPuntoEnCliente { get; set; }
 }
 
+public sealed class DeclararDesiertaRequest
+{
+    /// <summary>Obligatorio en modo INDIVIDUALES: carta a declarar desierta.</summary>
+    public Guid? SubastaDetalleId { get; set; }
+}
+
 public sealed class MargenSubastaDto
 {
     public required decimal PrecioBase { get; init; }
@@ -117,6 +149,7 @@ public sealed class PujaResponse
 {
     public required Guid Id { get; init; }
     public required Guid SubastaTcgId { get; init; }
+    public Guid? SubastaDetalleId { get; init; }
     public Guid? ClienteId { get; init; }
     public required string NombrePostor { get; init; }
     public required decimal Monto { get; init; }
@@ -129,10 +162,16 @@ public sealed class SubastaDetalleResponse
     public required Guid Id { get; init; }
     public required Guid ProductoId { get; init; }
     public required string ProductoNombre { get; init; }
+    /// <summary>Nombre editable del ítem; si null/vacío el cliente debe usar <see cref="ProductoNombre"/>.</summary>
+    public string? TituloPersonalizado { get; init; }
     public required string CodigoSku { get; init; }
     public required TipoProducto TipoProducto { get; init; }
     public required decimal Cantidad { get; init; }
     public required int Orden { get; init; }
+    public required EstadoSubastaDetalle Estado { get; init; }
+    public Guid? PujaGanadoraId { get; init; }
+    public Guid? PedidoDigitalId { get; init; }
+    public string? PedidoCodigo { get; init; }
 }
 
 public sealed class SubastaTcgResponse
@@ -149,6 +188,7 @@ public sealed class SubastaTcgResponse
     public required IReadOnlyList<SubastaDetalleResponse> Detalles { get; init; }
     public required string Titulo { get; init; }
     public required CanalSubastaTcg Canal { get; init; }
+    public required ModoSubastaTcg Modo { get; init; }
     public required decimal PrecioBase { get; init; }
     public required decimal IncrementoMinimo { get; init; }
     public decimal? PrecioReserva { get; init; }

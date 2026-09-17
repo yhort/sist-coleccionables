@@ -10,7 +10,7 @@
   <header class="dialog__header">
     <div>
       <h2 id="puja-title">Registrar puja</h2>
-      <p>{{ subasta().titulo }} · mínimo {{ minimo() | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }}</p>
+      <p>{{ subasta().titulo }} · mínimo {{ minimo() | soles }}</p>
     </div>
     <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">
       ×

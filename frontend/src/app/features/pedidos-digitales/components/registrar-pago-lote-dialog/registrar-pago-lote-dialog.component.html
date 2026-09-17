@@ -1,0 +1,100 @@
+<div class="dialog-backdrop" (click)="enviando() ? null : cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="pago-lote-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="pago-lote-title">Registrar pago</h2>
+      <p>
+        Constancia Yape / Plin / transferencia de
+        <strong>{{ clienteNombre() }}</strong>
+        por
+        <strong>{{ total() | soles }}</strong
+        >. Al confirmar, {{ pedidos().length === 1 ? 'el pedido pasa' : 'los pedidos pasan' }} a
+        Pagado.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="dialog__close"
+      aria-label="Cerrar"
+      [disabled]="enviando()"
+      (click)="cancelled.emit()"
+    >
+      ×
+    </button>
+  </header>
+
+  <ul class="lineas" aria-label="Cartas a cobrar">
+    @for (linea of lineas(); track $index) {
+      <li>
+        <span>
+          <strong>{{ linea.descripcion }}</strong>
+          <small>{{ linea.pedidoCodigo }}</small>
+        </span>
+        <span>{{ linea.total | soles }}</span>
+      </li>
+    }
+    <li class="lineas__total">
+      <span>Total a registrar</span>
+      <strong>{{ total() | soles }}</strong>
+    </li>
+  </ul>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label>
+        Origen
+        <select formControlName="origen">
+          @for (origen of origenes; track origen) {
+            <option [value]="origen">{{ etiquetasOrigen[origen] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Código de operación
+        <input
+          type="text"
+          formControlName="codigoOperacion"
+          maxlength="80"
+          placeholder="Nro. Yape / Plin / CCI"
+        />
+      </label>
+      <label class="wide">
+        Comprobante / voucher
+        <input
+          type="text"
+          formControlName="referenciaExterna"
+          maxlength="120"
+          placeholder="Captura, constancia o referencia"
+        />
+      </label>
+      <label class="wide">
+        Observación
+        <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+      </label>
+    </div>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" [disabled]="enviando()" (click)="cancelled.emit()">
+        Cancelar
+      </button>
+      <button type="submit" class="primary" [disabled]="enviando()">
+        @if (enviando()) {
+          Registrando…
+        } @else {
+          Confirmar pago {{ total() | soles }}
+        }
+      </button>
+    </footer>
+  </form>
+</section>

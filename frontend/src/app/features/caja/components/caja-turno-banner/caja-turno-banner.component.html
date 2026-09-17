@@ -5,7 +5,7 @@
       @if (caja.abierta && caja.sesion) {
         <p>
           Turno abierto desde {{ caja.sesion.fechaApertura | date: 'dd/MM HH:mm' }} · Fondo
-          {{ caja.sesion.montoApertura | currency: 'PEN' : 'symbol-narrow' : '1.2-2' }} ·
+          {{ caja.sesion.montoApertura | soles }} ·
           {{ caja.sesion.cantidadVentas }} venta(s)
         </p>
       } @else {

@@ -1,15 +1,16 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { CajaApiService } from '../../data-access/caja.service';
 import { CajaAperturaDialogComponent } from '../caja-apertura-dialog/caja-apertura-dialog.component';
 import { CajaArqueoDialogComponent } from '../caja-arqueo-dialog/caja-arqueo-dialog.component';
+import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
   selector: 'app-caja-turno-banner',
   imports: [
-    CurrencyPipe,
+    SolesPipe,
     DatePipe,
     RouterLink,
     CajaAperturaDialogComponent,

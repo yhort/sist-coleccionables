@@ -10,6 +10,7 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Cpe;
 public sealed class CpePdfGenerator : ICpePdfGenerator
 {
     private static readonly CultureInfo Cultura = CultureInfo.GetCultureInfo("es-PE");
+    private static readonly Lazy<byte[]?> LogoBytes = new(CargarLogo);
     private const string LeyendaAutorizacion =
         "Autorizado mediante Resolución de Superintendencia N.° 097-2012/SUNAT y normas modificatorias.";
     private const string LeyendaConsulta = "Consulte el comprobante en www.sunat.gob.pe";
@@ -71,6 +72,11 @@ public sealed class CpePdfGenerator : ICpePdfGenerator
             page.Content().Column(col =>
             {
                 col.Spacing(4);
+                if (LogoBytes.Value is { Length: > 0 } logo)
+                {
+                    col.Item().AlignCenter().Height(18, Unit.Millimetre).Image(logo).FitArea();
+                }
+
                 col.Item().AlignCenter().Text(payload.Emisor.NombreComercial).Bold().FontSize(10);
                 col.Item().AlignCenter().Text(payload.Emisor.RazonSocial).FontSize(7);
                 col.Item().AlignCenter().Text($"RUC {payload.Emisor.Ruc}").Bold();
@@ -103,9 +109,22 @@ public sealed class CpePdfGenerator : ICpePdfGenerator
         {
             row.RelativeItem().Column(col =>
             {
-                col.Item().Text(payload.Emisor.NombreComercial).Bold().FontSize(16).FontColor(Colors.Blue.Darken3);
-                col.Item().Text(payload.Emisor.RazonSocial).FontSize(10);
-                col.Item().PaddingTop(4).Text(DireccionEmisor(payload));
+                col.Spacing(4);
+                col.Item().Row(marca =>
+                {
+                    if (LogoBytes.Value is { Length: > 0 } logo)
+                    {
+                        marca.ConstantItem(52).Height(22, Unit.Millimetre).Image(logo).FitArea();
+                        marca.ConstantItem(8);
+                    }
+
+                    marca.RelativeItem().AlignMiddle().Column(texto =>
+                    {
+                        texto.Item().Text(payload.Emisor.NombreComercial).Bold().FontSize(16).FontColor(Colors.Blue.Darken3);
+                        texto.Item().Text(payload.Emisor.RazonSocial).FontSize(10);
+                    });
+                });
+                col.Item().PaddingTop(2).Text(DireccionEmisor(payload));
                 col.Item().Text($"{payload.Emisor.Distrito} — {payload.Emisor.Provincia} — {payload.Emisor.Departamento}");
                 col.Item().Text($"Ubigeo {payload.Emisor.Ubigeo}");
             });
@@ -304,4 +323,30 @@ public sealed class CpePdfGenerator : ICpePdfGenerator
         valor == decimal.Truncate(valor)
             ? valor.ToString("0", Cultura)
             : valor.ToString("0.###", Cultura);
+
+    private static byte[]? CargarLogo()
+    {
+        try
+        {
+            var candidatos = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "Assets", "logo-trunqi.jpg"),
+                Path.Combine(Directory.GetCurrentDirectory(), "Assets", "logo-trunqi.jpg"),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets", "logo-trunqi.jpg")),
+            };
+            foreach (var ruta in candidatos)
+            {
+                if (File.Exists(ruta))
+                {
+                    return File.ReadAllBytes(ruta);
+                }
+            }
+        }
+        catch
+        {
+            /* sin logo: el PDF sigue siendo válido */
+        }
+
+        return null;
+    }
 }
