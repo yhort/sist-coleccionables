@@ -31,13 +31,13 @@ public static class DevelopmentDataSeeder
             return;
         }
 
+        var email = config["DevelopmentSeed:AdminEmail"] ?? "admin@trunqi.local";
+        var password = config["DevelopmentSeed:AdminPassword"] ?? "Admin123!";
+        var ahora = DateTimeOffset.UtcNow;
+
         if (!await db.Empresas.IgnoreQueryFilters().AnyAsync())
         {
             tenant.SetEmpresa(EmpresaId);
-
-            var email = config["DevelopmentSeed:AdminEmail"] ?? "admin@trunqi.local";
-            var password = config["DevelopmentSeed:AdminPassword"] ?? "Admin123!";
-            var ahora = DateTimeOffset.UtcNow;
 
             var empresa = new Empresa
             {
@@ -60,23 +60,13 @@ public static class DevelopmentDataSeeder
                 FechaCreacion = ahora
             };
 
-            var usuario = new Usuario
-            {
-                Id = UsuarioId,
-                EmpresaId = EmpresaId,
-                Nombre = "Admin Trunqi",
-                Email = email,
-                Rol = RolUsuario.ADMIN,
-                Activo = true,
-                FechaCreacion = ahora
-            };
-            usuario.PasswordHash = hasher.HashPassword(usuario, password);
-
             db.Empresas.Add(empresa);
             db.Sedes.Add(sede);
-            db.Usuarios.Add(usuario);
             await db.SaveChangesAsync();
         }
+
+        // Siempre reescribe el hash del admin en Development (evita UPDATE manual / hash inválido).
+        await EnsureAdminAsync(db, tenant, hasher, email, password, ahora);
 
         tenant.SetEmpresa(EmpresaId);
         await EnsureSeriesComprobanteAsync(db);
@@ -85,6 +75,58 @@ public static class DevelopmentDataSeeder
         await EnsureWooAsync(db, protector, config);
         await EnsureEcosistemaAsync(db);
         await EnsureDemoCatalogoAsync(db);
+    }
+
+    private static async Task EnsureAdminAsync(
+        ApplicationDbContext db,
+        ITenantProvider tenant,
+        IPasswordHasher<Usuario> hasher,
+        string email,
+        string password,
+        DateTimeOffset ahora)
+    {
+        var empresaId = await db.Empresas.IgnoreQueryFilters()
+            .Where(e => e.Activa)
+            .OrderBy(e => e.FechaCreacion)
+            .Select(e => e.Id)
+            .FirstOrDefaultAsync();
+        if (empresaId == Guid.Empty)
+        {
+            return;
+        }
+
+        tenant.SetEmpresa(empresaId);
+
+        var usuario = await db.Usuarios.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+        if (usuario is null)
+        {
+            usuario = new Usuario
+            {
+                Id = UsuarioId,
+                EmpresaId = empresaId,
+                Dni = "00000001",
+                Nombres = "Admin",
+                Apellidos = "Trunqi",
+                Nombre = "Admin Trunqi",
+                Email = email,
+                Rol = RolUsuario.ADMIN,
+                Activo = true,
+                FechaCreacion = ahora
+            };
+            usuario.SincronizarNombreCompleto();
+            usuario.PasswordHash = hasher.HashPassword(usuario, password);
+            db.Usuarios.Add(usuario);
+        }
+        else
+        {
+            usuario.EmpresaId = empresaId;
+            usuario.Activo = true;
+            usuario.Rol = RolUsuario.ADMIN;
+            usuario.PasswordHash = hasher.HashPassword(usuario, password);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task EnsureSeriesComprobanteAsync(ApplicationDbContext db)

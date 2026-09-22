@@ -144,7 +144,9 @@ if (builder.Environment.IsDevelopment())
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
-            policy.WithOrigins("http://localhost:4200")
+            policy.WithOrigins(
+                    "http://localhost:4200",
+                    "https://pos-tcg.tykesoft.com")
                 .AllowAnyHeader()
                 .AllowAnyMethod());
     });
@@ -167,10 +169,13 @@ if (app.Environment.IsDevelopment())
     await DevelopmentDataSeeder.EnsureAsync(app.Services);
 }
 
-app.UseHttpsRedirection();
 if (app.Environment.IsDevelopment())
 {
     app.UseCors();
+}
+else
+{
+    app.UseHttpsRedirection();
 }
 app.UseAuthentication();
 app.UseAuthorization();

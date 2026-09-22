@@ -173,6 +173,9 @@ public sealed class ApplicationDbContext : DbContext
         var entity = modelBuilder.Entity<Usuario>();
         entity.ToTable("usuarios");
         entity.HasKey(e => e.Id);
+        entity.Property(e => e.Dni).HasMaxLength(8).IsRequired();
+        entity.Property(e => e.Nombres).HasMaxLength(80).IsRequired();
+        entity.Property(e => e.Apellidos).HasMaxLength(80).IsRequired();
         entity.Property(e => e.Nombre).HasMaxLength(160).IsRequired();
         entity.Property(e => e.Email).HasMaxLength(200).IsRequired();
         entity.Property(e => e.PasswordHash).HasMaxLength(256).IsRequired();
@@ -186,6 +189,10 @@ public sealed class ApplicationDbContext : DbContext
         entity.HasIndex(e => new { e.EmpresaId, e.Email })
             .IsUnique()
             .HasDatabaseName("ux_usuarios_empresa_id_email");
+
+        entity.HasIndex(e => new { e.EmpresaId, e.Dni })
+            .IsUnique()
+            .HasDatabaseName("ux_usuarios_empresa_id_dni");
     }
 
     private static void ConfigureProducto(ModelBuilder modelBuilder)

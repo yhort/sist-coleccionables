@@ -21,6 +21,10 @@ export function readApiError(error: unknown): string {
       return 'No hay conexión con CapitalPos.Tcg.Api. ¿Está levantada en el puerto 5249?';
     }
     if (error.status === 401) {
+      const url = error.url ?? '';
+      if (url.includes('/auth/login')) {
+        return 'Credenciales inválidas.';
+      }
       return 'Sesión inválida o expirada.';
     }
     if (error.status === 400) {
