@@ -93,7 +93,8 @@
               [sedeId]="sedeActual"
               [productoId]="productoPendienteId()"
               [stockLibreFn]="stockLibreFn"
-              [permitirAgregarSet]="modoCreacion() === 'INDIVIDUALES'"
+              [permitirAgregarSet]="true"
+              [productoIdsExcluidos]="idsEnLote()"
               (productoChange)="onProductoSeleccionado($event)"
               (agregarSet)="agregarSetAlLote($event)"
             />

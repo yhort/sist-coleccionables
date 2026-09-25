@@ -52,13 +52,19 @@ public sealed class PedidosDigitalesService(
             .OrderByDescending(p => p.FechaPedido)
             .ToListAsync(cancellationToken);
 
-        return pedidos.Select(Map).ToList();
+        return await MapManyAsync(pedidos, cancellationToken);
     }
 
     public async Task<PedidoDigitalResponse?> ObtenerAsync(Guid id, CancellationToken cancellationToken)
     {
         var pedido = await QueryBase().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-        return pedido is null ? null : Map(pedido);
+        if (pedido is null)
+        {
+            return null;
+        }
+
+        var mapped = await MapManyAsync([pedido], cancellationToken);
+        return mapped[0];
     }
 
     public async Task<PedidoDigitalResponse> CrearAsync(
@@ -239,6 +245,21 @@ public sealed class PedidosDigitalesService(
         string? observacion,
         CancellationToken cancellationToken)
     {
+        var pedidoEstado = await db.PedidosDigitales.AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => (EstadoPedidoDigital?)p.Estado)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (pedidoEstado is null)
+        {
+            throw new BusinessRuleException("No se encontró el pedido digital.", StatusCodes.Status404NotFound);
+        }
+
+        if (PedidoKanban.BloqueaOperacionesTrasNc(pedidoEstado.Value))
+        {
+            throw new BusinessRuleException(
+                "El pedido fue anulado o devuelto con nota de crédito. No admite empaque, despacho ni nueva facturación.");
+        }
+
         if (estadoNuevo == EstadoPedidoDigital.Cancelado)
         {
             return await CancelarAsync(id, observacion, cancellationToken);
@@ -343,9 +364,16 @@ public sealed class PedidosDigitalesService(
             throw new BusinessRuleException("No se puede cancelar un pedido ya entregado.");
         }
 
-        if (pedido.Estado == EstadoPedidoDigital.Cancelado)
+        if (pedido.Estado == EstadoPedidoDigital.Cancelado
+            || PedidoKanban.BloqueaOperacionesTrasNc(pedido.Estado))
         {
             return Map(pedido);
+        }
+
+        if (pedido.VentaId is not null)
+        {
+            throw new BusinessRuleException(
+                "El pedido ya tiene venta o comprobante fiscal. No se puede cancelar; gestiona una nota de crédito si corresponde.");
         }
 
         var motivo = observacion?.Trim();
@@ -470,6 +498,12 @@ public sealed class PedidosDigitalesService(
         CancellationToken cancellationToken)
     {
         var pedido = await CargarAsync(id, cancellationToken);
+        if (PedidoKanban.BloqueaOperacionesTrasNc(pedido.Estado))
+        {
+            throw new BusinessRuleException(
+                "El pedido fue anulado o devuelto con nota de crédito. No se puede confirmar entrega ni facturar.");
+        }
+
         if (pedido.Estado == EstadoPedidoDigital.Entregado && pedido.VentaId is { } ventaExistente)
         {
             var existente = await db.Comprobantes.AsNoTracking()
@@ -494,16 +528,201 @@ public sealed class PedidosDigitalesService(
                     : "La entrega se confirma desde Pendiente de entrega.");
         }
 
+        var tipo = ResolverTipoComprobante(request.TipoComprobante);
         var transaccionExterna = db.Database.CurrentTransaction is not null;
         await using var tx = transaccionExterna
             ? null
             : await db.Database.BeginTransactionAsync(cancellationToken);
 
         var ahora = DateTimeOffset.UtcNow;
-        var cliente = await ResolverClienteAsync(pedido, request, ahora, cancellationToken);
-        var ventaId = Guid.NewGuid();
         var cajaSesionId = await caja.ExigirSesionAbiertaAsync(pedido.SedeId, cancellationToken);
+        Guid ventaId;
 
+        if (pedido.VentaId is { } ventaPrevia)
+        {
+            ventaId = ventaPrevia;
+            if (pedido.IndicadorReserva != IndicadorReservaPedido.Confirmado)
+            {
+                await ConfirmarStockVentaAsync(pedido, ventaId, cancellationToken);
+            }
+        }
+        else
+        {
+            ventaId = await CrearVentaFiscalAsync(pedido, request, ahora, cajaSesionId, confirmarStock: true, cancellationToken);
+        }
+
+        var nota = request.Observacion?.Trim();
+        if (string.IsNullOrEmpty(nota))
+        {
+            nota = pedido.EsRecojoTienda
+                ? "Recojo en tienda. Se convierte a venta y se confirma la reserva."
+                : "Entrega confirmada. Se convierte a venta y se confirma la reserva.";
+        }
+
+        AplicarHistorial(pedido, EstadoPedidoDigital.Entregado, nota);
+
+        if (pedido.Entrega is { } entrega)
+        {
+            entrega.Estado = EstadoLogistica.ENTREGADA;
+            entrega.FechaEntrega = ahora;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await caja.ActualizarTeoricoAsync(cajaSesionId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        ComprobanteResponse? comprobante = null;
+        if (request.EmitirComprobante)
+        {
+            comprobante = await fiscal.EmitirDesdeVentaAsync(ventaId, tipo, null, cancellationToken);
+        }
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
+        }
+
+        return new ConversionVentaResponse
+        {
+            Pedido = (await ObtenerAsync(id, cancellationToken))!,
+            VentaId = ventaId,
+            ComprobanteId = comprobante?.Id,
+            Serie = comprobante?.Serie ?? string.Empty,
+            Correlativo = comprobante?.Correlativo ?? 0,
+            TipoComprobante = comprobante?.Tipo ?? tipo,
+            EstadoEmision = comprobante?.Estado ?? EstadoEmisionSunat.SIMULADO
+        };
+    }
+
+    public async Task<ComprobanteConsolidadoResponse> EmitirComprobanteConsolidadoAsync(
+        EmitirComprobanteConsolidadoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ids = (request.PedidoDigitalIds ?? [])
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0)
+        {
+            throw new BusinessRuleException("Selecciona al menos un pedido pagado para emitir comprobante.");
+        }
+
+        var pedidos = new List<PedidoDigital>(ids.Count);
+        foreach (var id in ids)
+        {
+            pedidos.Add(await CargarAsync(id, cancellationToken));
+        }
+
+        if (pedidos.Any(p =>
+                p.Estado is EstadoPedidoDigital.PendientePago
+                    or EstadoPedidoDigital.Cancelado
+                    or EstadoPedidoDigital.Anulado
+                    or EstadoPedidoDigital.Devuelto))
+        {
+            throw new BusinessRuleException(
+                "Solo se emite comprobante de pedidos Pagados, Empaquetados, en entrega o Entregados. Los anulados/devueltos están bloqueados.");
+        }
+
+        if (pedidos.Any(p => p.VentaId is not null))
+        {
+            var ventaIds = pedidos
+                .Where(p => p.VentaId is not null)
+                .Select(p => p.VentaId!.Value)
+                .Distinct()
+                .ToList();
+            var conNc = await db.Comprobantes.AsNoTracking()
+                .Where(c => ventaIds.Contains(c.VentaId)
+                    && c.Tipo == TipoComprobanteSunat.NOTA_CREDITO
+                    && (c.Estado == EstadoEmisionSunat.ACEPTADO
+                        || c.Estado == EstadoEmisionSunat.SIMULADO))
+                .Select(c => c.VentaId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            if (conNc.Count > 0)
+            {
+                throw new BusinessRuleException(
+                    "Hay pedidos con nota de crédito emitida. No se puede volver a facturar.");
+            }
+        }
+
+        if (!PedidoKanban.MismoCliente(pedidos.Select(p => (p.ClienteId, p.ClienteNombre)).ToList()))
+        {
+            throw new BusinessRuleException("Selecciona pedidos del mismo cliente para emitir un comprobante consolidado.");
+        }
+
+        var sedes = pedidos.Select(p => p.SedeId).Distinct().ToList();
+        if (sedes.Count > 1)
+        {
+            throw new BusinessRuleException("Los pedidos de un comprobante consolidado deben ser de la misma sede.");
+        }
+
+        var tipo = ResolverTipoComprobante(request.TipoComprobante);
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var ahora = DateTimeOffset.UtcNow;
+        foreach (var pedido in pedidos)
+        {
+            if (pedido.VentaId is not null)
+            {
+                continue;
+            }
+
+            var cajaSesionId = await caja.ExigirSesionAbiertaAsync(pedido.SedeId, cancellationToken);
+            await CrearVentaFiscalAsync(
+                pedido,
+                new ConvertirVentaRequest { TipoComprobante = tipo, EmitirComprobante = false },
+                ahora,
+                cajaSesionId,
+                confirmarStock: false,
+                cancellationToken);
+            await caja.ActualizarTeoricoAsync(cajaSesionId, cancellationToken);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        var venta = await UnificarVentasDePedidosAsync(pedidos, cancellationToken);
+        var comprobante = await fiscal.EmitirDesdeVentaAsync(venta.Id, tipo, null, cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        var actualizados = new List<PedidoDigitalResponse>(pedidos.Count);
+        foreach (var pedido in pedidos)
+        {
+            actualizados.Add((await ObtenerAsync(pedido.Id, cancellationToken))!);
+        }
+
+        return new ComprobanteConsolidadoResponse
+        {
+            VentaId = venta.Id,
+            Comprobante = comprobante,
+            Pedidos = actualizados
+        };
+    }
+
+    /// <summary>
+    /// Crea la venta fiscal vinculada al pedido sin forzar Entregado.
+    /// Si <paramref name="confirmarStock"/> es false, la reserva se confirma al entregar.
+    /// </summary>
+    private async Task<Guid> CrearVentaFiscalAsync(
+        PedidoDigital pedido,
+        ConvertirVentaRequest request,
+        DateTimeOffset ahora,
+        Guid cajaSesionId,
+        bool confirmarStock,
+        CancellationToken cancellationToken)
+    {
+        if (pedido.VentaId is { } existente)
+        {
+            return existente;
+        }
+
+        var cliente = await ResolverClienteAsync(pedido, request, ahora, cancellationToken);
+        var tipo = ResolverTipoComprobante(request.TipoComprobante);
+        if (tipo == TipoComprobanteSunat.FACTURA && cliente.TipoDocumento != TipoDocumentoIdentidad.RUC)
+        {
+            throw new BusinessRuleException("La factura exige un cliente con RUC.");
+        }
+
+        DocumentoIdentidad.ValidarComprobante(tipo, cliente.TipoDocumento, cliente.NumeroDocumento);
+
+        var ventaId = Guid.NewGuid();
         var venta = new Venta
         {
             Id = ventaId,
@@ -563,7 +782,23 @@ public sealed class PedidosDigitalesService(
         }
 
         db.Ventas.Add(venta);
+        pedido.ClienteId = cliente.Id;
+        pedido.VentaId = ventaId;
 
+        if (confirmarStock)
+        {
+            await ConfirmarStockVentaAsync(pedido, ventaId, cancellationToken);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return ventaId;
+    }
+
+    private async Task ConfirmarStockVentaAsync(
+        PedidoDigital pedido,
+        Guid ventaId,
+        CancellationToken cancellationToken)
+    {
         await kardex.AplicarMuchosAsync(
             pedido.Detalles.Select(l => new KardexComando(
                 pedido.SedeId,
@@ -574,124 +809,15 @@ public sealed class PedidosDigitalesService(
                 "VENTA",
                 ventaId)),
             cancellationToken);
-
-        var tipo = request.TipoComprobante switch
-        {
-            TipoComprobanteSunat.FACTURA => TipoComprobanteSunat.FACTURA,
-            TipoComprobanteSunat.NOTA_VENTA => TipoComprobanteSunat.NOTA_VENTA,
-            _ => TipoComprobanteSunat.BOLETA
-        };
-        if (tipo == TipoComprobanteSunat.FACTURA && cliente.TipoDocumento != TipoDocumentoIdentidad.RUC)
-        {
-            throw new BusinessRuleException("La factura exige un cliente con RUC.");
-        }
-
-        DocumentoIdentidad.ValidarComprobante(tipo, cliente.TipoDocumento, cliente.NumeroDocumento);
-
-        pedido.ClienteId = cliente.Id;
-        pedido.VentaId = ventaId;
-        var nota = request.Observacion?.Trim();
-        if (string.IsNullOrEmpty(nota))
-        {
-            nota = pedido.EsRecojoTienda
-                ? "Recojo en tienda. Se convierte a venta y se confirma la reserva."
-                : "Entrega confirmada. Se convierte a venta y se confirma la reserva.";
-        }
-
-        AplicarHistorial(pedido, EstadoPedidoDigital.Entregado, nota);
-
-        if (pedido.Entrega is { } entrega)
-        {
-            entrega.Estado = EstadoLogistica.ENTREGADA;
-            entrega.FechaEntrega = ahora;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        await caja.ActualizarTeoricoAsync(cajaSesionId, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        ComprobanteResponse? comprobante = null;
-        if (request.EmitirComprobante)
-        {
-            comprobante = await fiscal.EmitirDesdeVentaAsync(ventaId, tipo, null, cancellationToken);
-        }
-
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
-        }
-
-        return new ConversionVentaResponse
-        {
-            Pedido = (await ObtenerAsync(id, cancellationToken))!,
-            VentaId = ventaId,
-            ComprobanteId = comprobante?.Id,
-            Serie = comprobante?.Serie ?? string.Empty,
-            Correlativo = comprobante?.Correlativo ?? 0,
-            TipoComprobante = comprobante?.Tipo ?? tipo,
-            EstadoEmision = comprobante?.Estado ?? EstadoEmisionSunat.SIMULADO
-        };
+        pedido.IndicadorReserva = IndicadorReservaPedido.Confirmado;
     }
 
-    public async Task<ComprobanteConsolidadoResponse> EmitirComprobanteConsolidadoAsync(
-        EmitirComprobanteConsolidadoRequest request,
-        CancellationToken cancellationToken)
+    private static TipoComprobanteSunat ResolverTipoComprobante(TipoComprobanteSunat tipo) => tipo switch
     {
-        var ids = (request.PedidoDigitalIds ?? [])
-            .Where(id => id != Guid.Empty)
-            .Distinct()
-            .ToList();
-        if (ids.Count == 0)
-        {
-            throw new BusinessRuleException("Selecciona al menos un pedido entregado.");
-        }
-
-        var pedidos = new List<PedidoDigital>(ids.Count);
-        foreach (var id in ids)
-        {
-            pedidos.Add(await CargarAsync(id, cancellationToken));
-        }
-
-        if (pedidos.Any(p => p.Estado != EstadoPedidoDigital.Entregado || p.VentaId is null))
-        {
-            throw new BusinessRuleException("Solo se emite comprobante consolidado de pedidos Entregados.");
-        }
-
-        if (!PedidoKanban.MismoCliente(pedidos.Select(p => (p.ClienteId, p.ClienteNombre)).ToList()))
-        {
-            throw new BusinessRuleException("Selecciona pedidos del mismo cliente para emitir un comprobante consolidado.");
-        }
-
-        var sedes = pedidos.Select(p => p.SedeId).Distinct().ToList();
-        if (sedes.Count > 1)
-        {
-            throw new BusinessRuleException("Los pedidos de un comprobante consolidado deben ser de la misma sede.");
-        }
-
-        var tipo = request.TipoComprobante switch
-        {
-            TipoComprobanteSunat.FACTURA => TipoComprobanteSunat.FACTURA,
-            TipoComprobanteSunat.NOTA_VENTA => TipoComprobanteSunat.NOTA_VENTA,
-            _ => TipoComprobanteSunat.BOLETA
-        };
-
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
-        var venta = await UnificarVentasDePedidosAsync(pedidos, cancellationToken);
-        var comprobante = await fiscal.EmitirDesdeVentaAsync(venta.Id, tipo, null, cancellationToken);
-        await tx.CommitAsync(cancellationToken);
-
-        var actualizados = new List<PedidoDigitalResponse>(pedidos.Count);
-        foreach (var pedido in pedidos)
-        {
-            actualizados.Add((await ObtenerAsync(pedido.Id, cancellationToken))!);
-        }
-
-        return new ComprobanteConsolidadoResponse
-        {
-            VentaId = venta.Id,
-            Comprobante = comprobante,
-            Pedidos = actualizados
-        };
-    }
+        TipoComprobanteSunat.FACTURA => TipoComprobanteSunat.FACTURA,
+        TipoComprobanteSunat.NOTA_VENTA => TipoComprobanteSunat.NOTA_VENTA,
+        _ => TipoComprobanteSunat.BOLETA
+    };
 
     public async Task<PedidoDigital> CargarAsync(Guid id, CancellationToken cancellationToken) =>
         await db.PedidosDigitales
@@ -1071,7 +1197,68 @@ public sealed class PedidosDigitalesService(
         return texto.Length == 0 ? null : texto[..Math.Min(texto.Length, max)];
     }
 
-    internal static PedidoDigitalResponse Map(PedidoDigital pedido)
+    internal static PedidoDigitalResponse Map(PedidoDigital pedido) =>
+        Map(pedido, comprobante: null, notaCredito: null);
+
+    private async Task<IReadOnlyList<PedidoDigitalResponse>> MapManyAsync(
+        IReadOnlyList<PedidoDigital> pedidos,
+        CancellationToken cancellationToken)
+    {
+        var ventaIds = pedidos
+            .Where(p => p.VentaId is { } id && id != Guid.Empty)
+            .Select(p => p.VentaId!.Value)
+            .Distinct()
+            .ToList();
+        if (ventaIds.Count == 0)
+        {
+            return pedidos.Select(p => Map(p)).ToList();
+        }
+
+        var comprobantes = await db.Comprobantes
+            .AsNoTracking()
+            .Where(c => ventaIds.Contains(c.VentaId))
+            .OrderByDescending(c => c.FechaCreacion)
+            .ToListAsync(cancellationToken);
+
+        var porVenta = comprobantes
+            .GroupBy(c => c.VentaId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return pedidos.Select(pedido =>
+        {
+            if (pedido.VentaId is not { } ventaId || !porVenta.TryGetValue(ventaId, out var lista))
+            {
+                return Map(pedido);
+            }
+
+            var documento = lista.FirstOrDefault(c =>
+                c.Tipo is TipoComprobanteSunat.BOLETA
+                    or TipoComprobanteSunat.FACTURA
+                    or TipoComprobanteSunat.NOTA_VENTA);
+            var nota = lista.FirstOrDefault(c => c.Tipo == TipoComprobanteSunat.NOTA_CREDITO);
+            return Map(pedido, ResumirComprobante(documento), ResumirComprobante(nota));
+        }).ToList();
+    }
+
+    private static PedidoComprobanteResumen? ResumirComprobante(Comprobante? comprobante) =>
+        comprobante is null
+            ? null
+            : new PedidoComprobanteResumen
+            {
+                Id = comprobante.Id,
+                Tipo = comprobante.Tipo,
+                Serie = comprobante.Serie,
+                Correlativo = comprobante.Correlativo,
+                Estado = comprobante.Estado,
+                DocumentoReferencia = comprobante.DocumentoReferencia,
+                CodigoMotivo = comprobante.CodigoMotivo,
+                DescripcionMotivo = comprobante.DescripcionMotivo
+            };
+
+    internal static PedidoDigitalResponse Map(
+        PedidoDigital pedido,
+        PedidoComprobanteResumen? comprobante,
+        PedidoComprobanteResumen? notaCredito)
     {
         var destinatario = string.IsNullOrWhiteSpace(pedido.DestinatarioNombre)
             ? pedido.ClienteNombre ?? "Cliente"
@@ -1107,6 +1294,8 @@ public sealed class PedidosDigitalesService(
             VentaId = pedido.VentaId,
             CodigoVenta = CodigoAmigable.Venta(pedido.VentaId),
             EntregaId = pedido.Entrega?.Id,
+            Comprobante = comprobante,
+            NotaCredito = notaCredito,
             Entrega = new PedidoDigitalEntregaResponse
             {
                 DestinatarioNombre = destinatario,

@@ -1,29 +1,25 @@
 import { DatePipe } from '@angular/common';
 import { AfterViewInit, Component, HostListener, computed, input, output } from '@angular/core';
 
-import { etiquetaCanalContacto } from '../../../../shared/models/contacto-entrega.model';
 import {
-  ETIQUETAS_CANAL_PEDIDO,
+  origenDeCanal,
   PedidoDigital,
   etiquetaCantidadPedidos,
 } from '../../models/pedido-digital.model';
 
+export type TicketEtiquetaTipo = 'WEB' | 'SUBASTA';
+
 export interface EtiquetaImpresion {
   id: string;
   consolidada: boolean;
-  pedidos: PedidoDigital[];
-  codigos: string;
-  clienteNombre: string;
-  sedeNombre: string;
-  telefono: string;
-  canal: string;
-  destinatarioFinal: string;
-  referencia: string | null;
-  metodoEnvio: string;
-  direccion: string;
-  subasta: string | null;
-  lineas: string[];
+  tipo: TicketEtiquetaTipo;
+  tituloTipo: string;
+  etiquetaNumero: string;
+  numero: string;
   fecha: string;
+  clienteNombre: string;
+  celular: string;
+  tienda: string;
 }
 
 @Component({
@@ -37,10 +33,8 @@ export class PedidoEtiquetaDialogComponent implements AfterViewInit {
   readonly autoPrint = input(false);
   readonly closed = output<void>();
 
-  readonly logoUrl = 'assets/img/logo-trunqi.jpg';
-  readonly etiquetasCanal = ETIQUETAS_CANAL_PEDIDO;
+  readonly logoUrl = 'assets/img/logo-trunqi.png';
   readonly etiquetaCantidad = etiquetaCantidadPedidos;
-  readonly etiquetaCanalContacto = etiquetaCanalContacto;
 
   readonly etiquetas = computed(() => agruparEtiquetas(this.pedidos()));
 
@@ -58,11 +52,16 @@ export class PedidoEtiquetaDialogComponent implements AfterViewInit {
 
   readonly resumenHint = computed(() => {
     const hojas = this.etiquetas();
-    const consolidadas = hojas.filter((e) => e.consolidada).length;
-    if (consolidadas === 0) {
-      return `${this.etiquetaCantidad(this.pedidos().length)} · ${hojas.length} etiqueta${hojas.length === 1 ? '' : 's'} individual${hojas.length === 1 ? '' : 'es'}`;
+    const subastas = hojas.filter((e) => e.tipo === 'SUBASTA').length;
+    const webs = hojas.length - subastas;
+    const partes: string[] = [];
+    if (webs > 0) {
+      partes.push(`${webs} PEDIDO WEB`);
     }
-    return `${this.etiquetaCantidad(this.pedidos().length)} · ${hojas.length} etiqueta${hojas.length === 1 ? '' : 's'} (${consolidadas} consolidada${consolidadas === 1 ? '' : 's'})`;
+    if (subastas > 0) {
+      partes.push(`${subastas} SUBASTA`);
+    }
+    return `${this.etiquetaCantidad(this.pedidos().length)} · ${partes.join(' · ') || 'sin hojas'}`;
   });
 
   ngAfterViewInit(): void {
@@ -88,22 +87,15 @@ function agruparEtiquetas(pedidos: PedidoDigital[]): EtiquetaImpresion[] {
 
   const grupos = new Map<string, PedidoDigital[]>();
   for (const pedido of pedidos) {
-    const clave = claveCliente(pedido);
+    const clave = `${tipoDePedido(pedido)}|${claveCliente(pedido)}`;
     const lista = grupos.get(clave) ?? [];
     lista.push(pedido);
     grupos.set(clave, lista);
   }
 
-  const etiquetas: EtiquetaImpresion[] = [];
-  for (const grupo of grupos.values()) {
-    if (grupo.length === 1) {
-      etiquetas.push(construirEtiqueta(grupo, false));
-    } else {
-      etiquetas.push(construirEtiqueta(grupo, true));
-    }
-  }
-
-  return etiquetas;
+  return [...grupos.values()].map((grupo) =>
+    construirEtiqueta(grupo, grupo.length > 1),
+  );
 }
 
 function claveCliente(pedido: PedidoDigital): string {
@@ -117,93 +109,64 @@ function claveCliente(pedido: PedidoDigital): string {
   return `p:${pedido.id}`;
 }
 
+function tipoDePedido(pedido: PedidoDigital): TicketEtiquetaTipo {
+  if (pedido.subastaTcgId || pedido.canalPedido === 'FACEBOOK_SUBASTA') {
+    return 'SUBASTA';
+  }
+  if (origenDeCanal(pedido.canalPedido) === 'FACEBOOK_SUBASTA') {
+    return 'SUBASTA';
+  }
+  return 'WEB';
+}
+
 function construirEtiqueta(pedidos: PedidoDigital[], consolidada: boolean): EtiquetaImpresion {
   const base = pedidos[0];
-  const codigos = pedidos.map((pedido) => pedido.codigo).join(' / ');
-  const lineas = pedidos.flatMap((pedido) =>
-    pedido.detalles.map((detalle) => {
-      const item =
-        detalle.cantidad > 1
-          ? `${detalle.descripcion.trim()} ×${detalle.cantidad}`
-          : detalle.descripcion.trim();
-      return consolidada ? `${pedido.codigo} · ${item}` : item;
-    }),
-  );
+  const tipo = tipoDePedido(base);
+  const esSubasta = tipo === 'SUBASTA';
 
-  const subastas = [
-    ...new Set(
-      pedidos
-        .map((pedido) => pedido.tituloSubasta?.trim() || pedido.codigoSubasta?.trim() || '')
-        .filter((valor) => valor.length > 0),
-    ),
-  ];
+  const numeros = pedidos.map((pedido) =>
+    esSubasta ? pedido.codigoSubasta?.trim() || pedido.codigo : pedido.codigo,
+  );
 
   return {
     id: pedidos.map((pedido) => pedido.id).join('|'),
     consolidada,
-    pedidos,
-    codigos,
-    clienteNombre: base.clienteNombre,
-    sedeNombre: base.sedeNombre?.trim() || 'Sede',
-    telefono: telefonoDe(base),
-    canal: canalDe(pedidos),
-    destinatarioFinal: destinatarioFinalDe(base),
-    referencia: base.entrega.contactoReferencia?.trim() || null,
-    metodoEnvio: metodoEnvioDe(base),
-    direccion: direccionEnvioDe(base),
-    subasta: subastas.length > 0 ? subastas.join(' · ') : null,
-    lineas,
-    fecha: base.fechaPedido,
+    tipo,
+    tituloTipo: esSubasta ? 'SUBASTA' : 'PEDIDO WEB',
+    etiquetaNumero: esSubasta
+      ? consolidada
+        ? 'N° SUBASTAS'
+        : 'N° SUBASTA'
+      : consolidada
+        ? 'N° PEDIDOS'
+        : 'N° PEDIDO',
+    numero: [...new Set(numeros)].join(' / '),
+    fecha: fechaDespachoDe(base),
+    clienteNombre: base.clienteNombre?.trim() || 'Cliente',
+    celular:
+      base.entrega.destinatarioTelefono?.trim() ||
+      base.clienteTelefono?.trim() ||
+      '—',
+    tienda: base.sedeNombre?.trim() || 'Tienda',
   };
 }
 
-function telefonoDe(pedido: PedidoDigital): string {
-  return (
-    pedido.entrega.destinatarioTelefono?.trim() ||
-    pedido.clienteTelefono?.trim() ||
-    '—'
+/** Preferir fecha de despacho (→ PendienteEntrega); si no, empaque; si no, pedido. */
+function fechaDespachoDe(pedido: PedidoDigital): string {
+  const historial = [...(pedido.historialEstados ?? [])].sort((a, b) =>
+    a.fecha.localeCompare(b.fecha),
   );
-}
-
-function canalDe(pedidos: PedidoDigital[]): string {
-  const base = pedidos[0];
-  const canalPedido = ETIQUETAS_CANAL_PEDIDO[base.canalPedido] ?? base.canalPedido;
-  const contacto = base.entrega.canalContacto
-    ? etiquetaCanalContacto(base.entrega.canalContacto)
-    : null;
-  return contacto ? `${canalPedido} · ${contacto}` : canalPedido;
-}
-
-function destinatarioFinalDe(pedido: PedidoDigital): string {
-  const dest = pedido.entrega.destinatarioNombre?.trim();
-  if (dest && dest.toLowerCase() !== pedido.clienteNombre.trim().toLowerCase()) {
-    return dest;
+  const despacho = [...historial]
+    .reverse()
+    .find((evento) => evento.estadoNuevo === 'PendienteEntrega');
+  if (despacho) {
+    return despacho.fecha;
   }
-  return dest || pedido.clienteNombre;
-}
-
-function metodoEnvioDe(pedido: PedidoDigital): string {
-  const e = pedido.entrega;
-  if (e.esRecojoTienda) {
-    return 'Recojo en tienda';
+  const empaque = [...historial]
+    .reverse()
+    .find((evento) => evento.estadoNuevo === 'Empaquetado');
+  if (empaque) {
+    return empaque.fecha;
   }
-  return e.puntoEntrega?.trim() || e.agencia?.trim() || e.courier?.trim() || 'Envío';
-}
-
-function direccionEnvioDe(pedido: PedidoDigital): string {
-  const e = pedido.entrega;
-  if (e.esRecojoTienda) {
-    return pedido.sedeNombre?.trim() || 'Mostrador';
-  }
-  const partes = [
-    e.direccion,
-    e.distrito,
-    e.provincia,
-    e.departamento,
-    e.agencia ? `Agencia: ${e.agencia}` : null,
-    e.numeroTracking ? `Tracking: ${e.numeroTracking}` : null,
-  ]
-    .map((p) => p?.trim())
-    .filter((p): p is string => !!p && p.length > 0);
-  return partes.length > 0 ? partes.join(' · ') : '—';
+  return pedido.fechaPedido;
 }

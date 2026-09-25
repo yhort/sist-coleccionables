@@ -54,6 +54,18 @@ interface SerieComprobanteApi {
   activa: boolean;
 }
 
+interface UsuarioApi {
+  id: string;
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  nombre: string;
+  email: string;
+  rol: UsuarioEmpresa['rol'];
+  activo: boolean;
+  fechaCreacion: string;
+}
+
 interface WebhookApi {
   id: string;
   nombre: string;
@@ -91,6 +103,9 @@ interface ComprobanteApi {
   tieneCdr?: boolean;
   tienePdf?: boolean;
   boletaConsolidadaId?: string | null;
+  codigoMotivo?: string | null;
+  descripcionMotivo?: string | null;
+  documentoReferencia?: string | null;
 }
 
 interface NotaVentaPendienteApi {
@@ -156,11 +171,12 @@ export class EcosistemaApiService {
 
   async cargar(): Promise<void> {
     try {
-      const [fiscal, series, webhook, comprobantes] = await Promise.all([
+      const [fiscal, series, webhook, comprobantes, usuarios] = await Promise.all([
         firstValueFrom(this.http.get<ConfiguracionFiscalApi>(apiUrl('ecosistema/fiscal'))),
         firstValueFrom(this.http.get<SerieComprobanteApi[]>(apiUrl('ecosistema/series'))),
         firstValueFrom(this.http.get<WebhookApi>(apiUrl('ecosistema/webhooks'))),
         firstValueFrom(this.http.get<ComprobanteApi[]>(apiUrl('ecosistema/cpe'))).catch(() => [] as ComprobanteApi[]),
+        firstValueFrom(this.http.get<UsuarioApi[]>(apiUrl('ecosistema/usuarios'))).catch(() => null),
         this.pedidosApi.refrescar().catch(() => []),
       ]);
       this.fiscalSignal.set({
@@ -184,7 +200,85 @@ export class EcosistemaApiService {
       this.webhooksSignal.set([mapWebhook(webhook)]);
       this.webhookLogsSignal.set((webhook.logs ?? []).map(mapWebhookLog));
       this.emisionesSignal.set(comprobantes.map((item) => this.mapEmision(item)));
+      if (usuarios) {
+        this.usuariosSignal.set(usuarios.map(mapUsuarioApi));
+      }
       await this.refrescarNotasPendientes().catch(() => undefined);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async refrescarUsuarios(): Promise<UsuarioEmpresa[]> {
+    try {
+      const items = await firstValueFrom(
+        this.http.get<UsuarioApi[]>(apiUrl('ecosistema/usuarios')),
+      );
+      const usuarios = items.map(mapUsuarioApi);
+      this.usuariosSignal.set(usuarios);
+      return usuarios.map(clonarUsuario);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async guardarUsuario(id: string | null, request: GuardarUsuarioRequest): Promise<UsuarioEmpresa> {
+    const dni = request.dni.trim();
+    const nombres = request.nombres.trim();
+    const apellidos = request.apellidos.trim();
+    const email = request.email.trim().toLowerCase();
+    const password = request.password?.trim() ?? '';
+
+    if (!/^\d{8}$/.test(dni)) {
+      throw new Error('El DNI debe tener exactamente 8 dígitos.');
+    }
+    if (nombres.length < 2) {
+      throw new Error('Indica los nombres (mínimo 2 caracteres).');
+    }
+    if (apellidos.length < 2) {
+      throw new Error('Indica los apellidos (mínimo 2 caracteres).');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error('Indica un correo / usuario de acceso válido.');
+    }
+    if (!id && password.length < 8) {
+      throw new Error('La contraseña es obligatoria (mínimo 8 caracteres).');
+    }
+    if (id && password.length > 0 && password.length < 8) {
+      throw new Error('Si cambias la contraseña, debe tener al menos 8 caracteres.');
+    }
+
+    try {
+      const body = {
+        dni,
+        nombres,
+        apellidos,
+        email,
+        rol: request.rol,
+        activo: request.activo,
+        ...(password.length > 0 ? { password } : id ? {} : { password }),
+      };
+      const dto = id
+        ? await firstValueFrom(
+            this.http.put<UsuarioApi>(apiUrl(`ecosistema/usuarios/${id}`), {
+              ...body,
+              password: password.length > 0 ? password : null,
+            }),
+          )
+        : await firstValueFrom(
+            this.http.post<UsuarioApi>(apiUrl('ecosistema/usuarios'), {
+              ...body,
+              password,
+            }),
+          );
+      const usuario = mapUsuarioApi(dto);
+      this.usuariosSignal.update((items) => {
+        const existe = items.some((item) => item.id === usuario.id);
+        return existe
+          ? items.map((item) => (item.id === usuario.id ? usuario : item))
+          : [usuario, ...items];
+      });
+      return clonarUsuario(usuario);
     } catch (error) {
       throw new Error(readApiError(error));
     }
@@ -283,38 +377,6 @@ export class EcosistemaApiService {
         : [sede, ...sinPrincipal];
     });
     return clonarSede(sede);
-  }
-
-  guardarUsuario(id: string | null, request: GuardarUsuarioRequest): UsuarioEmpresa {
-    const nombre = request.nombre.trim();
-    const email = request.email.trim().toLowerCase();
-    if (nombre.length < 3) {
-      throw new Error('Indica el nombre del usuario.');
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error('Indica un correo válido.');
-    }
-    const duplicado = this.usuariosSignal().some(
-      (usuario) => usuario.email === email && usuario.id !== id,
-    );
-    if (duplicado) {
-      throw new Error('Ya existe un usuario con ese correo.');
-    }
-
-    const usuario: UsuarioEmpresa = {
-      id: id ?? `usr-${globalThis.crypto.randomUUID().slice(0, 8)}`,
-      nombre,
-      email,
-      rol: request.rol,
-      activo: request.activo,
-    };
-    this.usuariosSignal.update((items) => {
-      const existe = items.some((item) => item.id === usuario.id);
-      return existe
-        ? items.map((item) => (item.id === usuario.id ? usuario : item))
-        : [usuario, ...items];
-    });
-    return clonarUsuario(usuario);
   }
 
   actualizarPermiso(rol: UsuarioEmpresa['rol'], modulo: ModuloPermiso, campo: 'lectura' | 'escritura', valor: boolean): void {
@@ -457,6 +519,47 @@ export class EcosistemaApiService {
     }
   }
 
+  async emitirNotaCredito(
+    ventaId: string,
+    request: {
+      codigoMotivo?: string;
+      descripcionMotivo?: string;
+      items?: Array<{ productoId: string; cantidad: number; ventaDetalleId?: string }>;
+    } = {},
+  ): Promise<EmisionSimulada> {
+    if (!ventaId.trim()) {
+      throw new Error('La venta es obligatoria para emitir la nota de crédito.');
+    }
+    try {
+      const body: Record<string, unknown> = {
+        codigoMotivo: request.codigoMotivo?.trim() || '01',
+        descripcionMotivo:
+          request.descripcionMotivo?.trim() || 'Anulación de la operación',
+      };
+      if (request.items && request.items.length > 0) {
+        body['items'] = request.items.map((item) => ({
+          productoId: item.productoId,
+          cantidad: item.cantidad,
+          ...(item.ventaDetalleId ? { ventaDetalleId: item.ventaDetalleId } : {}),
+        }));
+      }
+      const comprobante = await firstValueFrom(
+        this.http.post<ComprobanteApi>(apiUrl(`ecosistema/cpe/nota-credito/${ventaId}`), body),
+      );
+      const emision = this.mapEmision(comprobante);
+      this.emisionesSignal.update((items) => [emision, ...items.filter((item) => item.id !== emision.id)]);
+      this.seriesSignal.update((items) =>
+        items.map((item) =>
+          item.tipo === emision.tipo ? { ...item, correlativo: emision.correlativo + 1 } : item,
+        ),
+      );
+      this.notificar('pedido.estado', emision.clienteNombre, emision.mensaje);
+      return { ...emision };
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
   async refrescarNotasPendientes(fecha?: string): Promise<NotaVentaPendiente[]> {
     try {
       const items = await firstValueFrom(
@@ -573,6 +676,9 @@ export class EcosistemaApiService {
       tieneCdr: comprobante.tieneCdr === true,
       tienePdf: comprobante.tienePdf !== false,
       boletaConsolidadaId: comprobante.boletaConsolidadaId ?? null,
+      codigoMotivo: comprobante.codigoMotivo ?? null,
+      descripcionMotivo: comprobante.descripcionMotivo ?? null,
+      documentoReferencia: comprobante.documentoReferencia ?? null,
     };
   }
 
@@ -632,6 +738,26 @@ function mapWebhook(dto: WebhookApi): WebhookSalida {
     canal: dto.canal || 'WHATSAPP',
     eventos: dto.eventos?.length ? dto.eventos : ['pedido.estado'],
     activo: dto.activo,
+  };
+}
+
+function mapUsuarioApi(dto: UsuarioApi): UsuarioEmpresa {
+  const nombres = dto.nombres?.trim() || '';
+  const apellidos = dto.apellidos?.trim() || '';
+  const nombre =
+    dto.nombre?.trim() ||
+    `${nombres} ${apellidos}`.trim() ||
+    dto.email;
+  return {
+    id: dto.id,
+    dni: dto.dni ?? '',
+    nombres,
+    apellidos,
+    nombre,
+    email: dto.email,
+    rol: dto.rol,
+    activo: dto.activo,
+    fechaCreacion: dto.fechaCreacion,
   };
 }
 
@@ -739,6 +865,9 @@ const SEED_SEDES: SedeEmpresa[] = [
 const SEED_USUARIOS: UsuarioEmpresa[] = [
   {
     id: 'usr-admin',
+    dni: '00000001',
+    nombres: 'Yhort',
+    apellidos: 'Cruz',
     nombre: 'Yhort Cruz',
     email: 'yhort@trunqi.pe',
     rol: 'ADMIN',
@@ -746,6 +875,9 @@ const SEED_USUARIOS: UsuarioEmpresa[] = [
   },
   {
     id: 'usr-caja',
+    dni: '00000002',
+    nombres: 'Caja',
+    apellidos: 'Miraflores',
     nombre: 'Caja Miraflores',
     email: 'caja@trunqi.pe',
     rol: 'CAJERO',
@@ -753,6 +885,9 @@ const SEED_USUARIOS: UsuarioEmpresa[] = [
   },
   {
     id: 'usr-almacen',
+    dni: '00000003',
+    nombres: 'Logística',
+    apellidos: 'Surco',
     nombre: 'Logística Surco',
     email: 'almacen@trunqi.pe',
     rol: 'ALMACEN',

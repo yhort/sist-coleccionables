@@ -38,14 +38,41 @@
           }
         </select>
       </label>
-      <label>
+      <label class="juego-field">
         Categoría / juego
-        <select formControlName="juego">
-          <option value="">Sin juego</option>
-          @for (juego of juegos; track juego[0]) {
-            <option [value]="juego[0]">{{ juego[1] }}</option>
+        @if (!creandoJuego()) {
+          <select
+            [ngModel]="form.controls['juego'].value"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="onJuegoSelectChange($event)"
+          >
+            <option value="">Sin juego</option>
+            @for (juego of opcionesJuego(); track juego[0]) {
+              <option [value]="juego[0]">{{ juego[1] }}</option>
+            }
+            <option [value]="opcionNuevoJuego">+ Agregar nuevo juego/categoría</option>
+          </select>
+        } @else {
+          <div class="juego-field__nuevo">
+            <input
+              type="text"
+              maxlength="80"
+              placeholder="Ej. One Piece, Digimon…"
+              [value]="nuevoJuegoNombre()"
+              (input)="nuevoJuegoNombre.set($any($event.target).value)"
+              (keydown.enter)="$event.preventDefault(); confirmarNuevoJuego()"
+              (keydown.escape)="$event.preventDefault(); cancelarNuevoJuego()"
+              autofocus
+            />
+            <button type="button" class="ghost" (click)="confirmarNuevoJuego()">Crear</button>
+            <button type="button" class="link-btn" (click)="cancelarNuevoJuego()">Cancelar</button>
+          </div>
+          @if (errorJuego()) {
+            <small class="field-error">{{ errorJuego() }}</small>
+          } @else {
+            <small class="hint">Enter para crear · Esc para cancelar. Quedará seleccionado al guardar el producto.</small>
           }
-        </select>
+        }
       </label>
       <label>
         Código de barras

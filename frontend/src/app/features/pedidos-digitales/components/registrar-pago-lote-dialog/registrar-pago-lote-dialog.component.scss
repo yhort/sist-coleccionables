@@ -154,6 +154,63 @@ textarea {
   font-weight: 600;
 }
 
+.aviso {
+  margin: 0 1.5rem 0.75rem;
+  color: #92400e;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dialog__cpe-check {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.dialog__cpe-check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 40px;
+  font-size: 0.85rem;
+
+  input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    min-height: 0;
+    accent-color: var(--color-primary);
+  }
+}
+
+.dialog__resultado {
+  margin: 0.75rem 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background);
+
+  p {
+    margin: 0;
+
+    & + p {
+      margin-top: 0.35rem;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+    }
+  }
+
+  strong {
+    margin-right: 0.35rem;
+  }
+
+  &[data-estado='ACEPTADO'],
+  &[data-estado='PENDIENTE_CONSOLIDAR'],
+  &[data-estado='CONSOLIDADA'],
+  &[data-estado='SIMULADO'] {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
+}
+
 .ghost,
 .primary {
   min-height: 40px;

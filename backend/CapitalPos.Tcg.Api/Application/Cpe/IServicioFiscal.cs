@@ -13,6 +13,8 @@ public interface IServicioFiscal
 
     Task<ComprobanteResponse?> ObtenerPorVentaAsync(Guid ventaId, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<ComprobanteResponse>> ListarPorVentaAsync(Guid ventaId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<ComprobanteResponse>> ListarAsync(CancellationToken cancellationToken);
 
     Task<CpeArchivoDescarga?> ObtenerArchivoAsync(

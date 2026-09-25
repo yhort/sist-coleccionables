@@ -51,6 +51,26 @@ interface PedidoApi {
   ventaId?: string | null;
   codigoVenta?: string | null;
   entregaId?: string | null;
+  comprobante?: {
+    id: string;
+    tipo: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA' | 'NOTA_CREDITO' | 'GUIA_REMISION';
+    serie: string;
+    correlativo: number;
+    estado: string;
+    documentoReferencia?: string | null;
+    codigoMotivo?: string | null;
+    descripcionMotivo?: string | null;
+  } | null;
+  notaCredito?: {
+    id: string;
+    tipo: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA' | 'NOTA_CREDITO' | 'GUIA_REMISION';
+    serie: string;
+    correlativo: number;
+    estado: string;
+    documentoReferencia?: string | null;
+    codigoMotivo?: string | null;
+    descripcionMotivo?: string | null;
+  } | null;
   entrega: PedidoDigitalEntrega;
   detalles: Array<PedidoDigitalDetalle & { codigoSku?: string | null; codigo?: string | null }>;
   historialEstados: PedidoDigitalHistorialEstado[];
@@ -374,7 +394,7 @@ export class PedidosDigitalesApiService {
     tipo: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA',
   ): Promise<ComprobanteConsolidadoApi> {
     if (ids.length === 0) {
-      throw new Error('Selecciona al menos un pedido entregado.');
+      throw new Error('Selecciona al menos un pedido pagado para emitir comprobante.');
     }
     try {
       const resultado = await firstValueFrom(
@@ -485,6 +505,30 @@ function mapPedido(dto: PedidoApi): PedidoDigital {
     fechaNotificacion: dto.fechaNotificacion ?? null,
     ventaId: dto.ventaId ?? null,
     codigoVenta: dto.codigoVenta?.trim() || (dto.ventaId ? codigoVenta(dto.ventaId) : null),
+    comprobante: dto.comprobante
+      ? {
+          id: dto.comprobante.id,
+          tipo: dto.comprobante.tipo,
+          serie: dto.comprobante.serie,
+          correlativo: dto.comprobante.correlativo,
+          estado: dto.comprobante.estado,
+          documentoReferencia: dto.comprobante.documentoReferencia ?? null,
+          codigoMotivo: dto.comprobante.codigoMotivo ?? null,
+          descripcionMotivo: dto.comprobante.descripcionMotivo ?? null,
+        }
+      : null,
+    notaCredito: dto.notaCredito
+      ? {
+          id: dto.notaCredito.id,
+          tipo: dto.notaCredito.tipo,
+          serie: dto.notaCredito.serie,
+          correlativo: dto.notaCredito.correlativo,
+          estado: dto.notaCredito.estado,
+          documentoReferencia: dto.notaCredito.documentoReferencia ?? null,
+          codigoMotivo: dto.notaCredito.codigoMotivo ?? null,
+          descripcionMotivo: dto.notaCredito.descripcionMotivo ?? null,
+        }
+      : null,
     detalles: dto.detalles.map((detalle) => ({
       id: detalle.id,
       codigo: detalle.codigo?.trim() || codigoItem(detalle.id),

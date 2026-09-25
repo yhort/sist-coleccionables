@@ -24,7 +24,9 @@ export type EstadoPedidoDigital =
   | 'Empaquetado'
   | 'PendienteEntrega'
   | 'Entregado'
-  | 'Cancelado';
+  | 'Cancelado'
+  | 'Anulado'
+  | 'Devuelto';
 
 export type IndicadorReservaPedido = 'Reservado' | 'Liberado' | 'Confirmado';
 
@@ -93,9 +95,24 @@ export interface PedidoDigital {
   fechaNotificacion: string | null;
   ventaId: string | null;
   codigoVenta: string | null;
+  /** Documento de venta (boleta/factura/NV) si ya se emitió. */
+  comprobante: PedidoComprobanteResumen | null;
+  /** Nota de crédito asociada, si existe. */
+  notaCredito: PedidoComprobanteResumen | null;
   detalles: PedidoDigitalDetalle[];
   historialEstados: PedidoDigitalHistorialEstado[];
   entrega: PedidoDigitalEntrega;
+}
+
+export interface PedidoComprobanteResumen {
+  id: string;
+  tipo: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA' | 'NOTA_CREDITO' | 'GUIA_REMISION';
+  serie: string;
+  correlativo: number;
+  estado: string;
+  documentoReferencia?: string | null;
+  codigoMotivo?: string | null;
+  descripcionMotivo?: string | null;
 }
 
 export type FiltroNotificacionPedido = 'TODOS' | 'SIN_NOTIFICAR' | 'NOTIFICADOS';
@@ -166,6 +183,8 @@ export const COLUMNAS_KANBAN: readonly EstadoPedidoDigital[] = [
   'PendienteEntrega',
   'Entregado',
   'Cancelado',
+  'Anulado',
+  'Devuelto',
 ];
 
 export const FLUJO_OPERATIVO: readonly EstadoPedidoDigital[] = [
@@ -175,6 +194,15 @@ export const FLUJO_OPERATIVO: readonly EstadoPedidoDigital[] = [
   'PendienteEntrega',
   'Entregado',
 ];
+
+export const ESTADOS_TERMINALES_PEDIDO: readonly EstadoPedidoDigital[] = [
+  'Entregado',
+  'Cancelado',
+  'Anulado',
+  'Devuelto',
+];
+
+export const ESTADOS_BLOQUEO_NC: readonly EstadoPedidoDigital[] = ['Anulado', 'Devuelto'];
 
 export const CANALES_PEDIDO: readonly CanalPedidoDigital[] = [
   'FACEBOOK_SUBASTA',
@@ -231,6 +259,8 @@ export const ETIQUETAS_ESTADO_PEDIDO: Record<EstadoPedidoDigital, string> = {
   PendienteEntrega: 'Pendiente de entrega',
   Entregado: 'Entregado',
   Cancelado: 'Cancelado',
+  Anulado: 'Anulado',
+  Devuelto: 'Devuelto',
 };
 
 /** Etiqueta de acción operativa (botones Empaquetar / Despachar / Entregar). */
@@ -241,6 +271,8 @@ export const ETIQUETAS_ACCION_ESTADO_PEDIDO: Record<EstadoPedidoDigital, string>
   PendienteEntrega: 'Despachar',
   Entregado: 'Entregar',
   Cancelado: 'Cancelar',
+  Anulado: 'Anulado',
+  Devuelto: 'Devuelto',
 };
 
 export function etiquetaAccionEstado(destino: EstadoPedidoDigital): string {
@@ -295,7 +327,7 @@ export function canalDesdeOrigen(origen: OrigenPedidoDigital): CanalPedidoDigita
 }
 
 export function indicadorReservaDe(estado: EstadoPedidoDigital): IndicadorReservaPedido {
-  if (estado === 'Cancelado') {
+  if (estado === 'Cancelado' || estado === 'Anulado' || estado === 'Devuelto') {
     return 'Liberado';
   }
   if (estado === 'Entregado') {
@@ -304,11 +336,26 @@ export function indicadorReservaDe(estado: EstadoPedidoDigital): IndicadorReserv
   return 'Reservado';
 }
 
+export function pedidoBloqueadoPorNc(
+  pedido: Pick<PedidoDigital, 'estado' | 'notaCredito'>,
+): boolean {
+  if (pedido.estado === 'Anulado' || pedido.estado === 'Devuelto') {
+    return true;
+  }
+  return cpeEstadoEmitido(pedido.notaCredito?.estado);
+}
+
 export function transicionesPermitidas(
-  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
 ): EstadoPedidoDigital[] {
   const { estado } = pedido;
-  if (estado === 'Entregado' || estado === 'Cancelado') {
+  if (
+    estado === 'Entregado' ||
+    estado === 'Cancelado' ||
+    estado === 'Anulado' ||
+    estado === 'Devuelto' ||
+    pedidoBloqueadoPorNc(pedido)
+  ) {
     return [];
   }
 
@@ -336,20 +383,26 @@ export function transicionesPermitidas(
  * - Envío: solo desde PendienteEntrega (tras Empaquetar → Despachar).
  */
 export function puedeEntregarRapido(
-  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
 ): boolean {
   return transicionesPermitidas(pedido).includes('Entregado');
 }
 
 export function puedeEmpaquetar(
-  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
 ): boolean {
+  if (pedidoBloqueadoPorNc(pedido)) {
+    return false;
+  }
   return pedido.estado === 'Pagado' && transicionesPermitidas(pedido).includes('Empaquetado');
 }
 
 export function puedeDespachar(
-  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
 ): boolean {
+  if (pedidoBloqueadoPorNc(pedido)) {
+    return false;
+  }
   return (
     pedido.estado === 'Empaquetado' &&
     transicionesPermitidas(pedido).includes('PendienteEntrega')
@@ -357,7 +410,7 @@ export function puedeDespachar(
 }
 
 export function puedeTransicionarA(
-  pedido: Pick<PedidoDigital, 'estado' | 'entrega'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
   destino: EstadoPedidoDigital,
 ): boolean {
   return transicionesPermitidas(pedido).includes(destino);
@@ -368,8 +421,11 @@ export function puedeAnularPedido(pedido: Pick<PedidoDigital, 'estado'>): boolea
 }
 
 export function puedeImprimirEtiqueta(
-  pedido: Pick<PedidoDigital, 'estado'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'notaCredito'>,
 ): boolean {
+  if (pedidoBloqueadoPorNc(pedido)) {
+    return false;
+  }
   return (
     pedido.estado === 'Pagado' ||
     pedido.estado === 'Empaquetado' ||
@@ -382,10 +438,15 @@ export function puedeSeleccionarParaCobro(pedido: Pick<PedidoDigital, 'estado'>)
 }
 
 export function puedeSeleccionarEnLote(
-  pedido: Pick<PedidoDigital, 'estado'>,
+  pedido: Pick<PedidoDigital, 'estado' | 'notaCredito'>,
   tab: EstadoPedidoDigital | 'TODOS',
 ): boolean {
-  if (pedido.estado === 'Cancelado') {
+  if (
+    pedido.estado === 'Cancelado' ||
+    pedido.estado === 'Anulado' ||
+    pedido.estado === 'Devuelto' ||
+    pedidoBloqueadoPorNc(pedido)
+  ) {
     return false;
   }
   if (tab === 'TODOS') {
@@ -418,6 +479,89 @@ export function mismoClienteCobro(
     ...new Set(pedidos.map((pedido) => pedido.clienteId).filter((id): id is string => !!id?.trim())),
   ];
   return ids.length === 1 && pedidos.every((pedido) => pedido.clienteId === ids[0]);
+}
+
+/** Estados en los que el CPE se considera emitido (no se debe reemitir). */
+export function cpeEstadoEmitido(estado: string | null | undefined): boolean {
+  return (
+    estado === 'ACEPTADO' ||
+    estado === 'PENDIENTE_CONSOLIDAR' ||
+    estado === 'CONSOLIDADA' ||
+    estado === 'SIMULADO'
+  );
+}
+
+export function pedidoTieneCpeEmitido(
+  pedido: Pick<PedidoDigital, 'comprobante'>,
+): boolean {
+  return cpeEstadoEmitido(pedido.comprobante?.estado);
+}
+
+export function etiquetaNumeroCpe(
+  cpe: Pick<PedidoComprobanteResumen, 'serie' | 'correlativo'> | null | undefined,
+): string {
+  if (!cpe?.serie) {
+    return '';
+  }
+  return `${cpe.serie}-${String(cpe.correlativo).padStart(8, '0')}`;
+}
+
+/** Puede emitir NC si hay boleta/factura aceptada y aún no hay NC final. */
+export function pedidoPuedeNotaCredito(pedido: PedidoDigital): boolean {
+  if (pedidoBloqueadoPorNc(pedido)) {
+    return false;
+  }
+  const cpe = pedido.comprobante;
+  if (!cpe || (cpe.tipo !== 'BOLETA' && cpe.tipo !== 'FACTURA')) {
+    return false;
+  }
+  if (!cpeEstadoEmitido(cpe.estado)) {
+    return false;
+  }
+  if (pedido.notaCredito && cpeEstadoEmitido(pedido.notaCredito.estado)) {
+    return false;
+  }
+  return (
+    pedido.estado === 'Pagado' ||
+    pedido.estado === 'Empaquetado' ||
+    pedido.estado === 'PendienteEntrega' ||
+    pedido.estado === 'Entregado'
+  );
+}
+
+/** Motivos Catálogo 09 SUNAT (subset operativo). */
+export const MOTIVOS_NOTA_CREDITO_SUNAT: readonly {
+  codigo: string;
+  etiqueta: string;
+}[] = [
+  { codigo: '01', etiqueta: '01 — Anulación de la operación' },
+  { codigo: '02', etiqueta: '02 — Anulación por error en el RUC' },
+  { codigo: '03', etiqueta: '03 — Corrección por error en la descripción' },
+  { codigo: '04', etiqueta: '04 — Descuento global' },
+  { codigo: '05', etiqueta: '05 — Descuento por ítem' },
+  { codigo: '06', etiqueta: '06 — Devolución total' },
+  { codigo: '07', etiqueta: '07 — Devolución por ítem' },
+];
+
+export function descripcionMotivoNotaCredito(codigo: string): string {
+  switch (codigo) {
+    case '01':
+      return 'Anulación de la operación';
+    case '02':
+      return 'Anulación por error en el RUC';
+    case '03':
+      return 'Corrección por error en la descripción';
+    case '04':
+      return 'Descuento global';
+    case '05':
+      return 'Descuento por ítem';
+    case '06':
+      return 'Devolución total';
+    case '07':
+      return 'Devolución por ítem';
+    default:
+      return 'Nota de crédito';
+  }
 }
 
 export function entregaRecojo(destinatarioNombre: string): PedidoDigitalEntrega {

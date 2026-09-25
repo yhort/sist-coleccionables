@@ -30,18 +30,8 @@
 }
 
 h1 {
-  margin: 0;
+  margin: 0 0 1.25rem;
   font-size: 1.45rem;
-}
-
-.login__lead {
-  margin: 0.4rem 0 1.2rem;
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-
-  code {
-    font-size: 0.8rem;
-  }
 }
 
 form {

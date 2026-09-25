@@ -37,19 +37,46 @@
     <section class="lineas" formArrayName="detalles">
       <header>
         <h3>Ítems</h3>
-        <button type="button" class="link-btn" (click)="agregarLinea()">Agregar ítem</button>
       </header>
+
+      <label class="buscador">
+        Buscar y agregar productos
+        <input
+          #buscadorInput
+          type="search"
+          autocomplete="off"
+          placeholder="SKU, nombre o código de barras… Enter agrega el primero"
+          [value]="busqueda()"
+          (input)="onBusqueda($any($event.target).value)"
+          (focus)="listaAbierta.set(true)"
+          (keydown.enter)="$event.preventDefault(); onBusquedaEnter()"
+        />
+        @if (listaAbierta() && busqueda().trim().length > 0) {
+          <ul class="buscador__sugerencias" role="listbox">
+            @for (candidato of candidatos(); track candidato.id) {
+              <li>
+                <button type="button" (mousedown)="$event.preventDefault(); agregarProducto(candidato)">
+                  <strong>{{ candidato.codigoSku }}</strong>
+                  <span>{{ candidato.nombre }}</span>
+                </button>
+              </li>
+            } @empty {
+              <li class="buscador__vacio">Sin coincidencias</li>
+            }
+          </ul>
+        }
+      </label>
+      <p class="hint buscador__hint">
+        Al elegir un producto se agrega a la grilla (cantidad 1) y el buscador queda listo para el siguiente.
+        Si ya está en la lista, se suma +1.
+      </p>
+
       @for (linea of detalles.controls; track $index) {
         <div class="linea" [formGroupName]="$index">
-          <label class="wide">
-            Producto
-            <select formControlName="productoId">
-              <option value="">Seleccionar</option>
-              @for (producto of productos(); track producto.id) {
-                <option [value]="producto.id">{{ producto.nombre }} ({{ producto.codigoSku }})</option>
-              }
-            </select>
-          </label>
+          <div class="linea__producto">
+            <span class="linea__etiqueta">Producto</span>
+            <strong>{{ nombreProducto(linea.get('productoId')?.value) }}</strong>
+          </div>
           <label>
             Cantidad
             <input type="number" min="0.001" step="1" formControlName="cantidad" />
@@ -58,10 +85,10 @@
             Costo unitario
             <input type="number" min="0" step="0.01" formControlName="costoUnitario" />
           </label>
-          <button type="button" class="ghost" [disabled]="detalles.length === 1" (click)="quitarLinea($index)">
-            Quitar
-          </button>
+          <button type="button" class="ghost" (click)="quitarLinea($index)">Quitar</button>
         </div>
+      } @empty {
+        <p class="hint">Todavía no hay ítems. Busca arriba y haz clic para agregar.</p>
       }
       <p class="hint">Total {{ total() | number: '1.2-2' }}</p>
     </section>

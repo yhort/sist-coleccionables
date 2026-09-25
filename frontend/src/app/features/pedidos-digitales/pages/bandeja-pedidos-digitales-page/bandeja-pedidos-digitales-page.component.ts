@@ -20,6 +20,8 @@ import { PedidoKanbanItem } from '../../components/pedido-kanban-card/pedido-kan
 import { PedidosKanbanComponent } from '../../components/pedidos-kanban/pedidos-kanban.component';
 import { PedidosTablaComponent } from '../../components/pedidos-tabla/pedidos-tabla.component';
 import { EmitirCpeLoteDialogComponent } from '../../components/emitir-cpe-lote-dialog/emitir-cpe-lote-dialog.component';
+import { EmpaqueConsolidadoDialogComponent } from '../../components/empaque-consolidado-dialog/empaque-consolidado-dialog.component';
+import { PedidoAccionPreparadaDialogComponent } from '../../components/pedido-accion-preparada-dialog/pedido-accion-preparada-dialog.component';
 import { PedidoEtiquetaDialogComponent } from '../../components/pedido-etiqueta-dialog/pedido-etiqueta-dialog.component';
 import { RegistrarPagoLoteDialogComponent } from '../../components/registrar-pago-lote-dialog/registrar-pago-lote-dialog.component';
 import { PedidosDigitalesApiService } from '../../data-access/pedidos-digitales.service';
@@ -33,6 +35,7 @@ import {
   EstadoPedidoDigital,
   etiquetaCantidadPedidos,
   origenDeCanal,
+  pedidoPuedeNotaCredito,
 } from '../../models/pedido-digital.model';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
@@ -62,6 +65,8 @@ function leerVistaPreferida(): PedidosVistaMode {
     PackingSlipDialogComponent,
     RegistrarPagoLoteDialogComponent,
     EmitirCpeLoteDialogComponent,
+    EmpaqueConsolidadoDialogComponent,
+    PedidoAccionPreparadaDialogComponent,
     PedidoEtiquetaDialogComponent,
   ],
   templateUrl: './bandeja-pedidos-digitales-page.component.html',
@@ -88,7 +93,9 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
   readonly ticketFila = signal<EntregaFila | null>(null);
   readonly pagoLote = signal<PedidoDigital[] | null>(null);
   readonly cpeLote = signal<PedidoDigital[] | null>(null);
+  readonly notaCreditoLote = signal<PedidoDigital | null>(null);
   readonly etiquetasLote = signal<PedidoDigital[] | null>(null);
+  readonly consolidadoEmpaque = signal<PedidoDigital[] | null>(null);
   readonly error = signal('');
   readonly aviso = signal('');
 
@@ -110,7 +117,9 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
       this.ticketFila() ||
       this.pagoLote() ||
       this.cpeLote() ||
-      this.etiquetasLote()
+      this.notaCreditoLote() ||
+      this.etiquetasLote() ||
+      this.consolidadoEmpaque()
     ) {
       return;
     }
@@ -189,7 +198,12 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
       ).length,
       entregados: pedidos.filter((pedido) => pedido.estado === 'Entregado').length,
       monto: pedidos
-        .filter((pedido) => pedido.estado !== 'Cancelado')
+        .filter(
+          (pedido) =>
+            pedido.estado !== 'Cancelado' &&
+            pedido.estado !== 'Anulado' &&
+            pedido.estado !== 'Devuelto',
+        )
         .reduce((sum, pedido) => sum + pedido.total, 0),
     };
   });
@@ -332,6 +346,44 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     this.cpeLote.set(pedidos);
   }
 
+  abrirNotaCreditoLote(pedidos: PedidoDigital[]): void {
+    this.error.set('');
+    this.aviso.set('');
+    const representante =
+      pedidos.find((pedido) => pedidoPuedeNotaCredito(pedido)) ??
+      pedidos.find((pedido) => !!pedido.notaCredito) ??
+      pedidos[0];
+    if (!representante?.ventaId) {
+      this.error.set(
+        'No se encontró una venta con boleta/factura para emitir la nota de crédito del lote.',
+      );
+      return;
+    }
+    this.notaCreditoLote.set(representante);
+  }
+
+  cerrarNotaCreditoLote(): void {
+    const previo = this.notaCreditoLote();
+    const estadoPrevio = previo?.estado;
+    this.notaCreditoLote.set(null);
+    void this.pedidosApi.refrescar().then(() => {
+      const actualizado = previo
+        ? this.pedidosApi.pedidos().find((item) => item.id === previo.id)
+        : null;
+      if (
+        actualizado &&
+        (actualizado.estado === 'Anulado' || actualizado.estado === 'Devuelto') &&
+        estadoPrevio !== actualizado.estado
+      ) {
+        this.aviso.set(
+          `Nota de crédito emitida. Los pedidos del comprobante quedaron ${
+            actualizado.estado === 'Devuelto' ? 'Devueltos' : 'Anulados'
+          }.`,
+        );
+      }
+    });
+  }
+
   onCpeLoteGuardado(): void {
     const cuantos = this.cpeLote()?.length ?? 0;
     this.aviso.set(
@@ -352,6 +404,19 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
 
   cerrarEtiquetas(): void {
     this.etiquetasLote.set(null);
+  }
+
+  abrirConsolidadoEmpaque(pedidos: PedidoDigital[]): void {
+    this.error.set('');
+    this.aviso.set('');
+    if (pedidos.length < 2) {
+      return;
+    }
+    this.consolidadoEmpaque.set(pedidos);
+  }
+
+  cerrarConsolidadoEmpaque(): void {
+    this.consolidadoEmpaque.set(null);
   }
 
   async anular(pedido: PedidoDigital): Promise<void> {

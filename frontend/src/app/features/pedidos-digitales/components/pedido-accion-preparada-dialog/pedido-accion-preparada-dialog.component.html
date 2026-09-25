@@ -9,7 +9,9 @@
       ? 'accion-pago-title'
       : tipo() === 'pago-consulta'
         ? 'accion-pago-consulta-title'
-        : 'accion-cpe-title'
+        : tipo() === 'nota-credito'
+          ? 'accion-nc-title'
+          : 'accion-cpe-title'
   "
   (click)="$event.stopPropagation()"
 >
@@ -97,31 +99,49 @@
     <footer class="dialog__footer">
       <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
     </footer>
-  } @else {
+  } @else if (tipo() === 'cpe') {
     <header class="dialog__header">
       <div>
-        <h2 id="accion-cpe-title">Emitir comprobante</h2>
-        <p>Boleta, factura o nota de venta. La nota de venta no se envía a SUNAT hasta consolidar.</p>
+        <h2 id="accion-cpe-title">
+          {{ cpeSoloConsulta() ? 'Comprobante electrónico' : 'Emitir comprobante' }}
+        </h2>
+        <p>
+          @if (cpeSoloConsulta()) {
+            Este pedido ya tiene CPE emitido. Solo consulta y descargas.
+          } @else {
+            Boleta, factura o nota de venta. La nota de venta no se envía a SUNAT hasta consolidar.
+          }
+        </p>
       </div>
       <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
         ×
       </button>
     </header>
     <div class="dialog__body">
-      <p>
-        Elige el documento. La boleta y la factura van a SUNAT Beta. La nota de venta descuenta
-        stock y queda pendiente de boleta consolidada.
-      </p>
-      <label class="dialog__tipo">
-        Tipo de comprobante
-        <select [value]="tipoSeleccionado()" (change)="tipoSeleccionado.set($any($event.target).value)">
-          @for (tipo of tipos; track tipo) {
-            <option [value]="tipo">{{ etiquetas[tipo] }}</option>
-          }
-        </select>
-      </label>
+      @if (!cpeSoloConsulta()) {
+        <p>
+          Elige el documento. La boleta y la factura van a SUNAT Beta. La nota de venta queda
+          pendiente de boleta consolidada.
+        </p>
+        <label class="dialog__tipo">
+          Tipo de comprobante
+          <select
+            [value]="tipoSeleccionado()"
+            [disabled]="!!emision()"
+            (change)="tipoSeleccionado.set($any($event.target).value)"
+          >
+            @for (tipo of tipos; track tipo) {
+              <option [value]="tipo">{{ etiquetas[tipo] }}</option>
+            }
+          </select>
+        </label>
+      }
       @if (pedido()?.codigoVenta; as codigoVenta) {
         <p>Venta <code>{{ codigoVenta }}</code>.</p>
+      } @else if (pedido(); as pedidoSinVenta) {
+        <p>
+          Pedido <code>{{ pedidoSinVenta.codigo }}</code> · se creará la venta fiscal al emitir.
+        </p>
       }
       @if (error()) {
         <p class="dialog__error">{{ error() }}</p>
@@ -151,11 +171,11 @@
         <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('ticket')">
           Ticket
         </button>
-        @if (emision.estado !== 'ACEPTADO' && emision.estado !== 'PENDIENTE_CONSOLIDAR' && emision.estado !== 'CONSOLIDADA') {
+        @if (!cpeSoloConsulta() && emision.estado !== 'ACEPTADO' && emision.estado !== 'PENDIENTE_CONSOLIDAR' && emision.estado !== 'CONSOLIDADA' && emision.estado !== 'SIMULADO') {
           <button
             type="button"
             class="primary"
-            [disabled]="!pedido()?.ventaId || enviando()"
+            [disabled]="!puedeEmitirAhora()"
             (click)="emitir()"
           >
             {{ enviando() ? 'Emitiendo…' : 'Reintentar' }}
@@ -165,10 +185,178 @@
         <button
           type="button"
           class="primary"
-          [disabled]="!pedido()?.ventaId || enviando()"
+          [disabled]="!puedeEmitirAhora()"
           (click)="emitir()"
         >
           {{ enviando() ? 'Emitiendo…' : 'Emitir ' + etiquetas[tipoSeleccionado()].toLowerCase() }}
+        </button>
+      }
+    </footer>
+  } @else {
+    <header class="dialog__header">
+      <div>
+        <h2 id="accion-nc-title">
+          {{ notaCredito() ? 'Nota de crédito' : 'Emitir Nota de Crédito / Anular venta' }}
+        </h2>
+        <p>
+          Referencia al comprobante original. Motivos 01/06 = documento completo; 07 = devolución
+          por ítem (parcial).
+        </p>
+      </div>
+      <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
+        ×
+      </button>
+    </header>
+    <div class="dialog__body">
+      @if (pedido(); as pedidoNc) {
+        <p>
+          Pedido <code>{{ pedidoNc.codigo }}</code>
+          @if (pedidoNc.comprobante) {
+            · Origen
+            <strong>{{ etiquetaNumero(pedidoNc.comprobante) }}</strong>
+          }
+        </p>
+      }
+      @if (!notaCredito() && puedeEmitirNc()) {
+        <label class="dialog__tipo">
+          Código motivo SUNAT (Catálogo 09)
+          <select [value]="codigoMotivo()" (change)="onMotivoChange($any($event.target).value)">
+            @for (motivo of motivosSunat; track motivo.codigo) {
+              <option [value]="motivo.codigo">{{ motivo.etiqueta }}</option>
+            }
+          </select>
+        </label>
+        <label class="dialog__tipo">
+          Descripción del motivo
+          <input
+            type="text"
+            maxlength="250"
+            [value]="descripcionMotivo()"
+            (input)="descripcionMotivo.set($any($event.target).value)"
+          />
+        </label>
+
+        @if (lineasNc().length > 0) {
+          <div class="nc-items" [attr.data-modo]="esMotivoParcial() ? 'parcial' : 'total'">
+            <div class="nc-items__head">
+              <h3>Ítems del comprobante original</h3>
+              @if (esMotivoTotal()) {
+                <p>Anulación / devolución total: se incluyen todos los ítems al 100%.</p>
+              } @else if (esMotivoParcial()) {
+                <p>Devolución por ítem: marca productos y ajusta cantidades a devolver.</p>
+              } @else {
+                <p>Se emitirá la NC con los ítems mostrados (documento completo por defecto).</p>
+              }
+            </div>
+            <div class="nc-items__table-wrap">
+              <table class="nc-items__table">
+                <thead>
+                  <tr>
+                    @if (esMotivoParcial()) {
+                      <th class="check"></th>
+                    }
+                    <th>Producto / carta</th>
+                    <th class="num">Cant.</th>
+                    <th class="num">P. unit.</th>
+                    <th class="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (linea of lineasNc(); track linea.key) {
+                    <tr [class.nc-items__row--off]="esMotivoParcial() && !linea.seleccionado">
+                      @if (esMotivoParcial()) {
+                        <td class="check">
+                          <input
+                            type="checkbox"
+                            [checked]="linea.seleccionado"
+                            (change)="toggleLinea(linea.key, $any($event.target).checked)"
+                            [attr.aria-label]="'Incluir ' + linea.descripcion"
+                          />
+                        </td>
+                      }
+                      <td>{{ linea.descripcion }}</td>
+                      <td class="num">
+                        @if (esMotivoParcial() && linea.seleccionado) {
+                          <input
+                            type="number"
+                            min="0.0001"
+                            step="1"
+                            [max]="linea.cantidadMax"
+                            [value]="linea.cantidad"
+                            (change)="onCantidadLinea(linea.key, $any($event.target).value)"
+                            (input)="onCantidadLinea(linea.key, $any($event.target).value)"
+                          />
+                          <span class="nc-items__max">/ {{ linea.cantidadMax }}</span>
+                        } @else {
+                          {{ linea.cantidadMax }}
+                        }
+                      </td>
+                      <td class="num">{{ linea.precioUnitario | soles }}</td>
+                      <td class="num">
+                        {{
+                          (esMotivoParcial() && linea.seleccionado
+                            ? linea.cantidad * linea.precioUnitario
+                            : linea.totalMax
+                          ) | soles
+                        }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="nc-items__totales">
+              <span>Total origen {{ totalOrigen() | soles }}</span>
+              <strong>Total NC {{ totalNc() | soles }}</strong>
+            </div>
+          </div>
+        }
+      }
+      @if (error()) {
+        <p class="dialog__error">{{ error() }}</p>
+      }
+      @if (notaCredito(); as nc) {
+        <div class="dialog__resultado" [attr.data-estado]="nc.estado">
+          <p>
+            <strong>{{ numeroDe(nc) }}</strong>
+            <span>{{ etiquetasEstado[nc.estado] }}</span>
+          </p>
+          <p>
+            {{ nc.descripcionMotivo || nc.mensaje }}
+            @if (nc.total != null) {
+              · {{ nc.total | soles }}
+            }
+            @if (nc.documentoReferencia) {
+              · Ref. {{ nc.documentoReferencia }}
+            }
+          </p>
+        </div>
+      }
+    </div>
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+      @if (notaCredito(); as nc) {
+        <button type="button" class="ghost" [disabled]="!puedeXml(nc)" (click)="descargarXml('nc')">
+          XML
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedeCdr(nc)" (click)="descargarCdr('nc')">
+          CDR
+        </button>
+        <button type="button" class="ghost" [disabled]="!puedePdf(nc)" (click)="abrirPdf('a4', 'nc')">
+          PDF
+        </button>
+      } @else if (puedeEmitirNc()) {
+        <button
+          type="button"
+          class="primary"
+          [disabled]="enviando() || totalNc() <= 0"
+          (click)="emitirNotaCredito()"
+        >
+          @if (enviando()) {
+            Emitiendo NC…
+          } @else {
+            Emitir NC · {{ totalNc() | soles }}
+          }
         </button>
       }
     </footer>

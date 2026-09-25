@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Trunqi TCG ù logo oficial vectorial para documentos (boletas, facturas, etiquetas SUNAT).
+  ù Fondo transparente ù sin reborde blanco
+  ù ùrea de seguridad uniforme (~8% del viewBox)
+  ù Eje de simetrùa vertical en x=320
+
+  Paleta print-safe (RGB ? CMYK):
+    Azul real   #0A4EA8  ? C95 M70 Y0  K5
+    Azul borde  #083F8A  ? C100 M75 Y0 K15
+    Oro         #C9A227  ? C10 M25 Y90 K10
+    Negro       #1A1A1A  ? C0  M0  Y0  K90
+    Blanco      #FFFFFF  ? C0  M0  Y0  K0
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 640 560"
+     role="img"
+     aria-label="Trunqi TCG">
+  <title>Trunqi TCG</title>
+  <desc>Logo oficial Trunqi TCG ù cartas, espada, wordmark TRUNQI y subtùtulo TCG.</desc>
+
+  <g id="logo-mark">
+
+    <!-- ICONO: cartas + espada (centro 320, 148). Se apoya sobre el arco del banner. -->
+    <g id="icon" transform="translate(320 148)">
+      <!-- Carta trasera negra, rotada -14 grados, bien visible a la izquierda -->
+      <rect x="-68" y="-78" width="90" height="124" rx="10" ry="10"
+            fill="#1A1A1A" transform="rotate(-14)"/>
+      <!-- Carta delantera azul + borde oro -->
+      <rect x="-44" y="-72" width="88" height="124" rx="10" ry="10"
+            fill="#0A4EA8" stroke="#C9A227" stroke-width="8"/>
+      <!-- Espada blanca, contenida dentro del area azul de la carta -->
+      <g id="sword" fill="#FFFFFF">
+        <circle cx="0" cy="-42" r="6.5"/>
+        <rect x="-4" y="-42" width="8" height="20" rx="2"/>
+        <path d="M-24,-24 L24,-24 L24,-15 L14,-15 L9,-10 L-9,-10 L-14,-15 L-24,-15 Z"/>
+        <path d="M-8,-10 L8,-10 L5,36 L0,44 L-5,36 Z"/>
+      </g>
+    </g>
+
+    <!-- BANNER simetrico (eje x=320); arco superior bajo las cartas -->
+    <path id="banner"
+          fill="#0A4EA8"
+          stroke="#083F8A"
+          stroke-width="2.5"
+          stroke-linejoin="round"
+          d="M 100,248
+             C 100,228 160,216 320,216
+             C 480,216 540,228 540,248
+             L 586,304
+             L 540,344
+             L 456,344
+             L 428,364
+             C 404,380 356,390 320,390
+             C 284,390 236,380 212,364
+             L 184,344
+             L 100,344
+             L 54,304
+             Z"/>
+
+    <!-- TRUNQI: blanco, slant geometrico; leve offset X para centrado otico de italic -->
+    <g transform="translate(326 294) skewX(-12)">
+      <text x="0" y="0"
+            text-anchor="middle"
+            dominant-baseline="middle"
+            fill="#FFFFFF"
+            font-family="Arial Black, Impact, Helvetica Neue, Arial, sans-serif"
+            font-size="72"
+            font-weight="900"
+            letter-spacing="1.5">TRUNQI</text>
+    </g>
+
+    <!-- TCG: oro, centrado en la bolsa inferior -->
+    <text x="320" y="366"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          fill="#C9A227"
+          font-family="Arial Black, Impact, Helvetica Neue, Arial, sans-serif"
+          font-size="34"
+          font-weight="900"
+          letter-spacing="8">TCG</text>
+  </g>
+</svg>

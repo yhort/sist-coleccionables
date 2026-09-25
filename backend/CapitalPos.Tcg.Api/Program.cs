@@ -18,6 +18,7 @@ using CapitalPos.Tcg.Api.Application.Proveedores;
 using CapitalPos.Tcg.Api.Application.Reportes;
 using CapitalPos.Tcg.Api.Application.Sedes;
 using CapitalPos.Tcg.Api.Application.Subastas;
+using CapitalPos.Tcg.Api.Application.Usuarios;
 using CapitalPos.Tcg.Api.Application.WooCommerce;
 using CapitalPos.Tcg.Api.Domain.Entities;
 using CapitalPos.Tcg.Api.Infrastructure;
@@ -79,7 +80,9 @@ builder.Services.AddHttpClient("WooCommerce", client =>
 builder.Services.AddScoped<ICpeEmisor, CpeEmisorRouter>();
 builder.Services.AddSingleton<ICpePdfGenerator, CpePdfGenerator>();
 builder.Services.AddScoped<IServicioFiscal, ServicioFiscal>();
+builder.Services.AddScoped<NotaCreditoImpactoService>();
 builder.Services.AddScoped<EcosistemaService>();
+builder.Services.AddScoped<UsuariosService>();
 builder.Services.AddScoped<ReportesService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<CajaService>();

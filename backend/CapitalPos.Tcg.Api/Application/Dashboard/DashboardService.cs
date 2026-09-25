@@ -175,6 +175,8 @@ public sealed class DashboardService(ApplicationDbContext db)
         EstadoPedidoDigital.PendienteEntrega => "Pendiente de entrega",
         EstadoPedidoDigital.Entregado => "Entregado",
         EstadoPedidoDigital.Cancelado => "Cancelado",
+        EstadoPedidoDigital.Anulado => "Anulado",
+        EstadoPedidoDigital.Devuelto => "Devuelto",
         _ => estado.ToString()
     };
 

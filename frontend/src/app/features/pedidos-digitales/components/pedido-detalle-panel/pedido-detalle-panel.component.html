@@ -33,13 +33,31 @@
       @if (pedido.codigoSubasta) {
         <p>Nació de la subasta <code>{{ pedido.codigoSubasta }}</code>.</p>
       }
-      @if (pedido.codigoVenta) {
+          @if (pedido.codigoVenta) {
         <p>Venta confirmada <code>{{ pedido.codigoVenta }}</code> — lista para CPE.</p>
+      } @else if (puedeEmitirCpe()) {
+        <p>Pedido pagado: puedes emitir boleta, factura o nota de venta desde aquí.</p>
       }
       @if (comprobante(); as cpe) {
         <p class="cpe" [attr.data-estado]="cpe.estado">
           SUNAT <strong>{{ numeroDe(cpe) }}</strong>
           · <span>{{ etiquetasCpe[cpe.estado] }}</span>
+        </p>
+      } @else if (pedido.comprobante; as resumen) {
+        <p class="cpe" [attr.data-estado]="resumen.estado">
+          CPE <strong>{{ etiquetaCpeEmitido() }}</strong>
+          · <span>{{ resumen.estado }}</span>
+        </p>
+      }
+      @if (pedido.notaCredito; as nc) {
+        <p class="cpe cpe--nc" [attr.data-estado]="nc.estado">
+          Nota de crédito <strong>{{ etiquetaNumeroCpe(nc) }}</strong>
+          · {{ nc.descripcionMotivo || nc.codigoMotivo || 'Anulación' }}
+          · <span>{{ nc.estado }}</span>
+        </p>
+        <p class="hint-bloqueado">
+          Pedido {{ etiquetasEstado[pedido.estado] }}. Empaque, despacho y nueva facturación
+          bloqueados.
         </p>
       }
     </section>
@@ -188,14 +206,30 @@
           Registrar pago
         </button>
       }
-      <button
-        type="button"
-        class="ghost"
-        (click)="abrirCpe()"
-        [disabled]="pedido.estado !== 'Entregado' || !pedido.ventaId"
-      >
-        {{ comprobante()?.estado === 'ACEPTADO' || comprobante()?.estado === 'PENDIENTE_CONSOLIDAR' || comprobante()?.estado === 'CONSOLIDADA' ? 'Ver comprobante' : 'Emitir comprobante' }}
-      </button>
+      @if (cpeYaEmitido()) {
+        <span class="cpe-badge">CPE Emitido: {{ etiquetaCpeEmitido() }}</span>
+        <button type="button" class="ghost" (click)="abrirCpe()" [disabled]="!puedeEmitirCpe()">
+          Ver comprobante
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="ghost"
+          (click)="abrirCpe()"
+          [disabled]="!puedeEmitirCpe()"
+        >
+          Emitir comprobante
+        </button>
+      }
+      @if (puedeNotaCredito()) {
+        <button type="button" class="ghost ghost--danger" (click)="abrirNotaCredito()">
+          Emitir Nota de Crédito / Anular venta
+        </button>
+      } @else if (pedido.notaCredito) {
+        <button type="button" class="ghost" (click)="abrirNotaCredito()">
+          Ver nota de crédito
+        </button>
+      }
       @if (comprobante(); as cpe) {
         <button type="button" class="ghost" [disabled]="!puedeXml(cpe)" (click)="descargarXml()">
           XML

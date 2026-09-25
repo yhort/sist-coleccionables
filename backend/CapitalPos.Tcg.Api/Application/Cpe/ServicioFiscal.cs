@@ -44,8 +44,8 @@ public sealed class ServicioFiscal(
                 cancellationToken);
             if (existente is not null && tipo == existente.Tipo)
             {
-                if (tipo == TipoComprobanteSunat.NOTA_VENTA
-                    || (existente.Estado is EstadoEmisionSunat.ACEPTADO && !string.IsNullOrWhiteSpace(existente.Xml)))
+                if (EsEstadoCpeFinal(existente.Estado)
+                    || tipo == TipoComprobanteSunat.NOTA_VENTA)
                 {
                     return Map(existente, venta);
                 }
@@ -57,6 +57,18 @@ public sealed class ServicioFiscal(
                     existente.Tipo == TipoComprobanteSunat.NOTA_VENTA
                         ? "Esta venta ya tiene una nota de venta. Regularízala con Boleta Consolidada."
                         : "La venta ya tiene un comprobante de otro tipo.");
+            }
+        }
+
+        if (tipo == TipoComprobanteSunat.NOTA_CREDITO)
+        {
+            var ncExistente = venta.Comprobantes
+                .Where(c => c.Tipo == TipoComprobanteSunat.NOTA_CREDITO)
+                .OrderByDescending(c => c.FechaCreacion)
+                .FirstOrDefault();
+            if (ncExistente is not null && EsEstadoCpeFinal(ncExistente.Estado))
+            {
+                return Map(ncExistente, venta);
             }
         }
 
@@ -148,18 +160,42 @@ public sealed class ServicioFiscal(
         comprobante.FechaEnvioSunat = tipo == TipoComprobanteSunat.NOTA_VENTA ? null : ahora;
 
         await db.SaveChangesAsync(cancellationToken);
-        return Map(comprobante, venta);
+        var totalNc = tipo == TipoComprobanteSunat.NOTA_CREDITO ? payload.Total : (decimal?)null;
+        return Map(comprobante, venta, incluirArchivos: true, totalOverride: totalNc);
     }
 
     public async Task<ComprobanteResponse?> ObtenerPorVentaAsync(Guid ventaId, CancellationToken cancellationToken)
     {
-        var comprobante = await db.Comprobantes
+        var comprobantes = await db.Comprobantes
             .AsNoTracking()
             .Include(c => c.Venta).ThenInclude(v => v.Cliente)
             .Where(c => c.VentaId == ventaId)
             .OrderByDescending(c => c.FechaCreacion)
-            .FirstOrDefaultAsync(cancellationToken);
-        return comprobante is null ? null : Map(comprobante);
+            .ToListAsync(cancellationToken);
+        if (comprobantes.Count == 0)
+        {
+            return null;
+        }
+
+        // Preferir el documento de venta (boleta/factura/NV); la NC se consulta aparte si hace falta.
+        var documento = comprobantes.FirstOrDefault(c =>
+            c.Tipo is TipoComprobanteSunat.BOLETA
+                or TipoComprobanteSunat.FACTURA
+                or TipoComprobanteSunat.NOTA_VENTA);
+        return Map(documento ?? comprobantes[0]);
+    }
+
+    public async Task<IReadOnlyList<ComprobanteResponse>> ListarPorVentaAsync(
+        Guid ventaId,
+        CancellationToken cancellationToken)
+    {
+        var comprobantes = await db.Comprobantes
+            .AsNoTracking()
+            .Include(c => c.Venta).ThenInclude(v => v.Cliente)
+            .Where(c => c.VentaId == ventaId)
+            .OrderBy(c => c.FechaCreacion)
+            .ToListAsync(cancellationToken);
+        return comprobantes.Select(c => Map(c, incluirArchivos: false)).ToList();
     }
 
     public async Task<IReadOnlyList<ComprobanteResponse>> ListarAsync(CancellationToken cancellationToken)
@@ -326,9 +362,20 @@ public sealed class ServicioFiscal(
                     cliente.NumeroDocumento);
                 break;
             case TipoComprobanteSunat.NOTA_CREDITO:
-                if (nota is null || string.IsNullOrWhiteSpace(nota.DescripcionMotivo))
+                if (nota is null)
                 {
                     throw new BusinessRuleException("La nota de crédito exige motivo y descripción.");
+                }
+
+                nota.CodigoMotivo = Catalogo09Motivos.NormalizarCodigo(nota.CodigoMotivo);
+                nota.DescripcionMotivo = Catalogo09Motivos.ResolverDescripcion(
+                    nota.CodigoMotivo,
+                    nota.DescripcionMotivo);
+                Catalogo09Motivos.Validar(nota.CodigoMotivo, nota.DescripcionMotivo);
+                _ = ComprobanteOrigen(venta);
+                if (Catalogo09Motivos.EsDevolucionPorItem(nota.CodigoMotivo))
+                {
+                    _ = NotaCreditoLineas.Resolver(venta, nota);
                 }
 
                 break;
@@ -436,21 +483,40 @@ public sealed class ServicioFiscal(
             };
         }
 
-        var items = venta.Detalles.Select(d => new EmitirCpeItemDto
-        {
-            Codigo = d.CodigoSku,
-            Descripcion = d.Descripcion,
-            UnidadMedida = "NIU",
-            Cantidad = IgvCalculo.Round2(d.Cantidad),
-            ValorUnitario = IgvCalculo.Round2(d.ValorUnitario),
-            PrecioUnitario = IgvCalculo.Round2(d.PrecioUnitario),
-            Subtotal = IgvCalculo.Round2(d.Subtotal),
-            Igv = IgvCalculo.Round2(d.Igv),
-            Total = IgvCalculo.Round2(d.Total),
-            CodigoAfectacionIgv = string.IsNullOrWhiteSpace(d.CodigoAfectacionIgv)
-                ? "10"
-                : d.CodigoAfectacionIgv
-        }).ToList();
+        var lineasNc = tipo == TipoComprobanteSunat.NOTA_CREDITO
+            ? NotaCreditoLineas.Resolver(venta, nota)
+            : null;
+
+        var items = (lineasNc is null
+                ? venta.Detalles.Select(d => new EmitirCpeItemDto
+                {
+                    Codigo = d.CodigoSku,
+                    Descripcion = d.Descripcion,
+                    UnidadMedida = "NIU",
+                    Cantidad = IgvCalculo.Round2(d.Cantidad),
+                    ValorUnitario = IgvCalculo.Round2(d.ValorUnitario),
+                    PrecioUnitario = IgvCalculo.Round2(d.PrecioUnitario),
+                    Subtotal = IgvCalculo.Round2(d.Subtotal),
+                    Igv = IgvCalculo.Round2(d.Igv),
+                    Total = IgvCalculo.Round2(d.Total),
+                    CodigoAfectacionIgv = string.IsNullOrWhiteSpace(d.CodigoAfectacionIgv)
+                        ? "10"
+                        : d.CodigoAfectacionIgv
+                })
+                : lineasNc.Select(d => new EmitirCpeItemDto
+                {
+                    Codigo = d.CodigoSku,
+                    Descripcion = d.Descripcion,
+                    UnidadMedida = "NIU",
+                    Cantidad = d.Cantidad,
+                    ValorUnitario = d.ValorUnitario,
+                    PrecioUnitario = d.PrecioUnitario,
+                    Subtotal = d.Subtotal,
+                    Igv = d.Igv,
+                    Total = d.Total,
+                    CodigoAfectacionIgv = d.CodigoAfectacionIgv
+                }))
+            .ToList();
 
         var totalGravada = IgvCalculo.Round2(items.Where(i => i.CodigoAfectacionIgv == "10").Sum(i => i.Subtotal));
         var totalExonerada = IgvCalculo.Round2(items.Where(i => i.CodigoAfectacionIgv == "20").Sum(i => i.Subtotal));
@@ -503,12 +569,29 @@ public sealed class ServicioFiscal(
         };
     }
 
-    private static Comprobante ComprobanteOrigen(Venta venta) =>
-        venta.Comprobantes
+    private static Comprobante ComprobanteOrigen(Venta venta)
+    {
+        var origen = venta.Comprobantes
             .Where(c => c.Tipo is TipoComprobanteSunat.BOLETA or TipoComprobanteSunat.FACTURA)
             .OrderByDescending(c => c.FechaCreacion)
             .FirstOrDefault()
-        ?? throw new BusinessRuleException("La nota de crédito exige un comprobante de venta previo.");
+            ?? throw new BusinessRuleException(
+                "La nota de crédito exige una boleta o factura previa. Las notas de venta deben consolidarse primero.");
+
+        if (!EsEstadoCpeFinal(origen.Estado) && origen.Estado != EstadoEmisionSunat.SIMULADO)
+        {
+            throw new BusinessRuleException(
+                $"El comprobante {origen.Serie}-{origen.Correlativo:D8} no está aceptado ({origen.Estado}). No se puede emitir nota de crédito.");
+        }
+
+        return origen;
+    }
+
+    private static bool EsEstadoCpeFinal(EstadoEmisionSunat estado) =>
+        estado is EstadoEmisionSunat.ACEPTADO
+            or EstadoEmisionSunat.PENDIENTE_CONSOLIDAR
+            or EstadoEmisionSunat.CONSOLIDADA
+            or EstadoEmisionSunat.SIMULADO;
 
     private static DateTime FechaEmisionPeru(DateTimeOffset fecha)
     {
@@ -626,9 +709,26 @@ public sealed class ServicioFiscal(
     internal static ComprobanteResponse Map(
         Comprobante c,
         Venta? venta = null,
-        bool incluirArchivos = true)
+        bool incluirArchivos = true,
+        decimal? totalOverride = null)
     {
         venta ??= c.Venta;
+        decimal? total = totalOverride;
+        if (total is null && !string.IsNullOrWhiteSpace(c.PayloadJson) && c.Tipo == TipoComprobanteSunat.NOTA_CREDITO)
+        {
+            try
+            {
+                var payload = JsonSerializer.Deserialize<EmitirCpeRequest>(c.PayloadJson, Json);
+                if (payload is not null)
+                {
+                    total = payload.Total;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
         return new ComprobanteResponse
         {
             Id = c.Id,
@@ -646,7 +746,7 @@ public sealed class ServicioFiscal(
             DescripcionMotivo = c.DescripcionMotivo,
             DocumentoReferencia = c.DocumentoReferencia,
             ClienteNombre = venta?.Cliente?.Nombre,
-            Total = venta?.Total,
+            Total = total ?? venta?.Total,
             BoletaConsolidadaId = c.BoletaConsolidadaId,
             TieneXml = EsXml(c.Xml),
             TieneCdr = EsXml(c.Cdr) || EsZipBase64(c.Cdr),

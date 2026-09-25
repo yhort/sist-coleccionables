@@ -110,7 +110,8 @@ export interface ProductoTcg {
   codigoBarras: string | null;
   precioVenta: number;
   costo: number | null;
-  juego: JuegoTcg | '';
+  /** Código conocido (POKEMON/…) o etiqueta libre de juego/categoría. */
+  juego: string;
   activo: boolean;
   stockLocal: number;
   cartaCatalogoId: string | null;
@@ -123,7 +124,7 @@ export interface ProductoTcg {
 export interface ProductosTcgFiltros {
   busqueda: string;
   tipoProducto: TipoProductoTcg | 'TODOS';
-  juego: JuegoTcg | 'TODOS';
+  juego: string | 'TODOS';
   estadoStock: EstadoStock | 'TODOS';
   sincronizacionWoo: EstadoSincronizacionWoo | 'TODOS';
 }
@@ -205,6 +206,48 @@ export const ETIQUETAS_JUEGO: Record<JuegoTcg, string> = {
   MAGIC: 'Magic',
   YUGIOH: 'Yu-Gi-Oh!',
 };
+
+/** Etiqueta visible: código conocido → nombre; custom → tal cual. */
+export function etiquetaJuego(juego: string | null | undefined): string {
+  const valor = (juego ?? '').trim();
+  if (!valor) {
+    return '';
+  }
+  return ETIQUETAS_JUEGO[valor as JuegoTcg] ?? valor;
+}
+
+/** Texto que espera el API (siempre etiqueta legible). */
+export function juegoParaApi(juego: string | null | undefined): string {
+  const etiqueta = etiquetaJuego(juego);
+  return etiqueta || 'Pokémon';
+}
+
+/**
+ * Normaliza un juego desde API o input libre a valor de formulario:
+ * códigos conocidos si coincide; si no, la etiqueta trimmeada.
+ */
+export function normalizarJuego(valor?: string | null): string {
+  const texto = (valor ?? '').trim();
+  if (!texto) {
+    return '';
+  }
+  const lower = texto.toLowerCase();
+  for (const [codigo, etiqueta] of Object.entries(ETIQUETAS_JUEGO) as [JuegoTcg, string][]) {
+    if (codigo === texto || etiqueta.toLowerCase() === lower) {
+      return codigo;
+    }
+  }
+  if (lower.includes('pok')) {
+    return 'POKEMON';
+  }
+  if (lower.includes('magic')) {
+    return 'MAGIC';
+  }
+  if (lower.includes('yu') || lower.includes('gi-oh') || lower.includes('yugioh')) {
+    return 'YUGIOH';
+  }
+  return texto;
+}
 
 export const ETIQUETAS_RAREZA: Record<RarezaTcg, string> = {
   COMUN: 'Común',

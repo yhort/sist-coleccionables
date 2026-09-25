@@ -125,8 +125,25 @@ export function periodoMesActual(referencia = new Date()): ReportesPeriodo {
   };
 }
 
-export function franquiciaDeJuego(juego: JuegoTcg | ''): FranquiciaReporte {
-  return juego === 'POKEMON' || juego === 'MAGIC' || juego === 'YUGIOH' ? juego : 'OTROS';
+export function franquiciaDeJuego(juego: string | null | undefined): FranquiciaReporte {
+  const valor = (juego ?? '').trim();
+  if (!valor) {
+    return 'OTROS';
+  }
+  if (valor === 'POKEMON' || valor === 'MAGIC' || valor === 'YUGIOH') {
+    return valor;
+  }
+  const lower = valor.toLowerCase();
+  if (lower.includes('pok')) {
+    return 'POKEMON';
+  }
+  if (lower.includes('magic')) {
+    return 'MAGIC';
+  }
+  if (lower.includes('yu') || lower.includes('gi-oh') || lower.includes('yugioh')) {
+    return 'YUGIOH';
+  }
+  return 'OTROS';
 }
 
 export { round2 };

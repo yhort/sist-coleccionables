@@ -1,4 +1,4 @@
-<div class="dialog-backdrop" (click)="enviando() ? null : cancelled.emit()"></div>
+<div class="dialog-backdrop" (click)="enviando() || emision() || pagoConfirmadoSinCpe() ? null : cancelled.emit()"></div>
 
 <section
   class="dialog"
@@ -16,7 +16,12 @@
         por
         <strong>{{ total() | soles }}</strong
         >. Al confirmar, {{ pedidos().length === 1 ? 'el pedido pasa' : 'los pedidos pasan' }} a
-        Pagado.
+        Pagado
+        @if (form.controls.emitirComprobante.value) {
+          y se emite el comprobante electrónico.
+        } @else {
+          .
+        }
       </p>
     </div>
     <button
@@ -24,7 +29,7 @@
       class="dialog__close"
       aria-label="Cerrar"
       [disabled]="enviando()"
-      (click)="cancelled.emit()"
+      (click)="emision() || pagoConfirmadoSinCpe() ? cerrarTrasEmision() : cancelled.emit()"
     >
       ×
     </button>
@@ -46,55 +51,109 @@
     </li>
   </ul>
 
-  <form [formGroup]="form" (ngSubmit)="guardar()">
-    <div class="dialog__grid">
-      <label>
-        Origen
-        <select formControlName="origen">
-          @for (origen of origenes; track origen) {
-            <option [value]="origen">{{ etiquetasOrigen[origen] }}</option>
-          }
-        </select>
-      </label>
-      <label>
-        Código de operación
-        <input
-          type="text"
-          formControlName="codigoOperacion"
-          maxlength="80"
-          placeholder="Nro. Yape / Plin / CCI"
-        />
-      </label>
-      <label class="wide">
-        Comprobante / voucher
-        <input
-          type="text"
-          formControlName="referenciaExterna"
-          maxlength="120"
-          placeholder="Captura, constancia o referencia"
-        />
-      </label>
-      <label class="wide">
-        Observación
-        <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
-      </label>
+  @if (emision(); as emision) {
+    <div class="dialog__resultado" [attr.data-estado]="emision.estado">
+      <p>
+        Pago confirmado ·
+        <strong>{{ numeroDe(emision) }}</strong>
+        <span>{{ etiquetasEstado[emision.estado] }}</span>
+      </p>
+      <p>{{ emision.mensaje }}</p>
     </div>
-
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }
-
     <footer class="dialog__footer">
-      <button type="button" class="ghost" [disabled]="enviando()" (click)="cancelled.emit()">
-        Cancelar
+      <button type="button" class="ghost" [disabled]="!puedeXml(emision)" (click)="descargarXml()">
+        XML
       </button>
-      <button type="submit" class="primary" [disabled]="enviando()">
-        @if (enviando()) {
-          Registrando…
-        } @else {
-          Confirmar pago {{ total() | soles }}
-        }
+      <button type="button" class="ghost" [disabled]="!puedeCdr(emision)" (click)="descargarCdr()">
+        CDR
       </button>
+      <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('a4')">
+        PDF
+      </button>
+      <button type="button" class="ghost" [disabled]="!puedePdf(emision)" (click)="abrirPdf('ticket')">
+        Ticket
+      </button>
+      <button type="button" class="primary" (click)="cerrarTrasEmision()">Listo</button>
     </footer>
-  </form>
+  } @else if (pagoConfirmadoSinCpe()) {
+    @if (aviso()) {
+      <p class="aviso">{{ aviso() }}</p>
+    }
+    <footer class="dialog__footer">
+      <button type="button" class="primary" (click)="cerrarTrasEmision()">Cerrar</button>
+    </footer>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="guardar()">
+      <div class="dialog__grid">
+        <label>
+          Origen
+          <select formControlName="origen">
+            @for (origen of origenes; track origen) {
+              <option [value]="origen">{{ etiquetasOrigen[origen] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Código de operación
+          <input
+            type="text"
+            formControlName="codigoOperacion"
+            maxlength="80"
+            placeholder="Nro. Yape / Plin / CCI"
+          />
+        </label>
+        <label class="wide">
+          Comprobante / voucher
+          <input
+            type="text"
+            formControlName="referenciaExterna"
+            maxlength="120"
+            placeholder="Captura, constancia o referencia"
+          />
+        </label>
+        <label class="wide">
+          Observación
+          <textarea formControlName="observacion" rows="2" maxlength="500"></textarea>
+        </label>
+        <label class="wide dialog__cpe-check">
+          <span class="dialog__cpe-check-row">
+            <input type="checkbox" formControlName="emitirComprobante" />
+            Emitir comprobante electrónico al confirmar el pago
+          </span>
+        </label>
+        @if (form.controls.emitirComprobante.value) {
+          <label class="wide">
+            Tipo de comprobante
+            <select formControlName="tipoComprobante">
+              @for (tipo of tipos; track tipo) {
+                <option [value]="tipo">{{ etiquetasCpe[tipo] }}</option>
+              }
+            </select>
+          </label>
+        }
+      </div>
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+
+      <footer class="dialog__footer">
+        <button type="button" class="ghost" [disabled]="enviando()" (click)="cancelled.emit()">
+          Cancelar
+        </button>
+        <button type="submit" class="primary" [disabled]="enviando()">
+          @if (enviando()) {
+            {{ form.controls.emitirComprobante.value ? 'Registrando y emitiendo…' : 'Registrando…' }}
+          } @else if (form.controls.emitirComprobante.value) {
+            Confirmar pago y emitir {{ etiquetasCpe[form.controls.tipoComprobante.value].toLowerCase() }}
+          } @else {
+            Confirmar pago {{ total() | soles }}
+          }
+        </button>
+      </footer>
+    </form>
+  }
 </section>

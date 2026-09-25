@@ -2,15 +2,16 @@
   <article class="login__card">
     <p class="login__eyebrow">CapitalPOS · Trunqi TCG</p>
     <h1>Iniciar sesión</h1>
-    <p class="login__lead">
-      El POS habla solo con <code>CapitalPos.Tcg.Api</code>. La clave SUNAT nunca sale del
-      servidor.
-    </p>
 
     <form [formGroup]="form" (ngSubmit)="entrar()">
       <label>
-        Correo
-        <input type="email" formControlName="email" autocomplete="username" />
+        Correo / DNI / Usuario
+        <input
+          type="text"
+          formControlName="email"
+          autocomplete="username"
+          placeholder="correo, DNI o usuario"
+        />
       </label>
       <label>
         Contraseña

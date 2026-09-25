@@ -183,7 +183,9 @@
       (transicionarLote)="transicionarLote($event)"
       (registrarPago)="abrirPagoLote($event)"
       (emitirCpe)="abrirCpeLote($event)"
+      (emitirNotaCredito)="abrirNotaCreditoLote($event)"
       (imprimirEtiquetas)="abrirEtiquetas($event)"
+      (verConsolidadoEmpaque)="abrirConsolidadoEmpaque($event)"
       (anular)="anular($event)"
       (marcarNotificados)="onMarcarNotificados($event)"
       (toggleNotificacion)="onToggleNotificacion($event)"
@@ -224,6 +226,18 @@
   />
 }
 
+@if (notaCreditoLote(); as pedidoNc) {
+  <app-pedido-accion-preparada-dialog
+    tipo="nota-credito"
+    [pedido]="pedidoNc"
+    (closed)="cerrarNotaCreditoLote()"
+  />
+}
+
 @if (etiquetasLote(); as pedidos) {
   <app-pedido-etiqueta-dialog [pedidos]="pedidos" (closed)="cerrarEtiquetas()" />
+}
+
+@if (consolidadoEmpaque(); as pedidos) {
+  <app-empaque-consolidado-dialog [pedidos]="pedidos" (closed)="cerrarConsolidadoEmpaque()" />
 }

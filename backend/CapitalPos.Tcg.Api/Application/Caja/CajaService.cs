@@ -1,5 +1,7 @@
 using CapitalPos.Tcg.Api.Application.Comercial;
+using CapitalPos.Tcg.Api.Application.Cpe;
 using CapitalPos.Tcg.Api.Contracts.Caja;
+using CapitalPos.Tcg.Api.Contracts.Cpe;
 using CapitalPos.Tcg.Api.Domain.Entities;
 using CapitalPos.Tcg.Api.Domain.Enums;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
@@ -354,6 +356,100 @@ public sealed class CajaService(
         return sede;
     }
 
+    /// <summary>
+    /// Registra egreso de auditoría por NC.
+    /// Anulación total (01/06): prefijo [NC-REV] (no altera teórico; la venta se excluye del arqueo).
+    /// Parcial (07): prefijo [NC-PARCIAL] y sí resta del teórico el monto de la NC.
+    /// </summary>
+    public async Task RegistrarReversoNotaCreditoAsync(
+        Venta venta,
+        ComprobanteResponse notaCredito,
+        string? codigoMotivo,
+        bool anulacionTotal,
+        CancellationToken cancellationToken)
+    {
+        var marca = anulacionTotal
+            ? $"[NC-REV]{notaCredito.Id:N}"
+            : $"[NC-PARCIAL]{notaCredito.Id:N}";
+        var existe = await db.CajaMovimientos.AnyAsync(
+            m => m.Concepto.StartsWith(marca),
+            cancellationToken);
+        if (existe)
+        {
+            return;
+        }
+
+        CajaSesion? sesion = null;
+        if (venta.CajaSesionId is { } sesionId && sesionId != Guid.Empty)
+        {
+            sesion = await db.CajaSesiones
+                .Include(s => s.Movimientos)
+                .Include(s => s.Ventas)
+                    .ThenInclude(v => v.Comprobantes)
+                .Include(s => s.Ventas)
+                    .ThenInclude(v => v.Pagos)
+                .FirstOrDefaultAsync(s => s.Id == sesionId, cancellationToken);
+            if (sesion is { Estado: not EstadoCajaSesion.ABIERTA })
+            {
+                sesion = null;
+            }
+        }
+
+        if (sesion is null)
+        {
+            sesion = await db.CajaSesiones
+                .Include(s => s.Movimientos)
+                .Include(s => s.Ventas)
+                    .ThenInclude(v => v.Comprobantes)
+                .Include(s => s.Ventas)
+                    .ThenInclude(v => v.Pagos)
+                .FirstOrDefaultAsync(
+                    s => s.SedeId == venta.SedeId && s.Estado == EstadoCajaSesion.ABIERTA,
+                    cancellationToken);
+        }
+
+        if (sesion is null)
+        {
+            return;
+        }
+
+        var monto = IgvCalculo.Round2(notaCredito.Total ?? 0);
+        if (monto <= 0)
+        {
+            var pagos = IgvCalculo.Round2(venta.Pagos.Sum(p => p.Monto));
+            monto = pagos > 0 ? pagos : IgvCalculo.Round2(venta.Total);
+        }
+
+        if (monto <= 0)
+        {
+            return;
+        }
+
+        var etiqueta = $"{notaCredito.Serie}-{notaCredito.Correlativo:00000000}";
+        var tipoTxt = anulacionTotal ? "anulación" : "devolución parcial";
+        var concepto =
+            $"{marca} Reversión NC {etiqueta} · {tipoTxt} · motivo {Catalogo09Motivos.NormalizarCodigo(codigoMotivo)}";
+        if (concepto.Length > 200)
+        {
+            concepto = concepto[..200];
+        }
+
+        var movimiento = new CajaMovimiento
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = tenant.EmpresaId,
+            CajaSesionId = sesion.Id,
+            Tipo = TipoCajaMovimiento.EGRESO,
+            Monto = monto,
+            Concepto = concepto,
+            UsuarioId = currentUser.UserId,
+            Fecha = DateTimeOffset.UtcNow
+        };
+        db.CajaMovimientos.Add(movimiento);
+        sesion.Movimientos.Add(movimiento);
+        sesion.MontoEfectivoTeorico = CalcularTeorico(sesion);
+    }
+
     private IQueryable<CajaSesion> QueryBase() =>
         db.CajaSesiones
             .AsSplitQuery()
@@ -441,8 +537,10 @@ public sealed class CajaService(
             })
             .ToList();
 
-        var ingresos = IgvCalculo.Round2(sesion.Movimientos.Where(m => m.Tipo == TipoCajaMovimiento.INGRESO).Sum(m => m.Monto));
-        var egresos = IgvCalculo.Round2(sesion.Movimientos.Where(m => m.Tipo == TipoCajaMovimiento.EGRESO).Sum(m => m.Monto));
+        var ingresos = IgvCalculo.Round2(sesion.Movimientos
+            .Where(m => m.Tipo == TipoCajaMovimiento.INGRESO)
+            .Sum(m => m.Monto));
+        var egresos = IgvCalculo.Round2(EgresosQueAfectanTeorico(sesion).Sum(m => m.Monto));
         var ventasEfectivo = IgvCalculo.Round2(pagos.Where(p => p.Origen == OrigenPago.EFECTIVO).Sum(p => p.Monto));
         var teorico = CalcularTeorico(sesion);
         var diferencia = sesion.Diferencia ?? (sesion.MontoEfectivoReal is { } real
@@ -510,7 +608,23 @@ public sealed class CajaService(
         };
 
     private static List<Venta> VentasDeTurno(CajaSesion sesion) =>
-        sesion.Ventas.Where(v => !v.EsConsolidacion).ToList();
+        sesion.Ventas
+            .Where(v => !v.EsConsolidacion && !TieneNotaCreditoFinal(v))
+            .ToList();
+
+    private static bool TieneNotaCreditoFinal(Venta venta) =>
+        venta.Comprobantes.Any(c =>
+            c.Tipo == TipoComprobanteSunat.NOTA_CREDITO
+            && c.Estado is EstadoEmisionSunat.ACEPTADO or EstadoEmisionSunat.SIMULADO
+            && Catalogo09Motivos.EsDocumentoCompleto(c.CodigoMotivo));
+
+    private static bool EsEgresoReversoNc(CajaMovimiento movimiento) =>
+        movimiento.Tipo == TipoCajaMovimiento.EGRESO
+        && movimiento.Concepto.StartsWith("[NC-REV]", StringComparison.Ordinal);
+
+    private static IEnumerable<CajaMovimiento> EgresosQueAfectanTeorico(CajaSesion sesion) =>
+        sesion.Movimientos.Where(m =>
+            m.Tipo == TipoCajaMovimiento.EGRESO && !EsEgresoReversoNc(m));
 
     private static decimal CalcularTeorico(CajaSesion sesion, CajaMovimiento? extra = null)
     {
@@ -519,14 +633,14 @@ public sealed class CajaService(
             .Where(p => p.Origen == OrigenPago.EFECTIVO)
             .Sum(p => p.Monto);
         var ingresos = sesion.Movimientos.Where(m => m.Tipo == TipoCajaMovimiento.INGRESO).Sum(m => m.Monto);
-        var egresos = sesion.Movimientos.Where(m => m.Tipo == TipoCajaMovimiento.EGRESO).Sum(m => m.Monto);
-        if (extra is not null)
+        var egresos = EgresosQueAfectanTeorico(sesion).Sum(m => m.Monto);
+        if (extra is not null && !EsEgresoReversoNc(extra))
         {
             if (extra.Tipo == TipoCajaMovimiento.INGRESO)
             {
                 ingresos += extra.Monto;
             }
-            else
+            else if (extra.Tipo == TipoCajaMovimiento.EGRESO)
             {
                 egresos += extra.Monto;
             }

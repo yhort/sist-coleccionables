@@ -1,8 +1,11 @@
 import { DecimalPipe } from '@angular/common';
 import {
   Component,
+  ElementRef,
   HostListener,
   OnInit,
+  ViewChild,
+  computed,
   inject,
   input,
   output,
@@ -35,15 +38,29 @@ export class IngresoCompraDialogComponent implements OnInit {
   readonly saved = output<void>();
   readonly cancelled = output<void>();
 
+  @ViewChild('buscadorInput') private buscadorInput?: ElementRef<HTMLInputElement>;
+
   readonly error = signal('');
   readonly proveedores = this.proveedoresApi.proveedores;
   readonly etiquetaProveedor = etiquetaProveedor;
+  readonly busqueda = signal('');
+  readonly listaAbierta = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     proveedorId: ['', Validators.required],
     sedeId: ['', Validators.required],
     observacion: [''],
-    detalles: this.fb.array([this.nuevaLinea()]),
+    detalles: this.fb.array([]),
+  });
+
+  readonly candidatos = computed(() => {
+    const q = this.busqueda().trim().toLowerCase();
+    if (q.length < 1) {
+      return [];
+    }
+    return this.productos()
+      .filter((producto) => this.coincideProducto(producto, q))
+      .slice(0, 12);
   });
 
   get detalles(): FormArray {
@@ -60,17 +77,58 @@ export class IngresoCompraDialogComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.listaAbierta()) {
+      this.listaAbierta.set(false);
+      return;
+    }
     this.cancelled.emit();
   }
 
-  agregarLinea(): void {
-    this.detalles.push(this.nuevaLinea());
+  onBusqueda(valor: string): void {
+    this.busqueda.set(valor);
+    this.listaAbierta.set(true);
+  }
+
+  agregarProducto(producto: ProductoTcg): void {
+    const existente = this.detalles.controls.find(
+      (control) => control.get('productoId')?.value === producto.id,
+    );
+    if (existente) {
+      const actual = Number(existente.get('cantidad')?.value) || 0;
+      existente.get('cantidad')?.setValue(actual + 1);
+    } else {
+      const costo =
+        producto.costo != null && Number.isFinite(producto.costo) ? Number(producto.costo) : 0;
+      this.detalles.push(
+        this.fb.nonNullable.group({
+          productoId: [producto.id, Validators.required],
+          cantidad: [1, [Validators.required, Validators.min(0.001)]],
+          costoUnitario: [costo, [Validators.required, Validators.min(0)]],
+        }),
+      );
+    }
+
+    this.busqueda.set('');
+    this.listaAbierta.set(false);
+    queueMicrotask(() => this.buscadorInput?.nativeElement.focus());
+  }
+
+  onBusquedaEnter(): void {
+    const primero = this.candidatos()[0];
+    if (primero) {
+      this.agregarProducto(primero);
+    }
+  }
+
+  nombreProducto(productoId: string): string {
+    const producto = this.productos().find((item) => item.id === productoId);
+    if (!producto) {
+      return productoId;
+    }
+    return `${producto.nombre} (${producto.codigoSku})`;
   }
 
   quitarLinea(index: number): void {
-    if (this.detalles.length === 1) {
-      return;
-    }
     this.detalles.removeAt(index);
   }
 
@@ -84,8 +142,13 @@ export class IngresoCompraDialogComponent implements OnInit {
   async guardar(): Promise<void> {
     this.form.markAllAsTouched();
     this.error.set('');
+    if (this.detalles.length === 0) {
+      this.error.set('Agrega al menos un producto con el buscador.');
+      this.buscadorInput?.nativeElement.focus();
+      return;
+    }
     if (this.form.invalid) {
-      this.error.set('Selecciona proveedor, sede e ítems.');
+      this.error.set('Selecciona proveedor, sede e ítems válidos.');
       return;
     }
     const raw = this.form.getRawValue();
@@ -94,10 +157,10 @@ export class IngresoCompraDialogComponent implements OnInit {
         proveedorId: raw.proveedorId,
         sedeId: raw.sedeId,
         observacion: raw.observacion || null,
-        detalles: raw.detalles.map((linea) => ({
-          productoId: linea.productoId,
-          cantidad: Number(linea.cantidad),
-          costoUnitario: Number(linea.costoUnitario),
+        detalles: this.detalles.controls.map((control) => ({
+          productoId: String(control.get('productoId')?.value ?? ''),
+          cantidad: Number(control.get('cantidad')?.value),
+          costoUnitario: Number(control.get('costoUnitario')?.value),
         })),
       });
       await this.stockApi.refrescarSede(raw.sedeId).catch(() => undefined);
@@ -107,11 +170,12 @@ export class IngresoCompraDialogComponent implements OnInit {
     }
   }
 
-  private nuevaLinea() {
-    return this.fb.nonNullable.group({
-      productoId: ['', Validators.required],
-      cantidad: [1, [Validators.required, Validators.min(0.001)]],
-      costoUnitario: [0, [Validators.required, Validators.min(0)]],
-    });
+  private coincideProducto(producto: ProductoTcg, q: string): boolean {
+    return (
+      producto.nombre.toLowerCase().includes(q) ||
+      producto.codigoSku.toLowerCase().includes(q) ||
+      (producto.codigoBarras ?? '').toLowerCase().includes(q) ||
+      (producto.woo.sku || '').toLowerCase().includes(q)
+    );
   }
 }

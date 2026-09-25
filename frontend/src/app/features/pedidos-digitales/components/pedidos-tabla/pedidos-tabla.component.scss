@@ -89,6 +89,20 @@
   font-weight: 700;
 }
 
+.tabla__lote-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-md);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .tabla__lote-acciones {
   display: flex;
   flex-wrap: wrap;
@@ -187,7 +201,9 @@
     background: color-mix(in srgb, #dcfce7 36%, white);
   }
 
-  tbody tr[data-estado='Cancelado'] td {
+  tbody tr[data-estado='Cancelado'] td,
+  tbody tr[data-estado='Anulado'] td,
+  tbody tr[data-estado='Devuelto'] td {
     background: color-mix(in srgb, #fee2e2 34%, white);
     opacity: 0.88;
   }
@@ -390,7 +406,9 @@
     background: #dcfce7;
   }
 
-  &[data-estado='Cancelado'] {
+  &[data-estado='Cancelado'],
+  &[data-estado='Anulado'],
+  &[data-estado='Devuelto'] {
     color: #991b1b;
     background: #fee2e2;
   }
@@ -494,6 +512,17 @@
 
   &:hover:not(:disabled) {
     border-color: var(--color-primary);
+  }
+
+  &--danger {
+    color: #991b1b;
+    border-color: #fecaca;
+    background: #fef2f2;
+
+    &:hover:not(:disabled) {
+      border-color: #f87171;
+      background: #fee2e2;
+    }
   }
 }
 

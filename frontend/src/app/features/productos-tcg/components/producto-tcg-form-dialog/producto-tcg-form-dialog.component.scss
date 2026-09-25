@@ -234,6 +234,21 @@ textarea {
   font-weight: 600;
 }
 
+.juego-field {
+  &__nuevo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.45rem;
+    align-items: center;
+  }
+
+  .hint {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+}
+
 .atributos {
   padding-top: 0.25rem;
 }

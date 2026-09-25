@@ -68,6 +68,9 @@ export class SubastaFormDialogComponent implements OnInit, OnDestroy {
   /** Compat: mismos ítems que `loteItems`. */
   readonly lineas = this.loteItems;
 
+  /** IDs ya en el lote (para omitirlos en la carga masiva por set). */
+  readonly idsEnLote = computed(() => this.loteItems().map((l) => l.productoId));
+
   readonly form = this.fb.nonNullable.group({
     titulo: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200)]],
     sedeId: ['', Validators.required],
@@ -203,13 +206,9 @@ export class SubastaFormDialogComponent implements OnInit, OnDestroy {
     this.limpiarPicker();
   }
 
-  /** Carga masiva de un set/prefijo (modo Individuales). Omite SKUs ya presentes en el lote. */
+  /** Carga masiva de un set/prefijo. Omite SKUs ya presentes en el lote. */
   agregarSetAlLote(productos: ProductoTcg[]): void {
     this.error.set('');
-    if (this.modoCreacion() !== 'INDIVIDUALES') {
-      this.error.set('La carga masiva de set solo está disponible en subastas individuales.');
-      return;
-    }
     if (productos.length === 0) {
       return;
     }

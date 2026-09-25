@@ -11,7 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { ProductoTcg } from '../../../productos-tcg/models/producto-tcg.model';
 import {
@@ -23,9 +23,18 @@ import {
 } from '../../models/inventario.model';
 import { StockApiService } from '../../data-access/stock.service';
 
+interface OpcionProductoAjuste {
+  id: string;
+  nombre: string;
+  codigoSku: string;
+  codigoBarras: string | null;
+  wooSku: string;
+  tipoProducto: ProductoTcg['tipoProducto'] | StockFila['tipoProducto'];
+}
+
 @Component({
   selector: 'app-ajuste-stock-dialog',
-  imports: [FormsModule, ReactiveFormsModule, DecimalPipe],
+  imports: [ReactiveFormsModule, DecimalPipe],
   templateUrl: './ajuste-stock-dialog.component.html',
   styleUrl: './ajuste-stock-dialog.component.scss',
 })
@@ -43,7 +52,9 @@ export class AjusteStockDialogComponent implements OnInit {
   readonly etiquetas = ETIQUETAS_MOVIMIENTO;
   readonly error = signal('');
   readonly stockActual = signal<StockFila | null>(null);
-  readonly busquedaProducto = signal('');
+  readonly busqueda = signal('');
+  readonly listaAbierta = signal(false);
+  readonly productoSeleccionado = signal<OpcionProductoAjuste | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     sedeId: ['', Validators.required],
@@ -54,9 +65,8 @@ export class AjusteStockDialogComponent implements OnInit {
   });
 
   /** Catálogo activo + fila preseleccionada (productos nuevos sin stock previo). */
-  readonly opcionesProducto = computed(() => {
-    const q = this.busquedaProducto().trim().toLowerCase();
-    const porId = new Map<string, { id: string; nombre: string; codigoSku: string }>();
+  private readonly catalogoOpciones = computed(() => {
+    const porId = new Map<string, OpcionProductoAjuste>();
 
     for (const producto of this.productos()) {
       if (!producto.activo) {
@@ -66,6 +76,9 @@ export class AjusteStockDialogComponent implements OnInit {
         id: producto.id,
         nombre: producto.nombre,
         codigoSku: producto.codigoSku,
+        codigoBarras: producto.codigoBarras,
+        wooSku: producto.woo.sku || '',
+        tipoProducto: producto.tipoProducto,
       });
     }
 
@@ -75,17 +88,23 @@ export class AjusteStockDialogComponent implements OnInit {
         id: inicial.productoId,
         nombre: inicial.productoNombre,
         codigoSku: inicial.codigoSku,
+        codigoBarras: null,
+        wooSku: '',
+        tipoProducto: inicial.tipoProducto,
       });
     }
 
-    return [...porId.values()]
-      .filter((item) => {
-        if (!q) {
-          return true;
-        }
-        return `${item.nombre} ${item.codigoSku}`.toLowerCase().includes(q);
-      })
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    return [...porId.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  });
+
+  readonly candidatos = computed(() => {
+    const q = this.busqueda().trim().toLowerCase();
+    if (q.length < 1) {
+      return [];
+    }
+    return this.catalogoOpciones()
+      .filter((item) => this.coincideProducto(item, q))
+      .slice(0, 12);
   });
 
   ngOnInit(): void {
@@ -96,6 +115,15 @@ export class AjusteStockDialogComponent implements OnInit {
         productoId: inicial.productoId,
         sentido: 'ENTRADA',
       });
+      this.productoSeleccionado.set({
+        id: inicial.productoId,
+        nombre: inicial.productoNombre,
+        codigoSku: inicial.codigoSku,
+        codigoBarras: null,
+        wooSku: '',
+        tipoProducto: inicial.tipoProducto,
+      });
+      this.busqueda.set(`${inicial.codigoSku} · ${inicial.productoNombre}`);
       this.stockActual.set(inicial);
     } else if (this.sedes()[0]) {
       this.form.patchValue({ sedeId: this.sedes()[0].id });
@@ -117,13 +145,50 @@ export class AjusteStockDialogComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.listaAbierta()) {
+      this.listaAbierta.set(false);
+      return;
+    }
     this.cancelled.emit();
+  }
+
+  onBusqueda(valor: string): void {
+    this.busqueda.set(valor);
+    this.listaAbierta.set(true);
+    if (this.productoSeleccionado()) {
+      this.productoSeleccionado.set(null);
+      this.form.controls.productoId.setValue('');
+    }
+  }
+
+  seleccionarProducto(producto: OpcionProductoAjuste): void {
+    this.productoSeleccionado.set(producto);
+    this.form.controls.productoId.setValue(producto.id);
+    this.busqueda.set(`${producto.codigoSku} · ${producto.nombre}`);
+    this.listaAbierta.set(false);
+  }
+
+  onBusquedaEnter(): void {
+    const primero = this.candidatos()[0];
+    if (primero) {
+      this.seleccionarProducto(primero);
+    }
+  }
+
+  limpiarProducto(): void {
+    this.productoSeleccionado.set(null);
+    this.form.controls.productoId.setValue('');
+    this.busqueda.set('');
+    this.listaAbierta.set(false);
   }
 
   async guardar(): Promise<void> {
     this.form.markAllAsTouched();
     this.error.set('');
     if (this.form.invalid) {
+      if (!this.form.controls.productoId.value) {
+        this.error.set('Busca y selecciona un producto.');
+      }
       return;
     }
 
@@ -145,6 +210,15 @@ export class AjusteStockDialogComponent implements OnInit {
     }
   }
 
+  private coincideProducto(producto: OpcionProductoAjuste, q: string): boolean {
+    return (
+      producto.nombre.toLowerCase().includes(q) ||
+      producto.codigoSku.toLowerCase().includes(q) ||
+      (producto.codigoBarras ?? '').toLowerCase().includes(q) ||
+      producto.wooSku.toLowerCase().includes(q)
+    );
+  }
+
   private refrescarStock(): void {
     const sedeId = this.form.controls.sedeId.value;
     const productoId = this.form.controls.productoId.value;
@@ -157,7 +231,10 @@ export class AjusteStockDialogComponent implements OnInit {
       this.stockActual.set(fila);
       return;
     }
-    const opcion = this.opcionesProducto().find((item) => item.id === productoId);
+    const opcion =
+      this.productoSeleccionado()?.id === productoId
+        ? this.productoSeleccionado()
+        : this.catalogoOpciones().find((item) => item.id === productoId);
     const sedeNombre = this.sedes().find((s) => s.id === sedeId)?.nombre ?? '';
     this.stockActual.set(
       opcion
@@ -168,7 +245,7 @@ export class AjusteStockDialogComponent implements OnInit {
             productoId,
             productoNombre: opcion.nombre,
             codigoSku: opcion.codigoSku,
-            tipoProducto: this.stockInicial()?.tipoProducto ?? 'ACCESORIO',
+            tipoProducto: opcion.tipoProducto,
             cantidadDisponible: 0,
             cantidadReservada: 0,
             cantidadLibre: 0,

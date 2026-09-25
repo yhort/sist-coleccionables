@@ -16,6 +16,7 @@ public sealed class EcosistemaService(
     ApplicationDbContext db,
     ITenantProvider tenant,
     IServicioFiscal fiscal,
+    NotaCreditoImpactoService notaCreditoImpacto,
     ICpeEmisor cpeEmisor,
     IOptions<CpeApiOptions> cpeOptions)
 {
@@ -215,11 +216,41 @@ public sealed class EcosistemaService(
         CancellationToken cancellationToken) =>
         fiscal.EmitirDesdeVentaAsync(ventaId, tipo, null, cancellationToken);
 
-    public Task<ComprobanteResponse> EmitirNotaCreditoAsync(
+    public async Task<ComprobanteResponse> EmitirNotaCreditoAsync(
         Guid ventaId,
         EmitirNotaCreditoRequest request,
-        CancellationToken cancellationToken) =>
-        fiscal.EmitirDesdeVentaAsync(ventaId, TipoComprobanteSunat.NOTA_CREDITO, request, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        request.CodigoMotivo = Catalogo09Motivos.NormalizarCodigo(request.CodigoMotivo);
+        request.DescripcionMotivo = Catalogo09Motivos.ResolverDescripcion(
+            request.CodigoMotivo,
+            request.DescripcionMotivo);
+        Catalogo09Motivos.Validar(request.CodigoMotivo, request.DescripcionMotivo);
+
+        var transaccionExterna = db.Database.CurrentTransaction is not null;
+        await using var tx = transaccionExterna
+            ? null
+            : await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var comprobante = await fiscal.EmitirDesdeVentaAsync(
+            ventaId,
+            TipoComprobanteSunat.NOTA_CREDITO,
+            request,
+            cancellationToken);
+
+        await notaCreditoImpacto.AplicarTrasEmisionExitosaAsync(
+            ventaId,
+            comprobante,
+            request,
+            cancellationToken);
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
+        }
+
+        return comprobante;
+    }
 
     private async Task AsegurarConexionesAsync(CancellationToken cancellationToken)
     {

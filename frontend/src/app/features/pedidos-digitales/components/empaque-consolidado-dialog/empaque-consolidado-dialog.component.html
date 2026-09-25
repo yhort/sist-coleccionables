@@ -1,0 +1,64 @@
+<div class="dialog-backdrop" (click)="closed.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="empaque-consolidado-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="empaque-consolidado-title">Resumen de empaque</h2>
+      <p>
+        Consolidado de
+        <strong>{{ clienteNombre() }}</strong>
+        · {{ etiquetaCantidad(pedidos().length) }}
+      </p>
+      <p class="dialog__codigos">{{ codigos() }}</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
+      ×
+    </button>
+  </header>
+
+  <div class="dialog__body">
+    @if (lineas().length === 0) {
+      <p class="dialog__empty">No hay ítems en los pedidos seleccionados.</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Carta / producto</th>
+            <th>Rareza</th>
+            <th>Cant.</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (linea of lineas(); track linea.clave) {
+            <tr>
+              <td><code>{{ linea.sku }}</code></td>
+              <td>{{ linea.nombre }}</td>
+              <td>{{ linea.rareza }}</td>
+              <td>{{ linea.cantidad }}</td>
+              <td>{{ linea.total | soles }}</td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3">Totales</td>
+            <td>{{ totalUnidades() }}</td>
+            <td>{{ totalMonto() | soles }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    }
+  </div>
+
+  <footer class="dialog__footer">
+    <button type="button" class="primary" (click)="closed.emit()">Cerrar</button>
+  </footer>
+</section>

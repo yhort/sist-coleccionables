@@ -85,8 +85,24 @@ export interface SedeEmpresa {
 
 export interface UsuarioEmpresa {
   id: string;
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  /** Nombre completo de display (auditoría). */
   nombre: string;
   email: string;
+  rol: RolUsuario;
+  activo: boolean;
+  fechaCreacion?: string;
+}
+
+export interface GuardarUsuarioRequest {
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  email: string;
+  /** Obligatoria al crear; opcional al editar (vacía = no cambiar). */
+  password?: string;
   rol: RolUsuario;
   activo: boolean;
 }
@@ -148,6 +164,9 @@ export interface EmisionSimulada {
   tieneCdr: boolean;
   tienePdf: boolean;
   boletaConsolidadaId?: string | null;
+  codigoMotivo?: string | null;
+  descripcionMotivo?: string | null;
+  documentoReferencia?: string | null;
 }
 
 export function numeroComprobante(emision: Pick<EmisionSimulada, 'serie' | 'correlativo'>): string {
@@ -178,13 +197,6 @@ export interface GuardarSedeRequest {
   esPuntoLlegadaGre: boolean;
   esAlmacenPrincipal: boolean;
   activa: boolean;
-}
-
-export interface GuardarUsuarioRequest {
-  nombre: string;
-  email: string;
-  rol: RolUsuario;
-  activo: boolean;
 }
 
 export type FiltroBoletaConsolidada = 'VENTAS_MENORES' | 'SELECCION_GENERAL';

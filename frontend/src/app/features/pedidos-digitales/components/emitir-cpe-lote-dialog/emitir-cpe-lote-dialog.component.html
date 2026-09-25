@@ -9,13 +9,21 @@
 >
   <header class="dialog__header">
     <div>
-      <h2 id="cpe-lote-title">Emitir comprobante consolidado</h2>
+      <h2 id="cpe-lote-title">
+        {{ soloConsulta() || emision() ? 'Comprobante electrónico' : 'Emitir comprobante consolidado' }}
+      </h2>
       <p>
-        Boleta, factura o nota de venta de
-        <strong>{{ clienteNombre() }}</strong>
-        por
-        <strong>{{ total() | soles }}</strong>
-        · {{ etiquetaCantidad(pedidos().length) }}. Los ítems se combinan en una sola venta.
+        @if (soloConsulta()) {
+          Consulta del CPE ya emitido para
+          <strong>{{ clienteNombre() }}</strong>
+          · {{ etiquetaCantidad(pedidos().length) }}.
+        } @else {
+          Boleta, factura o nota de venta de
+          <strong>{{ clienteNombre() }}</strong>
+          por
+          <strong>{{ total() | soles }}</strong>
+          · {{ etiquetaCantidad(pedidos().length) }}. Si aún no tienen venta, se crea al emitir.
+        }
       </p>
     </div>
     <button
@@ -50,7 +58,7 @@
       Tipo de comprobante
       <select
         [value]="tipoSeleccionado()"
-        [disabled]="enviando() || !!emision()"
+        [disabled]="enviando() || !!emision() || soloConsulta()"
         (change)="setTipo($any($event.target).value)"
       >
         @for (tipo of tipos; track tipo) {
@@ -90,7 +98,7 @@
         Ticket
       </button>
     } @else {
-      <button type="button" class="primary" [disabled]="enviando()" (click)="emitir()">
+      <button type="button" class="primary" [disabled]="enviando() || soloConsulta()" (click)="emitir()">
         @if (enviando()) {
           Emitiendo…
         } @else {

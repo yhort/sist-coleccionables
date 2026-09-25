@@ -14,6 +14,9 @@ public sealed class UsuarioAuthDto
     public required Guid Id { get; init; }
     public required Guid EmpresaId { get; init; }
     public required string Nombre { get; init; }
+    public string? Dni { get; init; }
+    public string? Nombres { get; init; }
+    public string? Apellidos { get; init; }
     public required string Email { get; init; }
     public required RolUsuario Rol { get; init; }
 }

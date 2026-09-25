@@ -12,6 +12,7 @@ import {
   FormArray,
   FormBuilder,
   FormGroup,
+  FormsModule,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
@@ -39,6 +40,8 @@ import {
   TipoSellado,
   crearAtributosTcgVacios,
   crearMetadatosWooVacios,
+  etiquetaJuego,
+  normalizarJuego,
 } from '../../models/producto-tcg.model';
 import { ProductosTcgApiService } from '../../data-access/productos-tcg.service';
 import { esUrlImagenDirecta, urlsImagenesDesde } from '../../data-access/producto-tcg.mapper';
@@ -47,9 +50,11 @@ import { StockApiService } from '../../../inventario/data-access/stock.service';
 
 type TabFormulario = 'tcg' | 'woo';
 
+const OPCION_NUEVO_JUEGO = '__nuevo_juego__';
+
 @Component({
   selector: 'app-producto-tcg-form-dialog',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, FormsModule],
   templateUrl: './producto-tcg-form-dialog.component.html',
   styleUrl: './producto-tcg-form-dialog.component.scss',
 })
@@ -71,9 +76,14 @@ export class ProductoTcgFormDialogComponent implements OnInit {
   readonly cantidadContenido = signal(1);
   readonly listaContenidoAbierta = signal(false);
   readonly sedes = this.sedesApi.sedes;
+  /** Juegos/categorías añadidos en esta sesión (además de los del catálogo). */
+  readonly juegosExtra = signal<string[]>([]);
+  readonly creandoJuego = signal(false);
+  readonly nuevoJuegoNombre = signal('');
+  readonly errorJuego = signal('');
+  readonly opcionNuevoJuego = OPCION_NUEVO_JUEGO;
 
   readonly tipos = Object.entries(ETIQUETAS_TIPO) as [TipoProductoTcg, string][];
-  readonly juegos = Object.entries(ETIQUETAS_JUEGO) as [JuegoTcg, string][];
   readonly rarezas = Object.entries(ETIQUETAS_RAREZA) as [RarezaTcg, string][];
   readonly idiomas = Object.entries(ETIQUETAS_IDIOMA) as [IdiomaTcg, string][];
   readonly condiciones = Object.entries(ETIQUETAS_CONDICION) as [CondicionTcg, string][];
@@ -81,11 +91,32 @@ export class ProductoTcgFormDialogComponent implements OnInit {
   readonly accesorios = Object.entries(ETIQUETAS_ACCESORIO) as [TipoAccesorio, string][];
   readonly etiquetasSync = ETIQUETAS_SYNC;
 
+  /** Opciones del selector: conocidos + catálogo + recién creados. */
+  readonly opcionesJuego = computed(() => {
+    const porValor = new Map<string, string>();
+    for (const [codigo, etiqueta] of Object.entries(ETIQUETAS_JUEGO) as [JuegoTcg, string][]) {
+      porValor.set(codigo, etiqueta);
+    }
+    for (const producto of this.catalogo()) {
+      const valor = normalizarJuego(producto.juego);
+      if (valor && !porValor.has(valor)) {
+        porValor.set(valor, etiquetaJuego(valor) || valor);
+      }
+    }
+    for (const extra of this.juegosExtra()) {
+      const valor = normalizarJuego(extra);
+      if (valor && !porValor.has(valor)) {
+        porValor.set(valor, etiquetaJuego(valor) || valor);
+      }
+    }
+    return [...porValor.entries()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
+  });
+
   readonly form: FormGroup = this.fb.nonNullable.group({
     nombre: ['', Validators.required],
     codigoSku: ['', Validators.required],
     tipoProducto: this.fb.nonNullable.control<TipoProductoTcg>('CARTA'),
-    juego: this.fb.nonNullable.control<JuegoTcg | ''>(''),
+    juego: this.fb.nonNullable.control<string>(''),
     codigoBarras: [''],
     costo: this.fb.control<number | null>(null),
     stockLocal: [0, [Validators.required, Validators.min(0)]],
@@ -196,6 +227,49 @@ export class ProductoTcgFormDialogComponent implements OnInit {
 
   seleccionarTab(tab: TabFormulario): void {
     this.tabActiva = tab;
+  }
+
+  onJuegoSelectChange(valor: string): void {
+    if (valor === OPCION_NUEVO_JUEGO) {
+      this.form.controls['juego'].setValue('');
+      this.errorJuego.set('');
+      this.nuevoJuegoNombre.set('');
+      this.creandoJuego.set(true);
+      return;
+    }
+    this.creandoJuego.set(false);
+    this.form.controls['juego'].setValue(valor);
+  }
+
+  confirmarNuevoJuego(): void {
+    const nombre = this.nuevoJuegoNombre().trim();
+    if (!nombre) {
+      this.errorJuego.set('Escribe el nombre del juego o categoría.');
+      return;
+    }
+    if (nombre.length > 80) {
+      this.errorJuego.set('Máximo 80 caracteres.');
+      return;
+    }
+    const valor = normalizarJuego(nombre);
+    const etiqueta = etiquetaJuego(valor) || valor;
+    const existe = this.opcionesJuego().some(
+      ([codigo, label]) =>
+        codigo === valor || label.toLowerCase() === etiqueta.toLowerCase(),
+    );
+    if (!existe) {
+      this.juegosExtra.update((items) => [...items, valor]);
+    }
+    this.form.controls['juego'].setValue(valor);
+    this.creandoJuego.set(false);
+    this.nuevoJuegoNombre.set('');
+    this.errorJuego.set('');
+  }
+
+  cancelarNuevoJuego(): void {
+    this.creandoJuego.set(false);
+    this.nuevoJuegoNombre.set('');
+    this.errorJuego.set('');
   }
 
   agregarAtributoWoo(nombre = '', valores = ''): void {
@@ -371,7 +445,7 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       codigoBarras: String(raw.codigoBarras || '').trim() || null,
       precioVenta,
       costo: this.asNumberOrNull(raw.costo),
-      juego: raw.juego,
+      juego: normalizarJuego(raw.juego),
       activo: Boolean(raw.activo),
       stockLocal,
       cartaCatalogoId: existentes?.cartaCatalogoId ?? null,
@@ -411,11 +485,15 @@ export class ProductoTcgFormDialogComponent implements OnInit {
   }
 
   private cargarProducto(producto: ProductoTcg): void {
+    const juego = normalizarJuego(producto.juego);
+    if (juego && !(juego in ETIQUETAS_JUEGO)) {
+      this.juegosExtra.update((items) => (items.includes(juego) ? items : [...items, juego]));
+    }
     this.form.patchValue({
       nombre: producto.nombre,
       codigoSku: producto.codigoSku,
       tipoProducto: producto.tipoProducto,
-      juego: producto.juego,
+      juego,
       codigoBarras: producto.codigoBarras ?? '',
       costo: producto.costo,
       stockLocal: producto.stockLocal,

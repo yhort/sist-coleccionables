@@ -328,12 +328,20 @@ public sealed class CpePdfGenerator : ICpePdfGenerator
     {
         try
         {
-            var candidatos = new[]
+            // Preferir PNG transparente (vector exportado); JPG legado como fallback.
+            var bases = new[]
             {
-                Path.Combine(AppContext.BaseDirectory, "Assets", "logo-trunqi.jpg"),
-                Path.Combine(Directory.GetCurrentDirectory(), "Assets", "logo-trunqi.jpg"),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Assets", "logo-trunqi.jpg")),
+                AppContext.BaseDirectory,
+                Directory.GetCurrentDirectory(),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")),
             };
+            var candidatos = bases
+                .SelectMany(b => new[]
+                {
+                    Path.Combine(b, "Assets", "logo-trunqi.png"),
+                    Path.Combine(b, "Assets", "logo-trunqi.jpg"),
+                })
+                .ToArray();
             foreach (var ruta in candidatos)
             {
                 if (File.Exists(ruta))

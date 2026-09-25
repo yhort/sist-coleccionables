@@ -21,7 +21,12 @@ public static class PedidoKanban
         EstadoPedidoDigital destino,
         bool esRecojoTienda)
     {
-        if (actual is EstadoPedidoDigital.Entregado or EstadoPedidoDigital.Cancelado)
+        if (EsTerminal(actual))
+        {
+            return false;
+        }
+
+        if (destino is EstadoPedidoDigital.Anulado or EstadoPedidoDigital.Devuelto)
         {
             return false;
         }
@@ -44,9 +49,20 @@ public static class PedidoKanban
         return siguiente == destino && destino != EstadoPedidoDigital.Entregado;
     }
 
+    public static bool EsTerminal(EstadoPedidoDigital estado) =>
+        estado is EstadoPedidoDigital.Entregado
+            or EstadoPedidoDigital.Cancelado
+            or EstadoPedidoDigital.Anulado
+            or EstadoPedidoDigital.Devuelto;
+
+    public static bool BloqueaOperacionesTrasNc(EstadoPedidoDigital estado) =>
+        estado is EstadoPedidoDigital.Anulado or EstadoPedidoDigital.Devuelto;
+
     public static IndicadorReservaPedido IndicadorDe(EstadoPedidoDigital estado) => estado switch
     {
-        EstadoPedidoDigital.Cancelado => IndicadorReservaPedido.Liberado,
+        EstadoPedidoDigital.Cancelado
+            or EstadoPedidoDigital.Anulado
+            or EstadoPedidoDigital.Devuelto => IndicadorReservaPedido.Liberado,
         EstadoPedidoDigital.Entregado => IndicadorReservaPedido.Confirmado,
         _ => IndicadorReservaPedido.Reservado
     };
@@ -58,6 +74,8 @@ public static class PedidoKanban
         EstadoPedidoDigital.PendienteEntrega => "Listo para despacho o recojo.",
         EstadoPedidoDigital.Entregado => "Entrega confirmada. Se convierte a venta y se confirma la reserva.",
         EstadoPedidoDigital.Cancelado => "Pedido cancelado. Se libera la reserva de stock.",
+        EstadoPedidoDigital.Anulado => "Pedido anulado por nota de crédito.",
+        EstadoPedidoDigital.Devuelto => "Pedido devuelto por nota de crédito.",
         _ => $"Estado actualizado a {estado}."
     };
 

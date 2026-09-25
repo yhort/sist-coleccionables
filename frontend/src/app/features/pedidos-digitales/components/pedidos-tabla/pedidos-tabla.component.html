@@ -31,7 +31,10 @@
             }
             @case ('despachar') {
               <strong>{{ etiquetaCantidad(lote.count) }}</strong>
-              listos para despacho.
+              listos para despacho
+              @if (lote.mismoCliente) {
+                · {{ lote.clienteNombre }}
+              }
             }
             @case ('entregar') {
               <strong>{{ etiquetaCantidad(lote.count) }}</strong>
@@ -61,6 +64,36 @@
               <button type="button" class="primary" (click)="ejecutarLoteLogistico('Empaquetado')">
                 Mover a Empaquetado ({{ etiquetaCantidad(lote.count) }})
               </button>
+              @if (lote.mismoCliente) {
+                @if (lote.cpeEmitido) {
+                  <span class="tabla__lote-badge" title="Comprobante ya emitido">
+                    CPE Emitido{{ lote.cpeLabel ? ': ' + lote.cpeLabel : '' }}
+                  </span>
+                  <button type="button" class="ghost" (click)="abrirCpeDesdePagado()">
+                    Ver comprobante
+                  </button>
+                  @if (lote.puedeNotaCredito) {
+                    <button
+                      type="button"
+                      class="ghost ghost--danger"
+                      (click)="abrirNotaCreditoLote()"
+                    >
+                      Emitir Nota de Crédito
+                    </button>
+                  } @else if (lote.tieneNotaCredito) {
+                    <button type="button" class="ghost" (click)="abrirNotaCreditoLote()">
+                      Ver nota de crédito{{ lote.ncLabel ? ': ' + lote.ncLabel : '' }}
+                    </button>
+                  }
+                } @else if (lote.cpeParcial) {
+                  <span class="tabla__lote-warn">CPE parcial en la selección</span>
+                  <button type="button" class="ghost" disabled>Emitir comprobante</button>
+                } @else {
+                  <button type="button" class="ghost" (click)="abrirCpeDesdePagado()">
+                    Emitir comprobante
+                  </button>
+                }
+              }
             }
             @case ('despachar') {
               <button type="button" class="primary" (click)="ejecutarLoteLogistico('PendienteEntrega')">
@@ -69,6 +102,11 @@
               <button type="button" class="ghost" (click)="imprimirEtiquetasLote()">
                 Imprimir Etiquetas ({{ lote.count }})
               </button>
+              @if (lote.mismoCliente && lote.count > 1) {
+                <button type="button" class="ghost" (click)="abrirConsolidadoEmpaque()">
+                  Ver consolidado
+                </button>
+              }
             }
             @case ('entregar') {
               <button type="button" class="primary" (click)="ejecutarLoteLogistico('Entregado')">
@@ -76,9 +114,34 @@
               </button>
             }
             @case ('cpe') {
-              <button type="button" class="primary" (click)="abrirCpe()">
-                Emitir Comprobante Consolidado ({{ lote.total | soles }})
-              </button>
+              @if (lote.cpeEmitido) {
+                <span class="tabla__lote-badge">
+                  CPE Emitido{{ lote.cpeLabel ? ': ' + lote.cpeLabel : '' }}
+                </span>
+                <button type="button" class="ghost" (click)="abrirCpe()">Ver comprobante</button>
+                @if (lote.puedeNotaCredito) {
+                  <button
+                    type="button"
+                    class="ghost ghost--danger"
+                    (click)="abrirNotaCreditoLote()"
+                  >
+                    Emitir Nota de Crédito
+                  </button>
+                } @else if (lote.tieneNotaCredito) {
+                  <button type="button" class="ghost" (click)="abrirNotaCreditoLote()">
+                    Ver nota de crédito{{ lote.ncLabel ? ': ' + lote.ncLabel : '' }}
+                  </button>
+                }
+              } @else if (lote.cpeParcial) {
+                <span class="tabla__lote-warn">CPE parcial en la selección</span>
+                <button type="button" class="primary" disabled>
+                  Emitir Comprobante Consolidado
+                </button>
+              } @else {
+                <button type="button" class="primary" (click)="abrirCpe()">
+                  Emitir Comprobante Consolidado ({{ lote.total | soles }})
+                </button>
+              }
             }
             @case ('invalido') {
               <button type="button" class="primary" disabled>

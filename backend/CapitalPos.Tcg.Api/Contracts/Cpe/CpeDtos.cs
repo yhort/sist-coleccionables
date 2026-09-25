@@ -89,6 +89,17 @@ public sealed class CpeEmisionResultado
     public string? NombreCdr { get; init; }
 }
 
+public sealed class EmitirNotaCreditoItemRequest
+{
+    public Guid? VentaDetalleId { get; set; }
+
+    [Required]
+    public Guid ProductoId { get; set; }
+
+    [Range(typeof(decimal), "0.0001", "999999")]
+    public decimal Cantidad { get; set; }
+}
+
 public sealed class EmitirNotaCreditoRequest
 {
     [Required]
@@ -99,6 +110,11 @@ public sealed class EmitirNotaCreditoRequest
     [MinLength(3)]
     [MaxLength(250)]
     public string DescripcionMotivo { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Ítems a devolver. Obligatorio para motivo 07; en 01/06 se ignora y se usa la venta completa.
+    /// </summary>
+    public List<EmitirNotaCreditoItemRequest>? Items { get; set; }
 }
 
 public sealed class ComprobanteResponse

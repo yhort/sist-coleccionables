@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
 import { ResultadoPaginado } from '../../../shared/ui/tabla-paginacion/paginacion';
-import { ETIQUETAS_JUEGO, MetadatosWooCommerce, ProductoTcg, ProductosTcgFiltros, estadoStockDe } from '../models/producto-tcg.model';
+import { etiquetaJuego, MetadatosWooCommerce, ProductoTcg, ProductosTcgFiltros, estadoStockDe } from '../models/producto-tcg.model';
 import { ProductoTcgApi, mapProductoFromApi, mapProductoToUpsert } from './producto-tcg.mapper';
 import { CrearVarianteProductoCartaRequest } from '../../catalogo-tcg/models/catalogo-tcg.model';
 
@@ -50,7 +50,7 @@ export class ProductosTcgApiService {
         params = params.set('tipoProducto', filtros.tipoProducto);
       }
       if (filtros.juego !== 'TODOS') {
-        params = params.set('juego', ETIQUETAS_JUEGO[filtros.juego]);
+        params = params.set('juego', etiquetaJuego(filtros.juego) || filtros.juego);
       }
 
       const result = await firstValueFrom(

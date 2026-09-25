@@ -1,7 +1,9 @@
 using CapitalPos.Tcg.Api.Application.Cpe;
 using CapitalPos.Tcg.Api.Application.Ecosistema;
+using CapitalPos.Tcg.Api.Application.Usuarios;
 using CapitalPos.Tcg.Api.Contracts.Cpe;
 using CapitalPos.Tcg.Api.Contracts.Ecosistema;
+using CapitalPos.Tcg.Api.Contracts.Usuarios;
 using CapitalPos.Tcg.Api.Domain.Enums;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +16,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Route("api/ecosistema")]
 public sealed class EcosistemaController(
     EcosistemaService ecosistema,
+    UsuariosService usuarios,
     IServicioFiscal fiscal) : ControllerBase
 {
     [HttpGet("conexiones")]
@@ -74,6 +77,46 @@ public sealed class EcosistemaController(
         return Ok(webhook);
     }
 
+    [HttpGet("usuarios")]
+    [RequiresPermission(Permiso.OperarIntegraciones)]
+    public async Task<ActionResult<IReadOnlyList<UsuarioResponse>>> ListarUsuarios(
+        CancellationToken cancellationToken)
+    {
+        var items = await usuarios.ListarAsync(cancellationToken);
+        return Ok(items);
+    }
+
+    [HttpGet("usuarios/{id:guid}")]
+    [RequiresPermission(Permiso.OperarIntegraciones)]
+    public async Task<ActionResult<UsuarioResponse>> ObtenerUsuario(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var usuario = await usuarios.ObtenerAsync(id, cancellationToken);
+        return usuario is null ? NotFound() : Ok(usuario);
+    }
+
+    [HttpPost("usuarios")]
+    [RequiresPermission(Permiso.OperarIntegraciones)]
+    public async Task<ActionResult<UsuarioResponse>> CrearUsuario(
+        [FromBody] CrearUsuarioRequest request,
+        CancellationToken cancellationToken)
+    {
+        var creado = await usuarios.CrearAsync(request, cancellationToken);
+        return Ok(creado);
+    }
+
+    [HttpPut("usuarios/{id:guid}")]
+    [RequiresPermission(Permiso.OperarIntegraciones)]
+    public async Task<ActionResult<UsuarioResponse>> ActualizarUsuario(
+        Guid id,
+        [FromBody] ActualizarUsuarioRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actualizado = await usuarios.ActualizarAsync(id, request, cancellationToken);
+        return Ok(actualizado);
+    }
+
     [HttpPost("webhooks/probar")]
     [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WebhookLogResponse>> ProbarWebhook(
@@ -121,6 +164,15 @@ public sealed class EcosistemaController(
     {
         var comprobante = await fiscal.ObtenerPorVentaAsync(ventaId, cancellationToken);
         return comprobante is null ? NotFound() : Ok(comprobante);
+    }
+
+    [HttpGet("cpe/venta/{ventaId:guid}/historial")]
+    public async Task<ActionResult<IReadOnlyList<ComprobanteResponse>>> HistorialVenta(
+        Guid ventaId,
+        CancellationToken cancellationToken)
+    {
+        var comprobantes = await fiscal.ListarPorVentaAsync(ventaId, cancellationToken);
+        return Ok(comprobantes);
     }
 
     [HttpGet("cpe/{id:guid}/xml")]

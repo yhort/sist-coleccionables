@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, inject, input, output, signal } from '@angular/core';
+import { Component, HostListener, computed, effect, inject, input, output, signal } from '@angular/core';
 
 import { EcosistemaApiService } from '../../../ecosistema/data-access/ecosistema.service';
 import {
@@ -16,7 +16,15 @@ import {
   ComprobanteConsolidadoApi,
   PedidosDigitalesApiService,
 } from '../../data-access/pedidos-digitales.service';
-import { PedidoDigital, etiquetaCantidadPedidos, round2 } from '../../models/pedido-digital.model';
+import {
+  PedidoDigital,
+  cpeEstadoEmitido,
+  etiquetaCantidadPedidos,
+  etiquetaNumeroCpe,
+  pedidoBloqueadoPorNc,
+  pedidoTieneCpeEmitido,
+  round2,
+} from '../../models/pedido-digital.model';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
@@ -36,6 +44,7 @@ export class EmitirCpeLoteDialogComponent {
   readonly error = signal('');
   readonly enviando = signal(false);
   readonly emision = signal<EmisionSimulada | null>(null);
+  readonly soloConsulta = signal(false);
   readonly tipoSeleccionado = signal<'BOLETA' | 'FACTURA' | 'NOTA_VENTA'>('BOLETA');
   readonly tipos = TIPOS_COMPROBANTE_POS;
   readonly etiquetas = ETIQUETAS_COMPROBANTE;
@@ -65,6 +74,41 @@ export class EmitirCpeLoteDialogComponent {
     ),
   );
 
+  constructor() {
+    effect(() => {
+      const pedidos = this.pedidos();
+      if (pedidos.length === 0 || !pedidos.every((pedido) => pedidoTieneCpeEmitido(pedido))) {
+        this.soloConsulta.set(false);
+        return;
+      }
+      const base = pedidos[0].comprobante;
+      if (!base) {
+        return;
+      }
+      this.soloConsulta.set(true);
+      this.emision.set({
+        id: base.id,
+        tipo: base.tipo,
+        serie: base.serie,
+        correlativo: base.correlativo,
+        estado: base.estado as EstadoEmisionSunat,
+        pedidoId: pedidos[0].id,
+        ventaId: pedidos[0].ventaId,
+        clienteNombre: pedidos[0].clienteNombre,
+        total: this.total(),
+        mensaje: `CPE ya emitido: ${etiquetaNumeroCpe(base)} · ${base.estado}`,
+        fecha: new Date().toISOString(),
+        hashFirma: null,
+        tieneXml: cpeEstadoEmitido(base.estado),
+        tieneCdr: base.estado === 'ACEPTADO',
+        tienePdf: true,
+      });
+      if (base.tipo === 'BOLETA' || base.tipo === 'FACTURA' || base.tipo === 'NOTA_VENTA') {
+        this.tipoSeleccionado.set(base.tipo);
+      }
+    });
+  }
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     if (!this.enviando()) {
@@ -73,15 +117,31 @@ export class EmitirCpeLoteDialogComponent {
   }
 
   setTipo(valor: string): void {
+    if (this.soloConsulta() || this.emision()) {
+      return;
+    }
     if (valor === 'BOLETA' || valor === 'FACTURA' || valor === 'NOTA_VENTA') {
       this.tipoSeleccionado.set(valor);
     }
   }
 
   async emitir(): Promise<void> {
+    if (this.soloConsulta()) {
+      return;
+    }
     const pedidos = this.pedidos();
     if (pedidos.length === 0) {
-      this.error.set('Selecciona al menos un pedido entregado.');
+      this.error.set('Selecciona al menos un pedido pagado.');
+      return;
+    }
+    if (pedidos.some((pedido) => pedidoTieneCpeEmitido(pedido))) {
+      this.error.set('Uno o más pedidos ya tienen comprobante emitido. No se puede reemitir.');
+      return;
+    }
+    if (pedidos.some((pedido) => pedidoBloqueadoPorNc(pedido))) {
+      this.error.set(
+        'Uno o más pedidos están anulados/devueltos o tienen nota de crédito. No se puede facturar.',
+      );
       return;
     }
 

@@ -38,7 +38,7 @@ export class PedidosKanbanComponent {
   }
 
   puedeArrastrar(pedido: PedidoDigital): boolean {
-    return pedido.estado !== 'Entregado' && pedido.estado !== 'Cancelado';
+    return pedido.estado !== 'Entregado' && pedido.estado !== 'Cancelado' && pedido.estado !== 'Anulado' && pedido.estado !== 'Devuelto';
   }
 
   onDragStart(event: DragEvent, pedido: PedidoDigital): void {

@@ -247,9 +247,25 @@ public sealed class PedidoDigitalResponse
     public Guid? VentaId { get; init; }
     public string? CodigoVenta { get; init; }
     public Guid? EntregaId { get; init; }
+    /// <summary>Documento de venta (boleta/factura/nota de venta) si ya se emitió.</summary>
+    public PedidoComprobanteResumen? Comprobante { get; init; }
+    /// <summary>Última nota de crédito asociada a la venta, si existe.</summary>
+    public PedidoComprobanteResumen? NotaCredito { get; init; }
     public required PedidoDigitalEntregaResponse Entrega { get; init; }
     public required IReadOnlyList<PedidoDigitalDetalleResponse> Detalles { get; init; }
     public required IReadOnlyList<PedidoDigitalHistorialResponse> HistorialEstados { get; init; }
+}
+
+public sealed class PedidoComprobanteResumen
+{
+    public required Guid Id { get; init; }
+    public required TipoComprobanteSunat Tipo { get; init; }
+    public required string Serie { get; init; }
+    public required int Correlativo { get; init; }
+    public required EstadoEmisionSunat Estado { get; init; }
+    public string? DocumentoReferencia { get; init; }
+    public string? CodigoMotivo { get; init; }
+    public string? DescripcionMotivo { get; init; }
 }
 
 public sealed class ConversionVentaResponse

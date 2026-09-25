@@ -1,8 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { AfterViewInit, Component, HostListener, computed, inject, input, output } from '@angular/core';
+import { AfterViewInit, Component, HostListener, computed, input, output } from '@angular/core';
 
 import { origenDeCanal } from '../../../pedidos-digitales/models/pedido-digital.model';
-import { EntregasApiService } from '../../data-access/entregas.service';
 import { EntregaFila } from '../../models/entrega.model';
 
 export type TicketDespachoTipo = 'WEB' | 'SUBASTA';
@@ -14,11 +13,11 @@ export type TicketDespachoTipo = 'WEB' | 'SUBASTA';
   styleUrl: './packing-slip-dialog.component.scss',
 })
 export class PackingSlipDialogComponent implements AfterViewInit {
-  private readonly entregasApi = inject(EntregasApiService);
-
   readonly fila = input.required<EntregaFila>();
   readonly autoPrint = input(false);
   readonly closed = output<void>();
+
+  readonly logoUrl = 'assets/img/logo-trunqi.png';
 
   readonly tipoTicket = computed<TicketDespachoTipo>(() => {
     const pedido = this.fila().pedido;
@@ -50,15 +49,28 @@ export class PackingSlipDialogComponent implements AfterViewInit {
     return pedido.codigo;
   });
 
-  readonly clienteNombre = computed(
-    () =>
-      this.fila().entrega.destinatarioNombre ||
-      this.fila().pedido.clienteNombre ||
-      'Cliente',
-  );
+  readonly fechaTicket = computed(() => {
+    const pedido = this.fila().pedido;
+    const historial = [...(pedido.historialEstados ?? [])].sort((a, b) =>
+      a.fecha.localeCompare(b.fecha),
+    );
+    const despacho = [...historial]
+      .reverse()
+      .find((evento) => evento.estadoNuevo === 'PendienteEntrega');
+    if (despacho) {
+      return despacho.fecha;
+    }
+    const empaque = [...historial]
+      .reverse()
+      .find((evento) => evento.estadoNuevo === 'Empaquetado');
+    if (empaque) {
+      return empaque.fecha;
+    }
+    return pedido.fechaPedido;
+  });
 
-  readonly contactoReferencia = computed(
-    () => this.fila().entrega.contactoReferencia?.trim() || null,
+  readonly clienteNombre = computed(
+    () => this.fila().pedido.clienteNombre?.trim() || 'Cliente',
   );
 
   readonly celular = computed(
@@ -69,10 +81,6 @@ export class PackingSlipDialogComponent implements AfterViewInit {
   );
 
   readonly tienda = computed(() => this.fila().sedeNombre || 'Tienda');
-
-  remitente() {
-    return this.entregasApi.remitente(this.fila().entrega.sedeOrigenId);
-  }
 
   ngAfterViewInit(): void {
     if (this.autoPrint()) {

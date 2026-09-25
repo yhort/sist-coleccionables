@@ -12,6 +12,7 @@
       <thead>
         <tr>
           <th>Usuario</th>
+          <th>DNI</th>
           <th>Rol</th>
           <th>Estado</th>
           <th></th>
@@ -24,6 +25,7 @@
               <strong>{{ usuario.nombre }}</strong>
               <small>{{ usuario.email }}</small>
             </td>
+            <td>{{ usuario.dni || '—' }}</td>
             <td>{{ etiquetasRol[usuario.rol] }}</td>
             <td>{{ usuario.activo ? 'Activo' : 'Inactivo' }}</td>
             <td>

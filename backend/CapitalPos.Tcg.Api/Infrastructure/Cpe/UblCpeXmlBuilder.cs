@@ -55,6 +55,7 @@ public static class UblCpeXmlBuilder
                 new XAttribute("listID", request.TipoOperacion),
                 request.TipoComprobante),
             new XElement(Cbc + "DocumentCurrencyCode", request.Moneda),
+            DiscrepancyResponse(request),
             DocumentoReferencia(request),
             FirmaReferencia(request),
             Parte(Cac + "AccountingSupplierParty", request),
@@ -117,6 +118,24 @@ public static class UblCpeXmlBuilder
             new XElement(Cac + "DigitalSignatureAttachment",
                 new XElement(Cac + "ExternalReference",
                     new XElement(Cbc + "URI", "#SignatureSP"))));
+
+    private static XElement? DiscrepancyResponse(EmitirCpeRequest request)
+    {
+        if (request.TipoComprobante != "07"
+            || string.IsNullOrWhiteSpace(request.CodigoMotivo))
+        {
+            return null;
+        }
+
+        var descripcion = string.IsNullOrWhiteSpace(request.DescripcionMotivo)
+            ? request.CodigoMotivo
+            : request.DescripcionMotivo;
+
+        return new XElement(Cac + "DiscrepancyResponse",
+            new XElement(Cbc + "ReferenceID", request.DocumentoReferencia?.SerieCorrelativo ?? string.Empty),
+            new XElement(Cbc + "ResponseCode", request.CodigoMotivo.Trim()),
+            new XElement(Cbc + "Description", new XCData(descripcion.Trim())));
+    }
 
     private static XElement? DocumentoReferencia(EmitirCpeRequest request)
     {

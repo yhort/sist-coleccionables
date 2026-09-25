@@ -10,12 +10,16 @@ import {
   etiquetaCantidadPedidos,
   mismoClienteCobro,
   origenDeCanal,
+  pedidoTieneCpeEmitido,
+  etiquetaNumeroCpe,
+  pedidoPuedeNotaCredito,
   puedeAnularPedido,
   puedeDespachar,
   puedeEmpaquetar,
   puedeEntregarRapido,
   puedeImprimirEtiqueta,
   puedeSeleccionarEnLote,
+  cpeEstadoEmitido,
   round2,
 } from '../../models/pedido-digital.model';
 import {
@@ -30,11 +34,52 @@ export type PedidosTablaSortDir = 'asc' | 'desc';
 
 export type PedidosLoteAccion =
   | { tipo: 'cobro'; pedidos: PedidoDigital[]; clienteNombre: string; total: number }
-  | { tipo: 'empaquetar'; pedidos: PedidoDigital[]; count: number }
-  | { tipo: 'despachar'; pedidos: PedidoDigital[]; count: number }
+  | {
+      tipo: 'empaquetar';
+      pedidos: PedidoDigital[];
+      count: number;
+      mismoCliente: boolean;
+      cpeEmitido: boolean;
+      cpeParcial: boolean;
+      cpeLabel: string | null;
+      puedeNotaCredito: boolean;
+      tieneNotaCredito: boolean;
+      ncLabel: string | null;
+    }
+  | {
+      tipo: 'despachar';
+      pedidos: PedidoDigital[];
+      count: number;
+      mismoCliente: boolean;
+      clienteNombre: string;
+    }
   | { tipo: 'entregar'; pedidos: PedidoDigital[]; count: number }
-  | { tipo: 'cpe'; pedidos: PedidoDigital[]; clienteNombre: string; total: number }
+  | {
+      tipo: 'cpe';
+      pedidos: PedidoDigital[];
+      clienteNombre: string;
+      total: number;
+      cpeEmitido: boolean;
+      cpeParcial: boolean;
+      cpeLabel: string | null;
+      puedeNotaCredito: boolean;
+      tieneNotaCredito: boolean;
+      ncLabel: string | null;
+    }
   | { tipo: 'invalido'; mensaje: string };
+
+function resumenNotaCreditoLote(pedidos: PedidoDigital[]): {
+  puedeNotaCredito: boolean;
+  tieneNotaCredito: boolean;
+  ncLabel: string | null;
+} {
+  const conNc = pedidos.find((pedido) => cpeEstadoEmitido(pedido.notaCredito?.estado));
+  return {
+    puedeNotaCredito: pedidos.some((pedido) => pedidoPuedeNotaCredito(pedido)),
+    tieneNotaCredito: !!conNc,
+    ncLabel: conNc?.notaCredito ? etiquetaNumeroCpe(conNc.notaCredito) : null,
+  };
+}
 
 const PAGE_SIZE = 40;
 
@@ -51,7 +96,9 @@ export class PedidosTablaComponent {
   readonly transicionarLote = output<{ pedidos: PedidoDigital[]; estado: EstadoPedidoDigital }>();
   readonly registrarPago = output<PedidoDigital[]>();
   readonly emitirCpe = output<PedidoDigital[]>();
+  readonly emitirNotaCredito = output<PedidoDigital[]>();
   readonly imprimirEtiquetas = output<PedidoDigital[]>();
+  readonly verConsolidadoEmpaque = output<PedidoDigital[]>();
   readonly anular = output<PedidoDigital>();
   readonly marcarNotificados = output<PedidoDigital[]>();
   readonly toggleNotificacion = output<PedidoDigital>();
@@ -217,10 +264,39 @@ export class PedidosTablaComponent {
           clienteNombre: pedidos[0].clienteNombre,
           total: round2(pedidos.reduce((sum, pedido) => sum + pedido.total, 0)),
         };
-      case 'Pagado':
-        return { tipo: 'empaquetar', pedidos, count: pedidos.length };
+      case 'Pagado': {
+        const mismoCliente = mismoClienteCobro(pedidos);
+        const conCpe = pedidos.filter((pedido) => pedidoTieneCpeEmitido(pedido));
+        const cpeEmitido = mismoCliente && conCpe.length === pedidos.length && pedidos.length > 0;
+        const cpeParcial = mismoCliente && conCpe.length > 0 && conCpe.length < pedidos.length;
+        const cpeLabel =
+          cpeEmitido && pedidos[0].comprobante
+            ? etiquetaNumeroCpe(pedidos[0].comprobante)
+            : null;
+        const nc = cpeEmitido ? resumenNotaCreditoLote(pedidos) : {
+          puedeNotaCredito: false,
+          tieneNotaCredito: false,
+          ncLabel: null,
+        };
+        return {
+          tipo: 'empaquetar',
+          pedidos,
+          count: pedidos.length,
+          mismoCliente,
+          cpeEmitido,
+          cpeParcial,
+          cpeLabel,
+          ...nc,
+        };
+      }
       case 'Empaquetado':
-        return { tipo: 'despachar', pedidos, count: pedidos.length };
+        return {
+          tipo: 'despachar',
+          pedidos,
+          count: pedidos.length,
+          mismoCliente: mismoClienteCobro(pedidos),
+          clienteNombre: pedidos[0].clienteNombre,
+        };
       case 'PendienteEntrega':
         return { tipo: 'entregar', pedidos, count: pedidos.length };
       case 'Entregado':
@@ -230,12 +306,27 @@ export class PedidosTablaComponent {
             mensaje: 'Selecciona pedidos del mismo cliente para emitir un comprobante consolidado.',
           };
         }
-        return {
-          tipo: 'cpe',
-          pedidos,
-          clienteNombre: pedidos[0].clienteNombre,
-          total: round2(pedidos.reduce((sum, pedido) => sum + pedido.total, 0)),
-        };
+        {
+          const conCpe = pedidos.filter((pedido) => pedidoTieneCpeEmitido(pedido));
+          const cpeEmitido = conCpe.length === pedidos.length && pedidos.length > 0;
+          const cpeParcial = conCpe.length > 0 && conCpe.length < pedidos.length;
+          const nc = cpeEmitido
+            ? resumenNotaCreditoLote(pedidos)
+            : { puedeNotaCredito: false, tieneNotaCredito: false, ncLabel: null };
+          return {
+            tipo: 'cpe',
+            pedidos,
+            clienteNombre: pedidos[0].clienteNombre,
+            total: round2(pedidos.reduce((sum, pedido) => sum + pedido.total, 0)),
+            cpeEmitido,
+            cpeParcial,
+            cpeLabel:
+              cpeEmitido && pedidos[0].comprobante
+                ? etiquetaNumeroCpe(pedidos[0].comprobante)
+                : null,
+            ...nc,
+          };
+        }
       default:
         return { tipo: 'invalido', mensaje: 'Este estado no tiene acciones en lote.' };
     }
@@ -364,7 +455,51 @@ export class PedidosTablaComponent {
       );
       return;
     }
+    if (lote.cpeParcial) {
+      this.errorAccion.emit(
+        'Hay pedidos con CPE y otros sin él. Ajusta la selección antes de emitir o consultar.',
+      );
+      return;
+    }
     this.emitirCpe.emit(lote.pedidos);
+  }
+
+  abrirCpeDesdePagado(): void {
+    const lote = this.lote();
+    if (lote?.tipo !== 'empaquetar' || !lote.mismoCliente) {
+      this.errorAccion.emit(
+        'Selecciona pedidos del mismo cliente en Pagado para emitir o ver comprobante.',
+      );
+      return;
+    }
+    if (lote.cpeParcial) {
+      this.errorAccion.emit(
+        'Hay pedidos con CPE y otros sin él. Selecciona solo los que faltan emitir, o solo los ya emitidos para consultar.',
+      );
+      return;
+    }
+    this.emitirCpe.emit(lote.pedidos);
+  }
+
+  abrirNotaCreditoLote(): void {
+    const lote = this.lote();
+    if (lote?.tipo !== 'empaquetar' && lote?.tipo !== 'cpe') {
+      this.errorAccion.emit(
+        'Selecciona pedidos del mismo cliente con comprobante emitido para la nota de crédito.',
+      );
+      return;
+    }
+    if (!lote.cpeEmitido) {
+      this.errorAccion.emit('El lote debe tener comprobante emitido para anular con nota de crédito.');
+      return;
+    }
+    if (!lote.puedeNotaCredito && !lote.tieneNotaCredito) {
+      this.errorAccion.emit(
+        'No se puede emitir nota de crédito para esta selección (requiere boleta/factura aceptada).',
+      );
+      return;
+    }
+    this.emitirNotaCredito.emit(lote.pedidos);
   }
 
   imprimirEtiquetasLote(): void {
@@ -374,6 +509,17 @@ export class PedidosTablaComponent {
       return;
     }
     this.imprimirEtiquetas.emit(lote.pedidos);
+  }
+
+  abrirConsolidadoEmpaque(): void {
+    const lote = this.lote();
+    if (lote?.tipo !== 'despachar' || !lote.mismoCliente || lote.count < 2) {
+      this.errorAccion.emit(
+        'Selecciona al menos dos pedidos del mismo cliente en Empaquetado para ver el consolidado.',
+      );
+      return;
+    }
+    this.verConsolidadoEmpaque.emit(lote.pedidos);
   }
 
   abrirEtiqueta(pedido: PedidoDigital): void {

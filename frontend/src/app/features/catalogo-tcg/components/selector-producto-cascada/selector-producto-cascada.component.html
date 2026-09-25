@@ -15,9 +15,9 @@
     <ul class="sugerencias">
       @if (opcionAgregarSet(); as setOpt) {
         <li class="sugerencias__set">
-          <button type="button" class="sugerencias__set-btn" (click)="confirmarAgregarSet()">
+          <button type="button" class="sugerencias__set-btn" (mousedown)="$event.preventDefault()" (click)="confirmarAgregarSet()">
             <strong>+ Agregar todas las cartas de {{ setOpt.etiqueta }} ({{ setOpt.productos.length }} ítems)</strong>
-            <span>Carga masiva del set / prefijo coincidente</span>
+            <span>Carga masiva del set / prefijo · omite las ya agregadas al lote</span>
           </button>
         </li>
       }

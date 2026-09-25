@@ -29,7 +29,7 @@
       (ngModelChange)="filtros.set({ ...filtros(), juego: $event })"
     >
       <option value="TODOS">Todos</option>
-      @for (juego of juegos; track juego[0]) {
+      @for (juego of juegos(); track juego[0]) {
         <option [value]="juego[0]">{{ juego[1] }}</option>
       }
     </select>

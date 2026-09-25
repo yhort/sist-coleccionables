@@ -4,12 +4,12 @@ import { Component, input, output } from '@angular/core';
 import { TablaPaginacionComponent } from '../../../../shared/ui/tabla-paginacion/tabla-paginacion.component';
 import { primeraUrlImagen } from '../../data-access/producto-tcg.mapper';
 import {
-  ETIQUETAS_JUEGO,
   ETIQUETAS_STOCK,
   ETIQUETAS_SYNC,
   ETIQUETAS_TIPO,
   ProductoTcg,
   estadoStockDe,
+  etiquetaJuego,
 } from '../../models/producto-tcg.model';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
@@ -43,9 +43,9 @@ export class ProductosTcgTableComponent {
   readonly pageSizeChange = output<number>();
 
   readonly etiquetasTipo = ETIQUETAS_TIPO;
-  readonly etiquetasJuego = ETIQUETAS_JUEGO;
   readonly etiquetasStock = ETIQUETAS_STOCK;
   readonly etiquetasSync = ETIQUETAS_SYNC;
+  readonly etiquetaJuego = etiquetaJuego;
 
   stockDe = estadoStockDe;
   readonly placeholderImagen = IMAGEN_PRODUCTO_PLACEHOLDER;

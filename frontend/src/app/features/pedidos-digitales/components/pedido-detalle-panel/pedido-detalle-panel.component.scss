@@ -98,10 +98,22 @@
     background: #fee2e2;
   }
 
+  &--Anulado,
+  &--Devuelto {
+    color: #7f1d1d;
+    background: #fecaca;
+  }
+
   &--PendientePago {
     color: #9a3412;
     background: #ffedd5;
   }
+}
+
+.hint-bloqueado {
+  margin: 0.35rem 0 0;
+  color: #991b1b;
+  font-size: 0.85rem;
 }
 
 .origen {
@@ -154,6 +166,24 @@
     color: #166534;
     font-weight: 700;
   }
+
+  &--nc {
+    color: #9a3412;
+  }
+}
+
+.cpe-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  color: #166534;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-md);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .bloque {

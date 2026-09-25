@@ -1,15 +1,15 @@
 import {
   AtributosTcg,
   CondicionTcg,
-  ETIQUETAS_JUEGO,
   IdiomaTcg,
-  JuegoTcg,
   ProductoTcg,
   RarezaTcg,
   TipoProductoTcg,
   TipoSellado,
   crearAtributosTcgVacios,
   crearMetadatosWooVacios,
+  juegoParaApi,
+  normalizarJuego,
 } from '../models/producto-tcg.model';
 
 export interface ProductoCartaApi {
@@ -130,7 +130,7 @@ export function mapProductoFromApi(dto: ProductoTcgApi, stockLocal = 0): Product
     dto.stockLibre != null && Number.isFinite(Number(dto.stockLibre))
       ? Number(dto.stockLibre)
       : stockLocal;
-  const juego = mapJuego(dto.carta?.juego ?? dto.sellado?.juego);
+  const juego = normalizarJuego(dto.carta?.juego ?? dto.sellado?.juego);
   const atributos: AtributosTcg = {
     ...crearAtributosTcgVacios(),
     setCodigo: dto.carta?.setCodigo ?? '',
@@ -179,7 +179,7 @@ export function mapProductoToUpsert(
   producto: ProductoTcg,
   opciones?: { sedeId?: string | null; esAlta?: boolean },
 ): UpsertProductoTcgRequest {
-  const juego = producto.juego ? ETIQUETAS_JUEGO[producto.juego] : 'Pokémon';
+  const juego = juegoParaApi(producto.juego);
   const request: UpsertProductoTcgRequest = {
     tipoProducto: producto.tipoProducto,
     nombre: producto.nombre.trim(),
@@ -230,19 +230,3 @@ export function mapProductoToUpsert(
   return request;
 }
 
-function mapJuego(valor?: string | null): JuegoTcg | '' {
-  const texto = (valor ?? '').toLowerCase();
-  if (!texto) {
-    return '';
-  }
-  if (texto.includes('pok')) {
-    return 'POKEMON';
-  }
-  if (texto.includes('magic')) {
-    return 'MAGIC';
-  }
-  if (texto.includes('yu') || texto.includes('gi-oh') || texto.includes('yugioh')) {
-    return 'YUGIOH';
-  }
-  return '';
-}

@@ -22,7 +22,7 @@ export class LoginPageComponent {
   readonly empresas = signal<EmpresaLogin[]>([]);
 
   readonly form = this.fb.nonNullable.group({
-    email: ['admin@trunqi.local', [Validators.required, Validators.email]],
+    email: ['', Validators.required],
     password: ['', Validators.required],
     empresaId: [''],
   });

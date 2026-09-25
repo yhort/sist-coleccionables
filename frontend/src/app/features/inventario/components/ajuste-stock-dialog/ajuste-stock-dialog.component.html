@@ -31,25 +31,43 @@
           }
         </select>
       </label>
-      <label>
-        Buscar producto
+
+      <label class="wide buscador">
+        Producto
         <input
           type="search"
-          [ngModel]="busquedaProducto()"
-          (ngModelChange)="busquedaProducto.set($event)"
-          [ngModelOptions]="{ standalone: true }"
-          placeholder="Nombre o SKU"
+          autocomplete="off"
+          placeholder="SKU, nombre o código de barras… Enter selecciona el primero"
+          [value]="busqueda()"
+          (input)="onBusqueda($any($event.target).value)"
+          (focus)="listaAbierta.set(true)"
+          (keydown.enter)="$event.preventDefault(); onBusquedaEnter()"
         />
+        @if (listaAbierta() && busqueda().trim().length > 0 && !productoSeleccionado()) {
+          <ul class="buscador__sugerencias" role="listbox">
+            @for (candidato of candidatos(); track candidato.id) {
+              <li>
+                <button type="button" (mousedown)="$event.preventDefault(); seleccionarProducto(candidato)">
+                  <strong>{{ candidato.codigoSku }}</strong>
+                  <span>{{ candidato.nombre }}</span>
+                </button>
+              </li>
+            } @empty {
+              <li class="buscador__vacio">Sin coincidencias</li>
+            }
+          </ul>
+        }
       </label>
-      <label class="wide">
-        Producto
-        <select formControlName="productoId">
-          <option value="">Seleccionar producto</option>
-          @for (producto of opcionesProducto(); track producto.id) {
-            <option [value]="producto.id">{{ producto.nombre }} ({{ producto.codigoSku }})</option>
-          }
-        </select>
-      </label>
+
+      @if (productoSeleccionado(); as elegido) {
+        <div class="producto-elegido wide">
+          <div>
+            <span class="producto-elegido__sku">{{ elegido.codigoSku }}</span>
+            <strong>{{ elegido.nombre }}</strong>
+          </div>
+          <button type="button" class="link-btn" (click)="limpiarProducto()">Cambiar</button>
+        </div>
+      }
 
       <fieldset class="sentido">
         <legend>Sentido</legend>

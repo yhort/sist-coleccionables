@@ -16,22 +16,7 @@
 
   <article class="ticket" [class.ticket--web]="!esSubasta()" [class.ticket--subasta]="esSubasta()">
     <header class="ticket__brand">
-      <div class="ticket__logo" aria-hidden="true">
-        <svg viewBox="0 0 120 72" xmlns="http://www.w3.org/2000/svg">
-          <rect x="18" y="4" width="42" height="56" rx="5" fill="#1e4fad" transform="rotate(-12 39 32)" />
-          <path
-            d="M34 22 L44 32 L34 42 L30 38 L36 32 L30 26 Z"
-            fill="#7ec8ff"
-            transform="rotate(-12 37 32)"
-          />
-          <rect x="48" y="8" width="42" height="56" rx="5" fill="#f5c518" />
-          <path d="M62 24 L74 36 L62 48 L58 44 L66 36 L58 28 Z" fill="#1e4fad" />
-        </svg>
-        <div class="ticket__logo-text">
-          <span class="ticket__logo-trunqi">TRUNQI</span>
-          <span class="ticket__logo-tcg">TCG</span>
-        </div>
-      </div>
+      <img class="ticket__logo-img" [src]="logoUrl" alt="TRUNQI TCG" />
     </header>
 
     <div class="ticket__type">
@@ -78,7 +63,7 @@
           <svg viewBox="0 0 20 20"><path fill="currentColor" d="M6 2h2v2h4V2h2v2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm10 7H4v7h12V9z"/></svg>
         </span>
         <dt>FECHA</dt>
-        <dd>{{ fila().pedido.fechaPedido | date: 'dd/MM/yyyy' }}</dd>
+        <dd>{{ fechaTicket() | date: 'dd/MM/yyyy' }}</dd>
       </div>
 
       <div class="ticket__row ticket__row--cliente">
@@ -86,12 +71,7 @@
           <svg viewBox="0 0 20 20"><path fill="currentColor" d="M10 10a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"/></svg>
         </span>
         <dt>CLIENTE</dt>
-        <dd>
-          <span>{{ clienteNombre() }}</span>
-          @if (contactoReferencia(); as ref) {
-            <span class="ticket__ref">Ref. {{ ref }}</span>
-          }
-        </dd>
+        <dd>{{ clienteNombre() }}</dd>
       </div>
 
       <div class="ticket__row">

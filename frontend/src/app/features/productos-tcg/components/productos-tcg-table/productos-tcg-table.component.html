@@ -53,7 +53,7 @@
                 </td>
                 <td>{{ etiquetasTipo[producto.tipoProducto] }}</td>
                 <td>
-                  {{ producto.juego ? etiquetasJuego[producto.juego] : '—' }}
+                  {{ producto.juego ? etiquetaJuego(producto.juego) : '—' }}
                 </td>
                 <td>
                   <div class="price">
@@ -125,7 +125,7 @@
             <p>
               {{ etiquetasTipo[producto.tipoProducto] }}
               @if (producto.juego) {
-                · {{ etiquetasJuego[producto.juego] }}
+                · {{ etiquetaJuego(producto.juego) }}
               }
             </p>
             <code>{{ producto.codigoSku }}</code>

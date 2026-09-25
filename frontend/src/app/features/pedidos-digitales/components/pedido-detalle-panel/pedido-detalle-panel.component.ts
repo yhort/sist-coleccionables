@@ -22,9 +22,14 @@ import {
   ETIQUETAS_ESTADO_PEDIDO,
   ETIQUETAS_ORIGEN_PEDIDO,
   EstadoPedidoDigital,
+  cpeEstadoEmitido,
   etiquetaAccionEstado,
+  etiquetaNumeroCpe,
   indicadorReservaDe,
   origenDeCanal,
+  pedidoBloqueadoPorNc,
+  pedidoPuedeNotaCredito,
+  pedidoTieneCpeEmitido,
   transicionesPermitidas,
 } from '../../models/pedido-digital.model';
 import { etiquetaCanalContacto } from '../../../../shared/models/contacto-entrega.model';
@@ -32,7 +37,7 @@ import { PedidoAccionPreparadaDialogComponent } from '../pedido-accion-preparada
 import { RegistrarPagoLoteDialogComponent } from '../registrar-pago-lote-dialog/registrar-pago-lote-dialog.component';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
-export type PedidoDetalleAccion = 'pago-consulta' | 'cpe';
+export type PedidoDetalleAccion = 'pago-consulta' | 'cpe' | 'nota-credito';
 
 @Component({
   selector: 'app-pedido-detalle-panel',
@@ -146,7 +151,12 @@ export class PedidoDetallePanelComponent {
   /** Consulta de cobro: depende del estado operativo, no de la lista en memoria. */
   readonly puedeVerPagoVinculado = computed(() => {
     const pedido = this.pedido();
-    if (!pedido || pedido.estado === 'Cancelado') {
+    if (
+      !pedido ||
+      pedido.estado === 'Cancelado' ||
+      pedido.estado === 'Anulado' ||
+      pedido.estado === 'Devuelto'
+    ) {
       return false;
     }
     if (this.estadosYaPagados.includes(pedido.estado)) {
@@ -156,10 +166,42 @@ export class PedidoDetallePanelComponent {
     return pedido.estado === 'PendientePago' && this.saldoPendiente() <= 0.009;
   });
 
+  /** Emisión CPE disponible desde Pagado en adelante (sin exigir Entregado). */
+  readonly puedeEmitirCpe = computed(() => {
+    const pedido = this.pedido();
+    if (!pedido || pedidoBloqueadoPorNc(pedido)) {
+      return false;
+    }
+    return this.estadosYaPagados.includes(pedido.estado);
+  });
+
+  readonly cpeYaEmitido = computed(() => {
+    const pedido = this.pedido();
+    if (pedido && pedidoTieneCpeEmitido(pedido)) {
+      return true;
+    }
+    return cpeEstadoEmitido(this.comprobante()?.estado);
+  });
+
+  readonly etiquetaCpeEmitido = computed(() => {
+    const pedido = this.pedido();
+    if (pedido?.comprobante) {
+      return etiquetaNumeroCpe(pedido.comprobante);
+    }
+    const cpe = this.comprobante();
+    return cpe ? numeroComprobante(cpe) : '';
+  });
+
+  readonly puedeNotaCredito = computed(() => {
+    const pedido = this.pedido();
+    return pedido ? pedidoPuedeNotaCredito(pedido) : false;
+  });
+
   origenDe = origenDeCanal;
   reservaDe = indicadorReservaDe;
   transicionesDe = transicionesPermitidas;
   etiquetaAccion = etiquetaAccionEstado;
+  etiquetaNumeroCpe = etiquetaNumeroCpe;
 
   constructor() {
     effect(() => {
@@ -247,6 +289,17 @@ export class PedidoDetallePanelComponent {
 
   abrirCpe(): void {
     this.accion.set('cpe');
+  }
+
+  abrirNotaCredito(): void {
+    const pedido = this.pedido();
+    if (!pedido) {
+      return;
+    }
+    if (!this.puedeNotaCredito() && !pedido.notaCredito) {
+      return;
+    }
+    this.accion.set('nota-credito');
   }
 
   cerrarAccion(): void {

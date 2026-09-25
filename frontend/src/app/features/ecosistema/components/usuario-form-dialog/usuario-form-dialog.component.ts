@@ -18,30 +18,70 @@ export class UsuarioFormDialogComponent implements OnInit {
   readonly saved = output<void>();
   readonly cancelled = output<void>();
   readonly error = signal('');
+  readonly enviando = signal(false);
   readonly roles = ROLES_USUARIO;
   readonly etiquetas = ETIQUETAS_ROL;
 
   readonly form = this.fb.nonNullable.group({
-    nombre: ['', Validators.required],
+    dni: ['', [Validators.required, Validators.pattern(/^\d{8}$/)]],
+    nombres: ['', [Validators.required, Validators.minLength(2)]],
+    apellidos: ['', [Validators.required, Validators.minLength(2)]],
     email: ['', [Validators.required, Validators.email]],
+    password: [''],
     rol: this.fb.nonNullable.control<RolUsuario>('CAJERO'),
-    activo: [true],
+    activo: this.fb.nonNullable.control<'Activo' | 'Inactivo'>('Activo'),
   });
+
+  get esEdicion(): boolean {
+    return !!this.usuario();
+  }
 
   ngOnInit(): void {
     const actual = this.usuario();
     if (actual) {
-      this.form.patchValue(actual);
+      this.form.patchValue({
+        dni: actual.dni,
+        nombres: actual.nombres,
+        apellidos: actual.apellidos,
+        email: actual.email,
+        password: '',
+        rol: actual.rol,
+        activo: actual.activo ? 'Activo' : 'Inactivo',
+      });
+      this.form.controls.password.clearValidators();
+    } else {
+      this.form.controls.password.setValidators([
+        Validators.required,
+        Validators.minLength(8),
+      ]);
     }
+    this.form.controls.password.updateValueAndValidity();
   }
 
-  guardar(): void {
+  async guardar(): Promise<void> {
     this.error.set('');
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.error.set('Completa los campos obligatorios de identidad y acceso.');
+      return;
+    }
+    this.enviando.set(true);
     try {
-      this.api.guardarUsuario(this.usuario()?.id ?? null, this.form.getRawValue());
+      const raw = this.form.getRawValue();
+      await this.api.guardarUsuario(this.usuario()?.id ?? null, {
+        dni: raw.dni,
+        nombres: raw.nombres,
+        apellidos: raw.apellidos,
+        email: raw.email,
+        password: raw.password,
+        rol: raw.rol,
+        activo: raw.activo === 'Activo',
+      });
       this.saved.emit();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo guardar el usuario.');
+    } finally {
+      this.enviando.set(false);
     }
   }
 }

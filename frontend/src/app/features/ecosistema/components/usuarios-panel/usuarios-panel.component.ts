@@ -30,9 +30,10 @@ export class UsuariosPanelComponent {
     this.dialogAbierto.set(true);
   }
 
-  cerrar(): void {
+  async cerrar(): Promise<void> {
     this.dialogAbierto.set(false);
     this.usuarioEnCurso.set(null);
+    await this.api.refrescarUsuarios().catch(() => undefined);
   }
 
   permisoDe(rol: UsuarioEmpresa['rol'], modulo: (typeof MODULOS_PERMISO)[number]) {

@@ -4,8 +4,12 @@ namespace CapitalPos.Tcg.Api.Contracts.Auth;
 
 public sealed class LoginRequest
 {
+    /// <summary>
+    /// Credencial de acceso: correo, DNI o usuario (parte local del correo).
+    /// Se mantiene el nombre <c>Email</c> por compatibilidad del contrato JSON.
+    /// </summary>
     [Required]
-    [EmailAddress]
+    [MaxLength(200)]
     public string Email { get; set; } = string.Empty;
 
     [Required]

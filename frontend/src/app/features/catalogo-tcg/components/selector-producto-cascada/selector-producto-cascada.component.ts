@@ -37,6 +37,8 @@ export class SelectorProductoCascadaComponent {
   readonly productoId = input<string>('');
   /** Habilita la acción masiva «Agregar todo el set» en el desplegable de SKU. */
   readonly permitirAgregarSet = input(false);
+  /** Productos ya en el lote: no se cuentan ni se re-emiten en la carga masiva. */
+  readonly productoIdsExcluidos = input<readonly string[]>([]);
   readonly stockLibreFn = input.required<(productoId: string) => number>();
   readonly productoChange = output<ProductoTcg | null>();
   readonly agregarSet = output<ProductoTcg[]>();
@@ -82,12 +84,8 @@ export class SelectorProductoCascadaComponent {
     if (raw.length < 2) {
       return null;
     }
-    // Si ya hay un SKU exacto seleccionado, no ofrecer el set.
-    const seleccionado = this.seleccionado();
-    if (seleccionado && seleccionado.codigoSku.toLowerCase() === raw.toLowerCase()) {
-      return null;
-    }
-    const productos = this.productosDelPrefijoSet(raw);
+    const excluidos = new Set(this.productoIdsExcluidos());
+    const productos = this.productosDelPrefijoSet(raw).filter((p) => !excluidos.has(p.id));
     if (productos.length < 2) {
       return null;
     }
@@ -349,21 +347,44 @@ export class SelectorProductoCascadaComponent {
   }
 }
 
+function normalizarClaveSet(valor: string): string {
+  return valor.trim().toLowerCase().replace(/[-_\s]+/g, '');
+}
+
 function coincidePrefijoSet(producto: ProductoTcg, q: string): boolean {
-  const setCodigo = producto.atributosTcg.setCodigo?.trim().toLowerCase() ?? '';
-  if (setCodigo && setCodigo === q) {
-    return true;
+  const qLower = q.trim().toLowerCase();
+  const qNorm = normalizarClaveSet(q);
+  if (!qLower || qNorm.length < 2) {
+    return false;
   }
+
+  const setCodigo = producto.atributosTcg.setCodigo?.trim().toLowerCase() ?? '';
+  if (setCodigo) {
+    if (setCodigo === qLower || normalizarClaveSet(setCodigo) === qNorm) {
+      return true;
+    }
+  }
+
   const sku = producto.codigoSku.toLowerCase();
   const woo = producto.woo.sku.toLowerCase();
   // Prefijo de set en SKU: ME-ASC, ME-ASC-, ME-ASC-047…
+  if (
+    sku === qLower ||
+    sku.startsWith(`${qLower}-`) ||
+    sku.startsWith(`${qLower}_`) ||
+    woo === qLower ||
+    woo.startsWith(`${qLower}-`) ||
+    woo.startsWith(`${qLower}_`)
+  ) {
+    return true;
+  }
+
+  // Sin guiones: MEASC ≈ ME-ASC-047 / ME_ASC_047
+  const skuNorm = normalizarClaveSet(sku);
+  const wooNorm = normalizarClaveSet(woo);
   return (
-    sku === q ||
-    sku.startsWith(`${q}-`) ||
-    sku.startsWith(`${q}_`) ||
-    woo === q ||
-    woo.startsWith(`${q}-`) ||
-    woo.startsWith(`${q}_`)
+    (skuNorm.startsWith(qNorm) && (skuNorm.length === qNorm.length || /\d/.test(skuNorm[qNorm.length] ?? ''))) ||
+    (wooNorm.startsWith(qNorm) && (wooNorm.length === qNorm.length || /\d/.test(wooNorm[qNorm.length] ?? '')))
   );
 }
 

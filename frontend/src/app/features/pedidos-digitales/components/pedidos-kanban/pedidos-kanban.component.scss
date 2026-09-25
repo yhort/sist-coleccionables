@@ -71,7 +71,9 @@
     background: #dcfce7;
   }
 
-  &[data-estado='Cancelado'] header span {
+  &[data-estado='Cancelado'] header span,
+  &[data-estado='Anulado'] header span,
+  &[data-estado='Devuelto'] header span {
     color: #991b1b;
     background: #fee2e2;
   }
