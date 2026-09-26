@@ -447,6 +447,8 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       costo: this.asNumberOrNull(raw.costo),
       juego: normalizarJuego(raw.juego),
       activo: Boolean(raw.activo),
+      tieneDependencias: existentes?.tieneDependencias ?? false,
+      wooVinculado: this.asNumberOrNull(woo.wooCommerceId) != null,
       stockLocal,
       cartaCatalogoId: existentes?.cartaCatalogoId ?? null,
       atributosTcg,

@@ -81,9 +81,10 @@ public sealed class ProductosTcgService(
 
         var productos = await query.ToListAsync(cancellationToken);
         await CargarContenidoFijoAsync(productos, cancellationToken);
+        var extras = await CargarExtrasAsync(productos.Select(p => p.Id).ToList(), cancellationToken);
         return new PagedResult<ProductoTcgResponse>
         {
-            Items = productos.Select(p => Map(p)).ToList(),
+            Items = productos.Select(p => Map(p, extras.GetValueOrDefault(p.Id))).ToList(),
             Total = total,
             Page = pagina,
             PageSize = tamano
@@ -99,7 +100,8 @@ public sealed class ProductosTcgService(
         }
 
         await CargarContenidoFijoAsync([producto], cancellationToken);
-        return Map(producto);
+        var extras = await CargarExtrasAsync([id], cancellationToken);
+        return Map(producto, extras.GetValueOrDefault(id));
     }
 
     public async Task<ProductoTcgResponse> CrearAsync(
@@ -162,8 +164,10 @@ public sealed class ProductosTcgService(
 
         await tx.CommitAsync(cancellationToken);
         await CargarContenidoFijoAsync([producto], cancellationToken);
+        var extrasAlta = await CargarExtrasAsync([producto.Id], cancellationToken);
         return Map(
             producto,
+            extrasAlta.GetValueOrDefault(producto.Id),
             stockLibre: request.StockInicial > 0 ? request.StockInicial : null,
             sedeStockId: request.StockInicial > 0 && sede is not null ? sede.Id : null);
     }
@@ -272,8 +276,10 @@ public sealed class ProductosTcgService(
         }
 
         await tx.CommitAsync(cancellationToken);
+        var extrasVariante = await CargarExtrasAsync([producto.Id], cancellationToken);
         return Map(
             producto,
+            extrasVariante.GetValueOrDefault(producto.Id),
             stockLibre: request.StockInicial > 0 ? request.StockInicial : null,
             sedeStockId: request.StockInicial > 0 && sede is not null ? sede.Id : null);
     }
@@ -315,7 +321,8 @@ public sealed class ProductosTcgService(
 
         await db.SaveChangesAsync(cancellationToken);
         await CargarContenidoFijoAsync([producto], cancellationToken);
-        return Map(producto);
+        var extrasUpdate = await CargarExtrasAsync([producto.Id], cancellationToken);
+        return Map(producto, extrasUpdate.GetValueOrDefault(producto.Id));
     }
 
     public async Task<ProductoTcgResponse?> CambiarActivoAsync(Guid id, bool activo, CancellationToken cancellationToken)
@@ -328,7 +335,92 @@ public sealed class ProductosTcgService(
 
         producto.Activo = activo;
         await db.SaveChangesAsync(cancellationToken);
-        return Map(producto);
+        await CargarContenidoFijoAsync([producto], cancellationToken);
+        var extras = await CargarExtrasAsync([id], cancellationToken);
+        return Map(producto, extras.GetValueOrDefault(id));
+    }
+
+    /// <summary>
+    /// Soft delete si hay historial/kardex/ventas/stock; borrado físico solo si no tiene
+    /// ID de WooCommerce ni dependencias.
+    /// </summary>
+    public async Task<EliminarProductoTcgResponse?> EliminarODesactivarAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var producto = await db.Productos.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (producto is null)
+        {
+            return null;
+        }
+
+        var extras = await CargarExtrasAsync([id], cancellationToken);
+        var info = extras.GetValueOrDefault(id) ?? ProductoExtras.Vacio;
+
+        if (info.TieneDependencias)
+        {
+            producto.Activo = false;
+            await db.SaveChangesAsync(cancellationToken);
+            await CargarContenidoFijoAsync([producto], cancellationToken);
+            extras = await CargarExtrasAsync([id], cancellationToken);
+            return new EliminarProductoTcgResponse
+            {
+                Id = id,
+                Accion = "DESACTIVADA",
+                Motivo =
+                    "El producto tiene historial (kardex, ventas, stock, pedidos u otros registros). " +
+                    "Se desactivó para conservar la trazabilidad; seguirá visible en reportes históricos y kardex de fechas pasadas, " +
+                    "pero no en selectores operativos ni en el stock actual.",
+                Producto = Map(producto, extras.GetValueOrDefault(id))
+            };
+        }
+
+        if (info.WooVinculado)
+        {
+            throw new BusinessRuleException(
+                "El producto está vinculado a WooCommerce y no tiene historial local. " +
+                "Desvincúlalo primero para eliminarlo, o desactívalo para ocultarlo de operaciones.");
+        }
+
+        await EliminarProductoLimpioAsync(producto, cancellationToken);
+        return new EliminarProductoTcgResponse
+        {
+            Id = id,
+            Accion = "ELIMINADA",
+            Motivo = "El producto no tenía ID de WooCommerce ni movimientos asociados y se eliminó de forma permanente.",
+            Producto = null
+        };
+    }
+
+    public async Task<ProductoTcgResponse?> DesvincularWooCommerceAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var producto = await db.Productos.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (producto is null)
+        {
+            return null;
+        }
+
+        var mapeo = await db.WooCommerceMapeosProducto
+            .FirstOrDefaultAsync(m => m.ProductoId == id, cancellationToken);
+        if (mapeo is null || (mapeo.WooProductId is null && mapeo.WooVariationId is null))
+        {
+            throw new BusinessRuleException("El producto no está vinculado a WooCommerce.");
+        }
+
+        mapeo.WooProductId = null;
+        mapeo.WooVariationId = null;
+        mapeo.EstadoMapeo = EstadoMapeoWoo.NO_MAPEADO;
+        mapeo.StockWoo = null;
+        mapeo.PrecioRebajadoWoo = null;
+        mapeo.Mensaje = "Desvinculado de WooCommerce. No entra al batch de sincronización.";
+        mapeo.UltimaSincronizacion = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        await CargarContenidoFijoAsync([producto], cancellationToken);
+        var extras = await CargarExtrasAsync([id], cancellationToken);
+        return Map(producto, extras.GetValueOrDefault(id));
     }
 
     private async Task AsegurarSkuDisponibleAsync(string codigoSku, Guid? excluirId, CancellationToken cancellationToken)
@@ -564,59 +656,230 @@ public sealed class ProductosTcgService(
         }
     }
 
+    private async Task EliminarProductoLimpioAsync(Producto producto, CancellationToken cancellationToken)
+    {
+        var mapeos = await db.WooCommerceMapeosProducto
+            .Where(m => m.ProductoId == producto.Id)
+            .ToListAsync(cancellationToken);
+        db.WooCommerceMapeosProducto.RemoveRange(mapeos);
+
+        var contenidoPropio = await db.ProductoSelladoContenidoFijo
+            .Where(c => c.ProductoSelladoId == producto.Id)
+            .ToListAsync(cancellationToken);
+        db.ProductoSelladoContenidoFijo.RemoveRange(contenidoPropio);
+
+        var stocksVacios = await db.StocksProductos
+            .Where(s => s.ProductoId == producto.Id)
+            .ToListAsync(cancellationToken);
+        db.StocksProductos.RemoveRange(stocksVacios);
+
+        db.Productos.Remove(producto);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, ProductoExtras>> CargarExtrasAsync(
+        IReadOnlyList<Guid> productoIds,
+        CancellationToken cancellationToken)
+    {
+        var result = productoIds.ToDictionary(id => id, _ => ProductoExtras.Vacio);
+        if (productoIds.Count == 0)
+        {
+            return result;
+        }
+
+        var mapeos = await db.WooCommerceMapeosProducto
+            .AsNoTracking()
+            .Where(m => productoIds.Contains(m.ProductoId))
+            .ToListAsync(cancellationToken);
+        foreach (var mapeo in mapeos)
+        {
+            var estado = mapeo.WooProductId is null ? EstadoMapeoWoo.NO_MAPEADO : mapeo.EstadoMapeo;
+            result[mapeo.ProductoId] = result[mapeo.ProductoId] with
+            {
+                WooVinculado = mapeo.WooProductId is not null,
+                WooProductId = mapeo.WooProductId,
+                WooVariationId = mapeo.WooVariationId,
+                EstadoMapeo = estado,
+                PrecioNormalWoo = mapeo.PrecioNormalWoo,
+                PrecioRebajadoWoo = mapeo.PrecioRebajadoWoo,
+                StockWoo = mapeo.StockWoo,
+                MensajeWoo = mapeo.Mensaje,
+                UltimaSincronizacion = mapeo.UltimaSincronizacion
+            };
+        }
+
+        var deps = await CargarMapaDependenciasAsync(productoIds, cancellationToken);
+        foreach (var id in productoIds)
+        {
+            result[id] = result[id] with { TieneDependencias = deps.GetValueOrDefault(id) };
+        }
+
+        return result;
+    }
+
+    private async Task<Dictionary<Guid, bool>> CargarMapaDependenciasAsync(
+        IReadOnlyList<Guid> productoIds,
+        CancellationToken cancellationToken)
+    {
+        var result = productoIds.ToDictionary(id => id, _ => false);
+        if (productoIds.Count == 0)
+        {
+            return result;
+        }
+
+        async Task MarcarSiExiste(IQueryable<Guid> query)
+        {
+            var ids = await query.Distinct().ToListAsync(cancellationToken);
+            foreach (var id in ids)
+            {
+                if (result.ContainsKey(id))
+                {
+                    result[id] = true;
+                }
+            }
+        }
+
+        await MarcarSiExiste(
+            db.MovimientosInventario
+                .Where(m => productoIds.Contains(m.ProductoId))
+                .Select(m => m.ProductoId));
+        await MarcarSiExiste(
+            db.StocksProductos
+                .Where(s => productoIds.Contains(s.ProductoId)
+                    && (s.CantidadDisponible > 0 || s.CantidadReservada > 0))
+                .Select(s => s.ProductoId));
+        await MarcarSiExiste(
+            db.VentaDetalles
+                .Where(d => productoIds.Contains(d.ProductoId))
+                .Select(d => d.ProductoId));
+        await MarcarSiExiste(
+            db.PedidoDigitalDetalles
+                .Where(d => productoIds.Contains(d.ProductoId))
+                .Select(d => d.ProductoId));
+        await MarcarSiExiste(
+            db.CompraDetalles
+                .Where(d => productoIds.Contains(d.ProductoId))
+                .Select(d => d.ProductoId));
+        await MarcarSiExiste(
+            db.SubastaDetalles
+                .Where(d => productoIds.Contains(d.ProductoId))
+                .Select(d => d.ProductoId));
+        await MarcarSiExiste(
+            db.SubastasTcg
+                .Where(s => productoIds.Contains(s.ProductoId))
+                .Select(s => s.ProductoId));
+        await MarcarSiExiste(
+            db.AperturasTcg
+                .Where(a => productoIds.Contains(a.ProductoSelladoId))
+                .Select(a => a.ProductoSelladoId));
+        await MarcarSiExiste(
+            db.AperturaTcgDetalles
+                .Where(d => productoIds.Contains(d.ProductoCartaId))
+                .Select(d => d.ProductoCartaId));
+        await MarcarSiExiste(
+            db.ProductoSelladoContenidoFijo
+                .Where(c => productoIds.Contains(c.ProductoComponenteId))
+                .Select(c => c.ProductoComponenteId));
+
+        return result;
+    }
+
     private static ProductoTcgResponse Map(
         Producto producto,
+        ProductoExtras? extras = null,
         decimal? stockLibre = null,
-        Guid? sedeStockId = null) => new()
+        Guid? sedeStockId = null)
     {
-        Id = producto.Id,
-        TipoProducto = producto.TipoProducto,
-        Nombre = producto.Nombre,
-        CodigoSku = producto.CodigoSku,
-        CodigoBarras = producto.CodigoBarras,
-        PrecioVenta = producto.PrecioVenta,
-        Costo = producto.Costo,
-        CategoriaId = producto.CategoriaId,
-        MarcaId = producto.MarcaId,
-        Imagenes = ProductoImagenes.Parse(producto.Imagenes),
-        Activo = producto.Activo,
-        FechaCreacion = producto.FechaCreacion,
-        StockLibre = stockLibre,
-        SedeStockId = sedeStockId,
-        Carta = producto is ProductoCarta carta
-            ? new ProductoCartaResponse
+        extras ??= ProductoExtras.Vacio;
+        return new()
+        {
+            Id = producto.Id,
+            TipoProducto = producto.TipoProducto,
+            Nombre = producto.Nombre,
+            CodigoSku = producto.CodigoSku,
+            CodigoBarras = producto.CodigoBarras,
+            PrecioVenta = producto.PrecioVenta,
+            Costo = producto.Costo,
+            CategoriaId = producto.CategoriaId,
+            MarcaId = producto.MarcaId,
+            Imagenes = ProductoImagenes.Parse(producto.Imagenes),
+            Activo = producto.Activo,
+            FechaCreacion = producto.FechaCreacion,
+            StockLibre = stockLibre,
+            SedeStockId = sedeStockId,
+            TieneDependencias = extras.TieneDependencias,
+            WooVinculado = extras.WooVinculado,
+            Woo = new ProductoWooResumenResponse
             {
-                CartaCatalogoId = carta.CartaCatalogoId,
-                Juego = carta.Juego,
-                SetCodigo = carta.SetCodigo,
-                SetNombre = carta.SetNombre,
-                NumeroCarta = carta.NumeroCarta,
-                Rareza = carta.Rareza,
-                Idioma = carta.Idioma,
-                Condicion = carta.Condicion,
-                EsFoil = carta.EsFoil,
-                Artista = carta.Artista
-            }
-            : null,
-        Sellado = producto is ProductoSellado sellado
-            ? new ProductoSelladoResponse
-            {
-                Juego = sellado.Juego,
-                Edicion = sellado.Edicion,
-                TipoSellado = sellado.TipoSellado,
-                CartasEsperadas = sellado.CartasEsperadas,
-                PermiteApertura = sellado.PermiteApertura,
-                ContenidoFijo = (sellado.ContenidoFijo ?? [])
-                    .OrderBy(c => c.ProductoComponente?.Nombre ?? "")
-                    .Select(c => new ProductoSelladoContenidoFijoResponse
-                    {
-                        ProductoId = c.ProductoComponenteId,
-                        Nombre = c.ProductoComponente?.Nombre ?? "",
-                        CodigoSku = c.ProductoComponente?.CodigoSku ?? "",
-                        Cantidad = c.Cantidad
-                    })
-                    .ToList()
-            }
-            : null
-    };
+                WooProductId = extras.WooProductId,
+                WooVariationId = extras.WooVariationId,
+                EstadoMapeo = extras.EstadoMapeo,
+                PrecioNormalWoo = extras.PrecioNormalWoo,
+                PrecioRebajadoWoo = extras.PrecioRebajadoWoo,
+                StockWoo = extras.StockWoo,
+                Mensaje = extras.MensajeWoo,
+                UltimaSincronizacion = extras.UltimaSincronizacion
+            },
+            Carta = producto is ProductoCarta carta
+                ? new ProductoCartaResponse
+                {
+                    CartaCatalogoId = carta.CartaCatalogoId,
+                    Juego = carta.Juego,
+                    SetCodigo = carta.SetCodigo,
+                    SetNombre = carta.SetNombre,
+                    NumeroCarta = carta.NumeroCarta,
+                    Rareza = carta.Rareza,
+                    Idioma = carta.Idioma,
+                    Condicion = carta.Condicion,
+                    EsFoil = carta.EsFoil,
+                    Artista = carta.Artista
+                }
+                : null,
+            Sellado = producto is ProductoSellado sellado
+                ? new ProductoSelladoResponse
+                {
+                    Juego = sellado.Juego,
+                    Edicion = sellado.Edicion,
+                    TipoSellado = sellado.TipoSellado,
+                    CartasEsperadas = sellado.CartasEsperadas,
+                    PermiteApertura = sellado.PermiteApertura,
+                    ContenidoFijo = (sellado.ContenidoFijo ?? [])
+                        .OrderBy(c => c.ProductoComponente?.Nombre ?? "")
+                        .Select(c => new ProductoSelladoContenidoFijoResponse
+                        {
+                            ProductoId = c.ProductoComponenteId,
+                            Nombre = c.ProductoComponente?.Nombre ?? "",
+                            CodigoSku = c.ProductoComponente?.CodigoSku ?? "",
+                            Cantidad = c.Cantidad
+                        })
+                        .ToList()
+                }
+                : null
+        };
+    }
+
+    private sealed record ProductoExtras(
+        bool TieneDependencias,
+        bool WooVinculado,
+        long? WooProductId,
+        long? WooVariationId,
+        EstadoMapeoWoo EstadoMapeo,
+        decimal PrecioNormalWoo,
+        decimal? PrecioRebajadoWoo,
+        decimal? StockWoo,
+        string? MensajeWoo,
+        DateTimeOffset? UltimaSincronizacion)
+    {
+        public static ProductoExtras Vacio { get; } = new(
+            false,
+            false,
+            null,
+            null,
+            EstadoMapeoWoo.NO_MAPEADO,
+            0,
+            null,
+            null,
+            null,
+            null);
+    }
 }

@@ -38,7 +38,11 @@ export class ProductosTcgTableComponent {
   readonly page = input(1);
   readonly pageSize = input(15);
   readonly total = input(0);
+  readonly accionId = input<string | null>(null);
   readonly editar = output<ProductoTcg>();
+  readonly desvincularWoo = output<ProductoTcg>();
+  readonly eliminarODesactivar = output<ProductoTcg>();
+  readonly reactivar = output<ProductoTcg>();
   readonly pageChange = output<number>();
   readonly pageSizeChange = output<number>();
 
@@ -90,5 +94,12 @@ export class ProductosTcgTableComponent {
       return false;
     }
     return this.precioWeb(producto) !== producto.precioVenta;
+  }
+
+  etiquetaEliminar(producto: ProductoTcg): string {
+    if (producto.tieneDependencias || producto.wooVinculado) {
+      return 'Desactivar';
+    }
+    return 'Eliminar';
   }
 }

@@ -116,8 +116,34 @@ public sealed class ProductoTcgResponse
     /// <summary>Stock libre en la sede del alta (solo informado al crear con stock inicial).</summary>
     public decimal? StockLibre { get; init; }
     public Guid? SedeStockId { get; init; }
+    /// <summary>True si tiene kardex, ventas, stock, pedidos u otros vínculos históricos.</summary>
+    public required bool TieneDependencias { get; init; }
+    /// <summary>True si tiene ID de producto en WooCommerce (mapeo activo).</summary>
+    public required bool WooVinculado { get; init; }
+    public ProductoWooResumenResponse? Woo { get; init; }
     public ProductoCartaResponse? Carta { get; init; }
     public ProductoSelladoResponse? Sellado { get; init; }
+}
+
+public sealed class ProductoWooResumenResponse
+{
+    public long? WooProductId { get; init; }
+    public long? WooVariationId { get; init; }
+    public required EstadoMapeoWoo EstadoMapeo { get; init; }
+    public decimal PrecioNormalWoo { get; init; }
+    public decimal? PrecioRebajadoWoo { get; init; }
+    public decimal? StockWoo { get; init; }
+    public string? Mensaje { get; init; }
+    public DateTimeOffset? UltimaSincronizacion { get; init; }
+}
+
+public sealed class EliminarProductoTcgResponse
+{
+    public required Guid Id { get; init; }
+    /// <summary>ELIMINADA (borrado físico) o DESACTIVADA (soft delete).</summary>
+    public required string Accion { get; init; }
+    public string? Motivo { get; init; }
+    public ProductoTcgResponse? Producto { get; init; }
 }
 
 public sealed class ProductoCartaResponse

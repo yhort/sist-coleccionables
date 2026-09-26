@@ -203,10 +203,56 @@
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
 
-  &:hover {
+  &:hover:not(:disabled) {
     color: var(--color-primary-hover);
   }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  &--danger {
+    color: #b91c1c;
+
+    &:hover:not(:disabled) {
+      color: #991b1b;
+    }
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  align-items: center;
+
+  &--card {
+    margin-inline: 1rem;
+  }
+}
+
+.row--inactivo td {
+  opacity: 0.72;
+}
+
+.badge--activo {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.badge--inactivo {
+  color: #6b7280;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+}
+
+.product-card--inactivo {
+  opacity: 0.78;
 }
 
 .catalog-grid {
@@ -242,6 +288,10 @@
   .price,
   .badge,
   .link-btn {
+    margin-inline: 1rem;
+  }
+
+  .acciones {
     margin-inline: 1rem;
   }
 

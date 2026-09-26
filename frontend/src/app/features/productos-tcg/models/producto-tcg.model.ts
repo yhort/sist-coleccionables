@@ -113,6 +113,10 @@ export interface ProductoTcg {
   /** Código conocido (POKEMON/…) o etiqueta libre de juego/categoría. */
   juego: string;
   activo: boolean;
+  /** True si tiene kardex, ventas, stock u otros vínculos históricos. */
+  tieneDependencias: boolean;
+  /** True si tiene ID de producto en WooCommerce. */
+  wooVinculado: boolean;
   stockLocal: number;
   cartaCatalogoId: string | null;
   atributosTcg: AtributosTcg;
@@ -127,6 +131,8 @@ export interface ProductosTcgFiltros {
   juego: string | 'TODOS';
   estadoStock: EstadoStock | 'TODOS';
   sincronizacionWoo: EstadoSincronizacionWoo | 'TODOS';
+  /** Si se omite o es TODOS, el API devuelve activos e inactivos. */
+  estadoActivo: 'TODOS' | 'ACTIVOS' | 'INACTIVOS';
 }
 
 export const FILTROS_PRODUCTOS_VACIOS: ProductosTcgFiltros = {
@@ -135,7 +141,15 @@ export const FILTROS_PRODUCTOS_VACIOS: ProductosTcgFiltros = {
   juego: 'TODOS',
   estadoStock: 'TODOS',
   sincronizacionWoo: 'TODOS',
+  estadoActivo: 'ACTIVOS',
 };
+
+export interface EliminarProductoTcgResultado {
+  id: string;
+  accion: 'ELIMINADA' | 'DESACTIVADA';
+  motivo: string | null;
+  producto: ProductoTcg | null;
+}
 
 export const UMBRAL_STOCK_BAJO = 3;
 

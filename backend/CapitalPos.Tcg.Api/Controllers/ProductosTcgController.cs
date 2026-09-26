@@ -88,6 +88,32 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
         return producto is null ? NotFound() : Ok(producto);
     }
 
+    /// <summary>
+    /// Soft delete si hay historial/kardex; borrado físico solo sin ID Woo ni dependencias.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<ActionResult<EliminarProductoTcgResponse>> Eliminar(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await productos.EliminarODesactivarAsync(id, cancellationToken);
+        return resultado is null ? NotFound() : Ok(resultado);
+    }
+
+    /// <summary>
+    /// Limpia el ID externo WooCommerce y deja el mapeo en NO_MAPEADO.
+    /// </summary>
+    [HttpPost("{id:guid}/desvincular-woocommerce")]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<ActionResult<ProductoTcgResponse>> DesvincularWooCommerce(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var producto = await productos.DesvincularWooCommerceAsync(id, cancellationToken);
+        return producto is null ? NotFound() : Ok(producto);
+    }
+
     [HttpGet("{id:guid}/componentes")]
     public ActionResult ListarComponentes(Guid id) => BomNoImplementado();
 

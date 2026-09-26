@@ -60,6 +60,9 @@
     @if (error()) {
       <p class="productos__error">{{ error() }}</p>
     }
+    @if (mensaje()) {
+      <p class="productos__ok">{{ mensaje() }}</p>
+    }
 
     <app-productos-tcg-table
       [productos]="productosFiltrados()"
@@ -67,7 +70,11 @@
       [page]="pagina()"
       [pageSize]="pageSize()"
       [total]="total()"
+      [accionId]="accionId()"
       (editar)="abrirEdicion($event)"
+      (desvincularWoo)="onDesvincularWoo($event)"
+      (eliminarODesactivar)="onEliminarODesactivar($event)"
+      (reactivar)="onReactivar($event)"
       (pageChange)="cambiarPagina($event)"
       (pageSizeChange)="cambiarTamano($event)"
     />

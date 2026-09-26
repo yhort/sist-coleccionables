@@ -14,12 +14,13 @@
               <th>Precio venta</th>
               <th>Inventario</th>
               <th>WooCommerce</th>
+              <th>Estado</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             @for (producto of productos(); track producto.id) {
-              <tr>
+              <tr [class.row--inactivo]="!producto.activo">
                 <td>
                   <div class="product-cell">
                     <span class="thumb" [attr.data-tipo]="producto.tipoProducto">
@@ -82,7 +83,49 @@
                   }
                 </td>
                 <td>
-                  <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+                  <span
+                    class="badge"
+                    [class.badge--activo]="producto.activo"
+                    [class.badge--inactivo]="!producto.activo"
+                  >
+                    {{ producto.activo ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="acciones">
+                    <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+                    @if (producto.activo && producto.wooVinculado) {
+                      <button
+                        type="button"
+                        class="link-btn"
+                        [disabled]="accionId() === producto.id"
+                        (click)="desvincularWoo.emit(producto)"
+                      >
+                        Desvincular Woo
+                      </button>
+                    }
+                    @if (producto.activo) {
+                      <button
+                        type="button"
+                        class="link-btn link-btn--danger"
+                        [disabled]="accionId() === producto.id"
+                        (click)="eliminarODesactivar.emit(producto)"
+                      >
+                        {{
+                          accionId() === producto.id ? 'Procesando…' : etiquetaEliminar(producto)
+                        }}
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="link-btn"
+                        [disabled]="accionId() === producto.id"
+                        (click)="reactivar.emit(producto)"
+                      >
+                        {{ accionId() === producto.id ? 'Reactivando…' : 'Reactivar' }}
+                      </button>
+                    }
+                  </div>
                 </td>
               </tr>
             }
@@ -105,7 +148,7 @@
     } @else {
       <div class="catalog-grid">
         @for (producto of productos(); track producto.id) {
-          <article class="product-card">
+          <article class="product-card" [class.product-card--inactivo]="!producto.activo">
             <span class="thumb thumb--lg" [attr.data-tipo]="producto.tipoProducto">
               @if (imagenPrincipal(producto)) {
                 <img
@@ -127,6 +170,7 @@
               @if (producto.juego) {
                 · {{ etiquetaJuego(producto.juego) }}
               }
+              · {{ producto.activo ? 'Activo' : 'Inactivo' }}
             </p>
             <code>{{ producto.codigoSku }}</code>
             <div class="price">
@@ -140,7 +184,38 @@
             <span class="badge" [ngClass]="'badge--stock-' + stockDe(producto.stockLocal)">
               {{ etiquetasStock[stockDe(producto.stockLocal)] }} · {{ producto.stockLocal }}
             </span>
-            <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+            <div class="acciones acciones--card">
+              <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+              @if (producto.activo && producto.wooVinculado) {
+                <button
+                  type="button"
+                  class="link-btn"
+                  [disabled]="accionId() === producto.id"
+                  (click)="desvincularWoo.emit(producto)"
+                >
+                  Desvincular Woo
+                </button>
+              }
+              @if (producto.activo) {
+                <button
+                  type="button"
+                  class="link-btn link-btn--danger"
+                  [disabled]="accionId() === producto.id"
+                  (click)="eliminarODesactivar.emit(producto)"
+                >
+                  {{ accionId() === producto.id ? 'Procesando…' : etiquetaEliminar(producto) }}
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="link-btn"
+                  [disabled]="accionId() === producto.id"
+                  (click)="reactivar.emit(producto)"
+                >
+                  {{ accionId() === producto.id ? 'Reactivando…' : 'Reactivar' }}
+                </button>
+              }
+            </div>
           </article>
         }
       </div>

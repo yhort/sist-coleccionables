@@ -61,5 +61,17 @@
     </select>
   </label>
 
+  <label>
+    <span>Estado</span>
+    <select
+      [ngModel]="filtros().estadoActivo"
+      (ngModelChange)="filtros.set({ ...filtros(), estadoActivo: $event })"
+    >
+      <option value="ACTIVOS">Activos</option>
+      <option value="INACTIVOS">Inactivos</option>
+      <option value="TODOS">Todos</option>
+    </select>
+  </label>
+
   <button type="button" class="filters__clear" (click)="limpiar()">Limpiar</button>
 </section>

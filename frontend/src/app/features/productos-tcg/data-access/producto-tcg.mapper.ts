@@ -1,6 +1,7 @@
 import {
   AtributosTcg,
   CondicionTcg,
+  EstadoSincronizacionWoo,
   IdiomaTcg,
   ProductoTcg,
   RarezaTcg,
@@ -54,8 +55,29 @@ export interface ProductoTcgApi {
   imagenes?: string[] | string | null;
   stockLibre?: number | null;
   sedeStockId?: string | null;
+  tieneDependencias?: boolean;
+  wooVinculado?: boolean;
+  woo?: ProductoWooResumenApi | null;
   carta?: ProductoCartaApi | null;
   sellado?: ProductoSelladoApi | null;
+}
+
+export interface ProductoWooResumenApi {
+  wooProductId?: number | null;
+  wooVariationId?: number | null;
+  estadoMapeo: string;
+  precioNormalWoo?: number;
+  precioRebajadoWoo?: number | null;
+  stockWoo?: number | null;
+  mensaje?: string | null;
+  ultimaSincronizacion?: string | null;
+}
+
+export interface EliminarProductoTcgApi {
+  id: string;
+  accion: 'ELIMINADA' | 'DESACTIVADA';
+  motivo?: string | null;
+  producto?: ProductoTcgApi | null;
 }
 
 export interface UpsertProductoTcgRequest {
@@ -147,6 +169,11 @@ export function mapProductoFromApi(dto: ProductoTcgApi, stockLocal = 0): Product
     permiteApertura: dto.sellado?.permiteApertura ?? true,
   };
 
+  const imagenes = urlsImagenesDesde(dto.imagenes);
+  const wooBase = crearMetadatosWooVacios(dto.codigoSku);
+  const wooApi = dto.woo;
+  const wooVinculado = dto.wooVinculado ?? wooApi?.wooProductId != null;
+
   return {
     id: dto.id,
     tipoProducto: dto.tipoProducto,
@@ -157,6 +184,8 @@ export function mapProductoFromApi(dto: ProductoTcgApi, stockLocal = 0): Product
     costo: dto.costo ?? null,
     juego,
     activo: dto.activo,
+    tieneDependencias: dto.tieneDependencias ?? false,
+    wooVinculado,
     stockLocal: stock,
     cartaCatalogoId: dto.carta?.cartaCatalogoId ?? null,
     atributosTcg: atributos,
@@ -168,11 +197,35 @@ export function mapProductoFromApi(dto: ProductoTcgApi, stockLocal = 0): Product
       cantidad: item.cantidad,
     })),
     woo: {
-      ...crearMetadatosWooVacios(dto.codigoSku),
-      precioNormal: dto.precioVenta,
-      imagenes: urlsImagenesDesde(dto.imagenes),
+      ...wooBase,
+      wooCommerceId: wooApi?.wooProductId ?? null,
+      precioNormal: wooApi?.precioNormalWoo && wooApi.precioNormalWoo > 0
+        ? wooApi.precioNormalWoo
+        : dto.precioVenta,
+      precioRebajado: wooApi?.precioRebajadoWoo ?? null,
+      stockWoo: wooApi?.stockWoo ?? null,
+      imagenes,
+      estadoSincronizacion: mapEstadoMapeoWoo(wooApi?.estadoMapeo),
+      ultimaSincronizacion: wooApi?.ultimaSincronizacion ?? null,
+      mensajeError: wooApi?.mensaje ?? null,
     },
   };
+}
+
+function mapEstadoMapeoWoo(estado?: string | null): EstadoSincronizacionWoo {
+  switch ((estado ?? '').toUpperCase()) {
+    case 'SINCRONIZADO':
+      return 'SINCRONIZADO';
+    case 'DESFASADO':
+      return 'DESFASADO';
+    case 'PENDIENTE_SUBIDA':
+    case 'PENDIENTE':
+      return 'PENDIENTE';
+    case 'ERROR':
+      return 'ERROR';
+    default:
+      return 'NO_MAPEADO';
+  }
 }
 
 export function mapProductoToUpsert(

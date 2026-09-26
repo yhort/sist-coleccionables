@@ -5,8 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
 import { ResultadoPaginado } from '../../../shared/ui/tabla-paginacion/paginacion';
-import { etiquetaJuego, MetadatosWooCommerce, ProductoTcg, ProductosTcgFiltros, estadoStockDe } from '../models/producto-tcg.model';
-import { ProductoTcgApi, mapProductoFromApi, mapProductoToUpsert } from './producto-tcg.mapper';
+import { etiquetaJuego, EliminarProductoTcgResultado, MetadatosWooCommerce, ProductoTcg, ProductosTcgFiltros, estadoStockDe } from '../models/producto-tcg.model';
+import { EliminarProductoTcgApi, ProductoTcgApi, mapProductoFromApi, mapProductoToUpsert } from './producto-tcg.mapper';
 import { CrearVarianteProductoCartaRequest } from '../../catalogo-tcg/models/catalogo-tcg.model';
 
 @Injectable({ providedIn: 'root' })
@@ -51,6 +51,11 @@ export class ProductosTcgApiService {
       }
       if (filtros.juego !== 'TODOS') {
         params = params.set('juego', etiquetaJuego(filtros.juego) || filtros.juego);
+      }
+      if (filtros.estadoActivo === 'ACTIVOS') {
+        params = params.set('activo', 'true');
+      } else if (filtros.estadoActivo === 'INACTIVOS') {
+        params = params.set('activo', 'false');
       }
 
       const result = await firstValueFrom(
@@ -185,11 +190,19 @@ export class ProductosTcgApiService {
       const stockFallback = esAlta ? (body.stockInicial ?? producto.stockLocal ?? 0) : producto.stockLocal;
       const persistido = mapProductoFromApi(dto, stockFallback);
       persistido.woo = {
+        ...persistido.woo,
         ...producto.woo,
         sku: persistido.codigoSku,
-        precioNormal: persistido.precioVenta,
-        imagenes: persistido.woo.imagenes,
+        precioNormal: persistido.woo.precioNormal || persistido.precioVenta,
+        imagenes: persistido.woo.imagenes.length > 0 ? persistido.woo.imagenes : producto.woo.imagenes,
+        wooCommerceId: persistido.woo.wooCommerceId ?? producto.woo.wooCommerceId,
+        estadoSincronizacion:
+          persistido.woo.estadoSincronizacion !== 'NO_MAPEADO'
+            ? persistido.woo.estadoSincronizacion
+            : producto.woo.estadoSincronizacion,
       };
+      persistido.wooVinculado = persistido.woo.wooCommerceId != null;
+      persistido.tieneDependencias = persistido.tieneDependencias || producto.tieneDependencias;
       this.productosSignal.update((items) => {
         const hay = items.some((item) => item.id === persistido.id);
         return hay
@@ -213,10 +226,96 @@ export class ProductosTcgApiService {
         ...actual.woo,
         ...patch,
       },
+      wooVinculado: patch.wooCommerceId != null ? true : actual.wooVinculado,
     };
     this.productosSignal.update((items) =>
       items.map((item) => (item.id === persistido.id ? persistido : item)),
     );
     return persistido;
+  }
+
+  async desvincularWooCommerce(id: string): Promise<ProductoTcg> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<ProductoTcgApi>(apiUrl(`productos-tcg/${id}/desvincular-woocommerce`), {}),
+      );
+      const previo = this.obtenerPorId(id);
+      const persistido = mapProductoFromApi(dto, previo?.stockLocal ?? 0);
+      this.productosSignal.update((items) =>
+        items.map((item) => (item.id === persistido.id ? persistido : item)),
+      );
+      return persistido;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async eliminarODesactivar(id: string): Promise<EliminarProductoTcgResultado> {
+    try {
+      const resultado = await firstValueFrom(
+        this.http.delete<EliminarProductoTcgApi>(apiUrl(`productos-tcg/${id}`)),
+      );
+      if (resultado.accion === 'ELIMINADA') {
+        this.productosSignal.update((items) => items.filter((item) => item.id !== id));
+      } else if (resultado.producto) {
+        const previo = this.obtenerPorId(id);
+        const mapped = mapProductoFromApi(resultado.producto, previo?.stockLocal ?? 0);
+        this.productosSignal.update((items) =>
+          items.map((item) => (item.id === mapped.id ? mapped : item)),
+        );
+        return {
+          id: resultado.id,
+          accion: resultado.accion,
+          motivo: resultado.motivo ?? null,
+          producto: mapped,
+        };
+      } else {
+        this.productosSignal.update((items) =>
+          items.map((item) => (item.id === id ? { ...item, activo: false } : item)),
+        );
+      }
+      return {
+        id: resultado.id,
+        accion: resultado.accion,
+        motivo: resultado.motivo ?? null,
+        producto: resultado.producto
+          ? mapProductoFromApi(resultado.producto)
+          : this.obtenerPorId(id) ?? null,
+      };
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async activar(id: string): Promise<ProductoTcg> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.patch<ProductoTcgApi>(apiUrl(`productos-tcg/${id}/activar`), {}),
+      );
+      const previo = this.obtenerPorId(id);
+      const persistido = mapProductoFromApi(dto, previo?.stockLocal ?? 0);
+      this.productosSignal.update((items) =>
+        items.map((item) => (item.id === persistido.id ? persistido : item)),
+      );
+      return persistido;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async desactivar(id: string): Promise<ProductoTcg> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.patch<ProductoTcgApi>(apiUrl(`productos-tcg/${id}/desactivar`), {}),
+      );
+      const previo = this.obtenerPorId(id);
+      const persistido = mapProductoFromApi(dto, previo?.stockLocal ?? 0);
+      this.productosSignal.update((items) =>
+        items.map((item) => (item.id === persistido.id ? persistido : item)),
+      );
+      return persistido;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 }

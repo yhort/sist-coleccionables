@@ -50,6 +50,8 @@ export class ProductosTcgPageComponent {
   readonly formularioAbierto = signal(false);
   readonly productoEditando = signal<ProductoTcg | null>(null);
   readonly error = signal('');
+  readonly mensaje = signal('');
+  readonly accionId = signal<string | null>(null);
 
   readonly productosFiltrados = computed(() => {
     const filtros = this.filtrosConsulta();
@@ -92,7 +94,8 @@ export class ProductosTcgPageComponent {
           actual.tipoProducto !== filtros.tipoProducto ||
           actual.juego !== filtros.juego ||
           actual.estadoStock !== filtros.estadoStock ||
-          actual.sincronizacionWoo !== filtros.sincronizacionWoo
+          actual.sincronizacionWoo !== filtros.sincronizacionWoo ||
+          actual.estadoActivo !== filtros.estadoActivo
         ) {
           this.filtrosConsulta.set({ ...filtros });
         }
@@ -212,5 +215,109 @@ export class ProductosTcgPageComponent {
   onVarianteCreada(): void {
     void this.cargarStockSede();
     void this.cargarPagina(this.filtrosConsulta(), this.pagina(), this.pageSize());
+  }
+
+  async onDesvincularWoo(producto: ProductoTcg): Promise<void> {
+    const aviso =
+      `Se desvinculará «${producto.nombre}» de WooCommerce.\n\n` +
+      `Se limpiará el ID externo y el estado de sincronización. El SKU local se conserva. ¿Continuar?`;
+    if (!window.confirm(aviso)) {
+      return;
+    }
+
+    this.error.set('');
+    this.mensaje.set('');
+    this.accionId.set(producto.id);
+    try {
+      const actualizado = await this.productosApi.desvincularWooCommerce(producto.id);
+      this.items.update((items) =>
+        items.map((item) => (item.id === actualizado.id ? { ...actualizado, stockLocal: item.stockLocal } : item)),
+      );
+      this.mensaje.set(`«${producto.nombre}» desvinculado de WooCommerce.`);
+    } catch (err) {
+      this.error.set(readApiError(err));
+    } finally {
+      this.accionId.set(null);
+    }
+  }
+
+  async onEliminarODesactivar(producto: ProductoTcg): Promise<void> {
+    const aviso =
+      producto.tieneDependencias
+        ? `«${producto.nombre}» tiene historial (kardex, ventas o stock).\n\nSe DESACTIVARÁ (soft delete) para conservar la trazabilidad. Seguirá visible en reportes históricos y kardex, pero no en selectores ni stock actual. ¿Continuar?`
+        : producto.wooVinculado
+          ? `«${producto.nombre}» está vinculado a WooCommerce y no tiene historial local.\n\nDesvincúlalo primero para eliminarlo, o desactívalo ahora para ocultarlo de operaciones. ¿Desactivar?`
+          : `«${producto.nombre}» no tiene ID de WooCommerce ni movimientos asociados.\n\nSe ELIMINARÁ de forma permanente. ¿Continuar?`;
+
+    if (!window.confirm(aviso)) {
+      return;
+    }
+
+    this.error.set('');
+    this.mensaje.set('');
+    this.accionId.set(producto.id);
+    try {
+      if (!producto.tieneDependencias && producto.wooVinculado) {
+        const actualizado = await this.productosApi.desactivar(producto.id);
+        this.aplicarProductoEnLista(actualizado);
+        this.mensaje.set(
+          `«${producto.nombre}» desactivado. Desvincúlalo de Woo si ya no debe existir en la tienda online.`,
+        );
+      } else {
+        const resultado = await this.productosApi.eliminarODesactivar(producto.id);
+        if (resultado.accion === 'ELIMINADA') {
+          this.items.update((items) => items.filter((item) => item.id !== producto.id));
+          this.total.update((t) => Math.max(0, t - 1));
+        } else if (resultado.producto) {
+          this.aplicarProductoEnLista(resultado.producto);
+        }
+        this.mensaje.set(
+          resultado.motivo ??
+            (resultado.accion === 'DESACTIVADA'
+              ? 'Producto desactivado para conservar el historial.'
+              : 'Producto eliminado permanentemente.'),
+        );
+      }
+    } catch (err) {
+      this.error.set(readApiError(err));
+    } finally {
+      this.accionId.set(null);
+    }
+  }
+
+  async onReactivar(producto: ProductoTcg): Promise<void> {
+    this.error.set('');
+    this.mensaje.set('');
+    this.accionId.set(producto.id);
+    try {
+      const actualizado = await this.productosApi.activar(producto.id);
+      this.aplicarProductoEnLista(actualizado);
+      this.mensaje.set(`«${producto.nombre}» reactivado. Volverá a aparecer en selectores y stock.`);
+    } catch (err) {
+      this.error.set(readApiError(err));
+    } finally {
+      this.accionId.set(null);
+    }
+  }
+
+  private aplicarProductoEnLista(producto: ProductoTcg): void {
+    const filtros = this.filtrosConsulta();
+    const debeMostrarse =
+      filtros.estadoActivo === 'TODOS' ||
+      (filtros.estadoActivo === 'ACTIVOS' && producto.activo) ||
+      (filtros.estadoActivo === 'INACTIVOS' && !producto.activo);
+
+    this.items.update((items) => {
+      if (!debeMostrarse) {
+        return items.filter((item) => item.id !== producto.id);
+      }
+      const hay = items.some((item) => item.id === producto.id);
+      const stockLocal =
+        items.find((item) => item.id === producto.id)?.stockLocal ?? producto.stockLocal;
+      const actualizado = { ...producto, stockLocal };
+      return hay
+        ? items.map((item) => (item.id === producto.id ? actualizado : item))
+        : [actualizado, ...items];
+    });
   }
 }
