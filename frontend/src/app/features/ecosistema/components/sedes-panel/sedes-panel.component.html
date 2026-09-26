@@ -2,32 +2,43 @@
   <header>
     <div>
       <h3>Sedes y almacenes</h3>
-      <p>Sedes físicas, puntos GRE y almacén principal asignado.</p>
+      <p>
+        Sedes físicas y almacenes. Si tienen historial se desactivan (soft delete); si están
+        limpios se pueden eliminar.
+      </p>
     </div>
     <button type="button" class="primary" (click)="abrir()">Nueva sede</button>
   </header>
+
+  @if (error()) {
+    <p class="banner banner--error">{{ error() }}</p>
+  }
+  @if (mensaje()) {
+    <p class="banner banner--ok">{{ mensaje() }}</p>
+  }
 
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Sede</th>
+          <th>Sede / Almacén</th>
           <th>Tipo</th>
           <th>Dirección</th>
           <th>GRE</th>
           <th>Almacén</th>
+          <th>Estado</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         @for (sede of api.sedes(); track sede.id) {
-          <tr>
+          <tr [class.row--inactiva]="!sede.activa">
             <td>
               <strong>{{ sede.nombre }}</strong>
               <small>{{ sede.distrito }}, {{ sede.departamento }}</small>
             </td>
             <td>{{ etiquetasTipo[sede.tipo] }}</td>
-            <td>{{ sede.direccion }}</td>
+            <td>{{ sede.direccion || '—' }}</td>
             <td>
               @if (sede.esPuntoPartidaGre) {
                 <span>Partida</span>
@@ -35,11 +46,50 @@
               @if (sede.esPuntoLlegadaGre) {
                 <span>Llegada</span>
               }
+              @if (!sede.esPuntoPartidaGre && !sede.esPuntoLlegadaGre) {
+                <span>—</span>
+              }
             </td>
             <td>{{ sede.esAlmacenPrincipal ? 'Principal' : '—' }}</td>
             <td>
-              <button type="button" class="link" (click)="abrir(sede)">Editar</button>
+              <span [class.estado--activa]="sede.activa" [class.estado--inactiva]="!sede.activa">
+                {{ sede.activa ? 'Activa' : 'Inactiva' }}
+              </span>
             </td>
+            <td>
+              <div class="acciones">
+                <button type="button" class="link" (click)="abrir(sede)">Editar</button>
+                @if (sede.activa) {
+                  <button
+                    type="button"
+                    class="link link--danger"
+                    [disabled]="accionId() === sede.id"
+                    (click)="eliminarODesactivar(sede)"
+                  >
+                    {{
+                      accionId() === sede.id
+                        ? 'Procesando…'
+                        : sede.tieneDependencias
+                          ? 'Desactivar'
+                          : 'Eliminar'
+                    }}
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="link"
+                    [disabled]="accionId() === sede.id"
+                    (click)="reactivar(sede)"
+                  >
+                    {{ accionId() === sede.id ? 'Reactivando…' : 'Reactivar' }}
+                  </button>
+                }
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="7">No hay sedes ni almacenes registrados.</td>
           </tr>
         }
       </tbody>
@@ -50,7 +100,7 @@
 @if (dialogAbierto()) {
   <app-sede-form-dialog
     [sede]="sedeEnCurso()"
-    (saved)="cerrar()"
+    (saved)="onGuardado()"
     (cancelled)="cerrar()"
   />
 }

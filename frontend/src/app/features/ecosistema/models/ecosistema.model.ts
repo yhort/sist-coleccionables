@@ -81,6 +81,8 @@ export interface SedeEmpresa {
   esPuntoLlegadaGre: boolean;
   esAlmacenPrincipal: boolean;
   activa: boolean;
+  /** True si tiene stock, movimientos, ventas u otros vínculos (solo soft-delete). */
+  tieneDependencias?: boolean;
 }
 
 export interface UsuarioEmpresa {
@@ -197,6 +199,13 @@ export interface GuardarSedeRequest {
   esPuntoLlegadaGre: boolean;
   esAlmacenPrincipal: boolean;
   activa: boolean;
+}
+
+export interface EliminarSedeResultado {
+  id: string;
+  accion: 'ELIMINADA' | 'DESACTIVADA';
+  motivo: string | null;
+  sede: SedeEmpresa | null;
 }
 
 export type FiltroBoletaConsolidada = 'VENTAS_MENORES' | 'SELECCION_GENERAL';

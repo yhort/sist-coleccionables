@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { SedesApiService } from '../../../core/data-access/sedes-api.service';
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
 import { EntregasApiService } from '../../entregas/data-access/entregas.service';
@@ -18,6 +19,7 @@ import {
   FiltroBoletaConsolidada,
   GuardarSedeRequest,
   GuardarUsuarioRequest,
+  EliminarSedeResultado,
   MatrizPermisos,
   ModuloPermiso,
   NotaVentaPendiente,
@@ -64,6 +66,29 @@ interface UsuarioApi {
   rol: UsuarioEmpresa['rol'];
   activo: boolean;
   fechaCreacion: string;
+}
+
+interface SedeApiDto {
+  id: string;
+  nombre: string;
+  tipo: SedeEmpresa['tipo'];
+  direccion?: string | null;
+  distrito?: string | null;
+  provincia?: string | null;
+  departamento?: string | null;
+  ubigeo?: string | null;
+  esPuntoPartidaGre: boolean;
+  esPuntoLlegadaGre: boolean;
+  esAlmacenPrincipal: boolean;
+  activa: boolean;
+  tieneDependencias?: boolean;
+}
+
+interface EliminarSedeApiDto {
+  id: string;
+  accion: 'ELIMINADA' | 'DESACTIVADA';
+  motivo?: string | null;
+  sede?: SedeApiDto | null;
 }
 
 interface WebhookApi {
@@ -135,10 +160,11 @@ export class EcosistemaApiService {
   private readonly http = inject(HttpClient);
   private readonly pedidosApi = inject(PedidosDigitalesApiService);
   private readonly entregasApi = inject(EntregasApiService);
+  private readonly sedesApi = inject(SedesApiService);
 
   private readonly fiscalSignal = signal<ConfiguracionFiscalEmpresa>(SEED_FISCAL);
   private readonly seriesSignal = signal<SerieComprobante[]>(SEED_SERIES.map(clonarSerie));
-  private readonly sedesSignal = signal<SedeEmpresa[]>(SEED_SEDES.map(clonarSede));
+  private readonly sedesSignal = signal<SedeEmpresa[]>([]);
   private readonly usuariosSignal = signal<UsuarioEmpresa[]>(SEED_USUARIOS.map(clonarUsuario));
   private readonly permisosSignal = signal<MatrizPermisos>(clonarMatriz(matrizPermisosPorDefecto()));
   private readonly webhooksSignal = signal<WebhookSalida[]>(SEED_WEBHOOKS.map(clonarWebhook));
@@ -178,6 +204,7 @@ export class EcosistemaApiService {
         firstValueFrom(this.http.get<ComprobanteApi[]>(apiUrl('ecosistema/cpe'))).catch(() => [] as ComprobanteApi[]),
         firstValueFrom(this.http.get<UsuarioApi[]>(apiUrl('ecosistema/usuarios'))).catch(() => null),
         this.pedidosApi.refrescar().catch(() => []),
+        this.refrescarSedes().catch(() => []),
       ]);
       this.fiscalSignal.set({
         ruc: fiscal.ruc,
@@ -204,6 +231,20 @@ export class EcosistemaApiService {
         this.usuariosSignal.set(usuarios.map(mapUsuarioApi));
       }
       await this.refrescarNotasPendientes().catch(() => undefined);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async refrescarSedes(): Promise<SedeEmpresa[]> {
+    try {
+      const items = await firstValueFrom(
+        this.http.get<SedeApiDto[]>(apiUrl('sedes/gestion')),
+      );
+      const sedes = items.map(mapSedeApi);
+      this.sedesSignal.set(sedes);
+      await this.sedesApi.refrescar().catch(() => undefined);
+      return sedes.map(clonarSede);
     } catch (error) {
       throw new Error(readApiError(error));
     }
@@ -340,7 +381,7 @@ export class EcosistemaApiService {
     return persistidas.map(clonarSerie);
   }
 
-  guardarSede(id: string | null, request: GuardarSedeRequest): SedeEmpresa {
+  async guardarSede(id: string | null, request: GuardarSedeRequest): Promise<SedeEmpresa> {
     const nombre = request.nombre.trim();
     if (nombre.length < 3) {
       throw new Error('El nombre de la sede debe tener al menos 3 caracteres.');
@@ -352,31 +393,84 @@ export class EcosistemaApiService {
       throw new Error('El UBIGEO de la sede debe tener 6 dígitos.');
     }
 
-    const sede: SedeEmpresa = {
-      id: id ?? `sede-${globalThis.crypto.randomUUID().slice(0, 8)}`,
+    const body = {
       nombre,
       tipo: request.tipo,
       direccion: request.direccion.trim(),
-      distrito: request.distrito.trim(),
+      distrito: request.distrito.trim() || null,
       provincia: request.provincia.trim() || 'Lima',
       departamento: request.departamento.trim() || 'Lima',
-      ubigeo: request.ubigeo.trim(),
+      ubigeo: request.ubigeo.trim() || null,
       esPuntoPartidaGre: request.esPuntoPartidaGre,
       esPuntoLlegadaGre: request.esPuntoLlegadaGre,
       esAlmacenPrincipal: request.esAlmacenPrincipal,
       activa: request.activa,
     };
 
-    this.sedesSignal.update((items) => {
-      const sinPrincipal = sede.esAlmacenPrincipal
-        ? items.map((item) => ({ ...item, esAlmacenPrincipal: false }))
-        : items;
-      const existe = sinPrincipal.some((item) => item.id === sede.id);
-      return existe
-        ? sinPrincipal.map((item) => (item.id === sede.id ? sede : item))
-        : [sede, ...sinPrincipal];
-    });
-    return clonarSede(sede);
+    try {
+      const sede = id
+        ? await firstValueFrom(this.http.put<SedeApiDto>(apiUrl(`sedes/${id}`), body))
+        : await firstValueFrom(this.http.post<SedeApiDto>(apiUrl('sedes'), body));
+      const mapped = mapSedeApi(sede);
+      this.sedesSignal.update((items) => {
+        const resto = items.filter((item) => item.id !== mapped.id);
+        return [mapped, ...resto].sort((a, b) => {
+          if (a.esAlmacenPrincipal !== b.esAlmacenPrincipal) {
+            return a.esAlmacenPrincipal ? -1 : 1;
+          }
+          return a.nombre.localeCompare(b.nombre);
+        });
+      });
+      await this.sedesApi.refrescar().catch(() => undefined);
+      return clonarSede(mapped);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async eliminarODesactivarSede(id: string): Promise<EliminarSedeResultado> {
+    try {
+      const resultado = await firstValueFrom(
+        this.http.delete<EliminarSedeApiDto>(apiUrl(`sedes/${id}`)),
+      );
+      if (resultado.accion === 'ELIMINADA') {
+        this.sedesSignal.update((items) => items.filter((item) => item.id !== id));
+      } else if (resultado.sede) {
+        const mapped = mapSedeApi(resultado.sede);
+        this.sedesSignal.update((items) =>
+          items.map((item) => (item.id === mapped.id ? mapped : item)),
+        );
+      } else {
+        this.sedesSignal.update((items) =>
+          items.map((item) => (item.id === id ? { ...item, activa: false, esAlmacenPrincipal: false } : item)),
+        );
+      }
+      await this.sedesApi.refrescar().catch(() => undefined);
+      return {
+        id: resultado.id,
+        accion: resultado.accion,
+        motivo: resultado.motivo ?? null,
+        sede: resultado.sede ? mapSedeApi(resultado.sede) : null,
+      };
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async reactivarSede(id: string): Promise<SedeEmpresa> {
+    try {
+      const sede = await firstValueFrom(
+        this.http.post<SedeApiDto>(apiUrl(`sedes/${id}/reactivar`), {}),
+      );
+      const mapped = mapSedeApi(sede);
+      this.sedesSignal.update((items) =>
+        items.map((item) => (item.id === mapped.id ? mapped : item)),
+      );
+      await this.sedesApi.refrescar().catch(() => undefined);
+      return clonarSede(mapped);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   actualizarPermiso(rol: UsuarioEmpresa['rol'], modulo: ModuloPermiso, campo: 'lectura' | 'escritura', valor: boolean): void {
@@ -761,6 +855,24 @@ function mapUsuarioApi(dto: UsuarioApi): UsuarioEmpresa {
   };
 }
 
+function mapSedeApi(dto: SedeApiDto): SedeEmpresa {
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    tipo: dto.tipo,
+    direccion: dto.direccion ?? '',
+    distrito: dto.distrito ?? '',
+    provincia: dto.provincia ?? 'Lima',
+    departamento: dto.departamento ?? 'Lima',
+    ubigeo: dto.ubigeo ?? '',
+    esPuntoPartidaGre: dto.esPuntoPartidaGre,
+    esPuntoLlegadaGre: dto.esPuntoLlegadaGre,
+    esAlmacenPrincipal: dto.esAlmacenPrincipal,
+    activa: dto.activa,
+    tieneDependencias: dto.tieneDependencias ?? false,
+  };
+}
+
 function mapWebhookLog(dto: WebhookLogApi): WebhookLog {
   return {
     id: dto.id,
@@ -829,37 +941,6 @@ const SEED_SERIES: SerieComprobante[] = [
   { tipo: 'NOTA_VENTA', serie: 'NV01', correlativo: 1, activa: true },
   { tipo: 'NOTA_CREDITO', serie: 'FC01', correlativo: 18, activa: true },
   { tipo: 'GUIA_REMISION', serie: 'T001', correlativo: 310, activa: true },
-];
-
-const SEED_SEDES: SedeEmpresa[] = [
-  {
-    id: 'sede-mira',
-    nombre: 'Tienda Miraflores',
-    tipo: 'TIENDA',
-    direccion: 'Av. José Larco 1230, interior 4',
-    distrito: 'Miraflores',
-    provincia: 'Lima',
-    departamento: 'Lima',
-    ubigeo: '150122',
-    esPuntoPartidaGre: true,
-    esPuntoLlegadaGre: true,
-    esAlmacenPrincipal: false,
-    activa: true,
-  },
-  {
-    id: 'sede-surco',
-    nombre: 'Almacén Surco',
-    tipo: 'ALMACEN',
-    direccion: 'Av. El Polo 710, almacén 2',
-    distrito: 'Santiago de Surco',
-    provincia: 'Lima',
-    departamento: 'Lima',
-    ubigeo: '150140',
-    esPuntoPartidaGre: true,
-    esPuntoLlegadaGre: false,
-    esAlmacenPrincipal: true,
-    activa: true,
-  },
 ];
 
 const SEED_USUARIOS: UsuarioEmpresa[] = [

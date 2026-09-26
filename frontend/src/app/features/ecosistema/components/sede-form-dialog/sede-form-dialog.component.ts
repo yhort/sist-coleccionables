@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { readApiError } from '../../../../core/http/api-error';
 import { EcosistemaApiService } from '../../data-access/ecosistema.service';
 import { SedeEmpresa, TipoSedeEmpresa } from '../../models/ecosistema.model';
 
@@ -18,6 +19,7 @@ export class SedeFormDialogComponent implements OnInit {
   readonly saved = output<void>();
   readonly cancelled = output<void>();
   readonly error = signal('');
+  readonly guardando = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     nombre: ['', Validators.required],
@@ -40,13 +42,20 @@ export class SedeFormDialogComponent implements OnInit {
     }
   }
 
-  guardar(): void {
+  async guardar(): Promise<void> {
     this.error.set('');
+    if (this.form.invalid || this.guardando()) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    this.guardando.set(true);
     try {
-      this.api.guardarSede(this.sede()?.id ?? null, this.form.getRawValue());
+      await this.api.guardarSede(this.sede()?.id ?? null, this.form.getRawValue());
       this.saved.emit();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo guardar la sede.');
+      this.error.set(readApiError(err));
+    } finally {
+      this.guardando.set(false);
     }
   }
 }

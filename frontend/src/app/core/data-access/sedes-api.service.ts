@@ -20,7 +20,10 @@ export class SedesApiService {
   readonly sedes = this.sedesSignal.asReadonly();
 
   async refrescar(): Promise<SedeInventario[]> {
-    const items = await firstValueFrom(this.http.get<SedeApi[]>(apiUrl('sedes')));
+    // El API ya filtra activas por defecto; reforzamos el filtro en cliente.
+    const items = await firstValueFrom(
+      this.http.get<SedeApi[]>(apiUrl('sedes'), { params: { activa: 'true' } }),
+    );
     const sedes = items
       .filter((item) => item.activa)
       .map((item) => ({

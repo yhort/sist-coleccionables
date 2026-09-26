@@ -46,6 +46,53 @@ header {
 .link {
   color: var(--color-primary);
   font-size: 0.82rem;
+
+  &--danger {
+    color: var(--color-danger);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+}
+
+.banner {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  &--error {
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  }
+
+  &--ok {
+    color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+}
+
+.row--inactiva {
+  opacity: 0.72;
+}
+
+.estado--activa {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.estado--inactiva {
+  color: var(--color-text-muted);
+  font-weight: 600;
 }
 
 .table-wrap {

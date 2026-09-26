@@ -60,7 +60,9 @@
     }
     <footer>
       <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
-      <button type="submit" class="primary">Guardar sede</button>
+      <button type="submit" class="primary" [disabled]="guardando()">
+        {{ guardando() ? 'Guardando…' : 'Guardar sede' }}
+      </button>
     </footer>
   </form>
 </section>
