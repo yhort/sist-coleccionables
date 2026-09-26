@@ -21,8 +21,6 @@ import {
   round2,
 } from '../models/pago.model';
 
-const USUARIO_PAGOS = 'Caja';
-
 interface PagoApi {
   id: string;
   origen: OrigenPago;
@@ -47,6 +45,18 @@ export class PagosApiService {
   private readonly http = inject(HttpClient);
 
   readonly pagos = this.pagosSignal.asReadonly();
+
+  /** Carga la bandeja desde el API (incluye anulados para historial). */
+  async refrescar(): Promise<Pago[]> {
+    try {
+      const items = await firstValueFrom(this.http.get<PagoApi[]>(apiUrl('pagos')));
+      const pagos = items.map(mapPagoApi);
+      this.pagosSignal.set(pagos);
+      return pagos.map(clonar);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
 
   /** Pagos asociados a un pedido digital (API real). */
   async listarPorPedido(pedidoDigitalId: string): Promise<Pago[]> {
@@ -107,6 +117,7 @@ export class PagosApiService {
       (pago) =>
         pago.id !== excluirId &&
         pago.estado !== 'RECHAZADO' &&
+        pago.estado !== 'ANULADO' &&
         normalizarCodigoOperacion(pago.codigoOperacion) === normalizado,
     );
   }
@@ -171,7 +182,7 @@ export class PagosApiService {
           cantidadHoy += 1;
         }
       }
-      if (esOrigenDigital(pago.origen) && !pago.pedidoDigitalId && pago.estado !== 'RECHAZADO') {
+      if (esOrigenDigital(pago.origen) && !pago.pedidoDigitalId && pago.estado !== 'RECHAZADO' && pago.estado !== 'ANULADO') {
         pendientesConciliar += 1;
         montoPendienteConciliar = round2(montoPendienteConciliar + pago.monto);
       }
@@ -210,193 +221,88 @@ export class PagosApiService {
     }
   }
 
-  registrar(request: RegistrarPagoRequest): Pago {
-    const monto = round2(Number(request.monto));
-    if (!Number.isFinite(monto) || monto <= 0) {
-      throw new Error('El monto debe ser mayor que cero.');
-    }
-
-    const codigo = textoOpcional(request.codigoOperacion, 80);
-    if (esOrigenDigital(request.origen) && !codigo) {
-      throw new Error('Indica el código de operación Yape o Izipay.');
-    }
-    this.asegurarCodigoLibre(codigo);
-
-    let clienteNombre = textoOpcional(request.clienteNombre, 160);
-    let pedidoDigitalId: string | null = null;
-    let estado: EstadoPago = 'NOTIFICADO';
-
-    if (request.pedidoDigitalId) {
-      const pedido = this.requierePedidoPendiente(request.pedidoDigitalId);
-      this.asegurarNoExcedeTotal(pedido, monto);
-      pedidoDigitalId = pedido.id;
-      clienteNombre = pedido.clienteNombre;
-      estado = 'ASOCIADO';
-    }
-
-    const ahora = new Date().toISOString();
-    const pago: Pago = {
-      id: globalThis.crypto.randomUUID(),
-      origen: request.origen,
-      estado,
-      monto,
-      codigoOperacion: codigo,
-      referenciaExterna: textoOpcional(request.referenciaExterna, 120),
-      pedidoDigitalId,
-      pedidoCodigo: pedidoDigitalId ? codigoPedido(pedidoDigitalId) : null,
-      ventaId: null,
-      clienteNombre,
-      fechaNotificacion: ahora,
-      fechaConfirmacion: null,
-      usuarioAsocioNombre: pedidoDigitalId ? USUARIO_PAGOS : null,
-      observacion: textoOpcional(request.observacion, 500),
-    };
-
-    this.pagosSignal.update((items) => [pago, ...items]);
-
-    if (request.confirmar) {
-      return this.confirmar(pago.id);
-    }
-    return clonar(pago);
-  }
-
-  asociar(id: string, pedidoDigitalId: string): Pago {
-    const actual = this.requiere(id);
-    if (actual.estado === 'RECHAZADO') {
-      throw new Error('No se puede asociar un pago rechazado.');
-    }
-    if (actual.estado === 'CONFIRMADO') {
-      throw new Error('El pago ya está confirmado.');
-    }
-
-    const pedido = this.requierePedidoPendiente(pedidoDigitalId);
-    this.asegurarNoExcedeTotal(pedido, actual.monto, actual.id);
-
-    const siguiente: Pago = {
-      ...actual,
-      estado: 'ASOCIADO',
-      pedidoDigitalId: pedido.id,
-      pedidoCodigo: pedido.codigo,
-      clienteNombre: pedido.clienteNombre,
-      usuarioAsocioNombre: USUARIO_PAGOS,
-    };
-    this.reemplazar(siguiente);
-    return clonar(siguiente);
-  }
-
-  confirmar(id: string): Pago {
-    const actual = this.requiere(id);
-    if (actual.estado === 'CONFIRMADO') {
-      return clonar(actual);
-    }
-    if (actual.estado === 'RECHAZADO') {
-      throw new Error('No se puede confirmar un pago rechazado.');
-    }
-    if (actual.pedidoDigitalId && actual.estado !== 'ASOCIADO') {
-      throw new Error('Asocia el pago a un pedido antes de confirmarlo.');
-    }
-
-    if (actual.pedidoDigitalId) {
-      const pedido = this.pedidosApi.obtener(actual.pedidoDigitalId);
-      if (!pedido) {
-        throw new Error('No se encontró el pedido digital asociado.');
-      }
-      this.asegurarNoExcedeTotal(pedido, actual.monto, actual.id, ['CONFIRMADO']);
-    }
-
-    const siguiente: Pago = {
-      ...actual,
-      estado: 'CONFIRMADO',
-      fechaConfirmacion: new Date().toISOString(),
-    };
-    this.reemplazar(siguiente);
-    this.marcarPedidoPagadoSiCubre(siguiente);
-    return clonar(siguiente);
-  }
-
-  rechazar(id: string, observacion?: string): Pago {
-    const actual = this.requiere(id);
-    if (actual.estado === 'CONFIRMADO') {
-      throw new Error('No se puede rechazar un pago ya confirmado.');
-    }
-    if (actual.estado === 'RECHAZADO') {
-      return clonar(actual);
-    }
-
-    const siguiente: Pago = {
-      ...actual,
-      estado: 'RECHAZADO',
-      observacion: textoOpcional(observacion, 500) ?? actual.observacion,
-    };
-    this.reemplazar(siguiente);
-    return clonar(siguiente);
-  }
-
-  private marcarPedidoPagadoSiCubre(pago: Pago): void {
-    if (!pago.pedidoDigitalId) {
-      return;
-    }
-    const pedido = this.pedidosApi.obtener(pago.pedidoDigitalId);
-    if (!pedido || pedido.estado !== 'PendientePago') {
-      return;
-    }
-    const cubierto = this.montoCubierto(pedido.id, ['CONFIRMADO']);
-    if (cubierto + 1e-9 < pedido.total) {
-      return;
-    }
-    void this.pedidosApi.cambiarEstado(
-      pedido.id,
-      'Pagado',
-      `Pago ${pago.origen} confirmado (${pago.codigoOperacion ?? pago.id}).`,
-    );
-  }
-
-  private asegurarCodigoLibre(codigo: string | null, excluirId?: string): void {
-    if (codigo && this.codigoOperacionDuplicado(codigo, excluirId)) {
-      throw new Error(`Ya existe un pago con el código de operación ${codigo}.`);
-    }
-  }
-
-  private asegurarNoExcedeTotal(
-    pedido: PedidoDigital,
-    montoNuevo: number,
-    excluirPagoId?: string,
-    estados: readonly EstadoPago[] = ['ASOCIADO', 'CONFIRMADO'],
-  ): void {
-    const cubierto = round2(
-      this.pagosSignal()
-        .filter(
-          (pago) =>
-            pago.pedidoDigitalId === pedido.id &&
-            pago.id !== excluirPagoId &&
-            estados.includes(pago.estado),
-        )
-        .reduce((sum, pago) => sum + pago.monto, 0),
-    );
-    if (round2(cubierto + montoNuevo) - pedido.total > 0.009) {
-      throw new Error(
-        `El pago excede el total del pedido (S/ ${pedido.total.toFixed(2)}). Saldo: S/ ${round2(pedido.total - cubierto).toFixed(2)}.`,
+  async registrar(request: RegistrarPagoRequest): Promise<Pago> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<PagoApi>(apiUrl('pagos'), {
+          origen: request.origen,
+          monto: round2(Number(request.monto)),
+          codigoOperacion: textoOpcional(request.codigoOperacion, 80),
+          referenciaExterna: textoOpcional(request.referenciaExterna, 120),
+          pedidoDigitalId: request.pedidoDigitalId || null,
+          clienteNombre: textoOpcional(request.clienteNombre, 160),
+          observacion: textoOpcional(request.observacion, 500),
+          confirmar: request.confirmar ?? false,
+        }),
       );
+      const pago = mapPagoApi(dto);
+      this.pagosSignal.update((items) => [pago, ...items.filter((item) => item.id !== pago.id)]);
+      if (request.confirmar) {
+        await this.pedidosApi.refrescar().catch(() => undefined);
+      }
+      return clonar(pago);
+    } catch (error) {
+      throw new Error(readApiError(error));
     }
   }
 
-  private requierePedidoPendiente(id: string): PedidoDigital {
-    const pedido = this.pedidosApi.obtener(id);
-    if (!pedido) {
-      throw new Error('Selecciona un pedido digital pendiente.');
+  async asociar(id: string, pedidoDigitalId: string): Promise<Pago> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<PagoApi>(apiUrl(`pagos/${id}/asociar`), { pedidoDigitalId }),
+      );
+      const pago = mapPagoApi(dto);
+      this.reemplazar(pago);
+      return clonar(pago);
+    } catch (error) {
+      throw new Error(readApiError(error));
     }
-    if (pedido.estado !== 'PendientePago') {
-      throw new Error('Solo se asocian pagos a pedidos en Pendiente de pago.');
-    }
-    return pedido;
   }
 
-  private requiere(id: string): Pago {
-    const encontrado = this.pagosSignal().find((item) => item.id === id);
-    if (!encontrado) {
-      throw new Error('No se encontró el pago.');
+  async confirmar(id: string): Promise<Pago> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<PagoApi>(apiUrl(`pagos/${id}/confirmar`), {}),
+      );
+      const pago = mapPagoApi(dto);
+      this.reemplazar(pago);
+      await this.pedidosApi.refrescar().catch(() => undefined);
+      return clonar(pago);
+    } catch (error) {
+      throw new Error(readApiError(error));
     }
-    return clonar(encontrado);
+  }
+
+  async rechazar(id: string, observacion?: string): Promise<Pago> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<PagoApi>(apiUrl(`pagos/${id}/rechazar`), {
+          observacion: textoOpcional(observacion, 500),
+        }),
+      );
+      const pago = mapPagoApi(dto);
+      this.reemplazar(pago);
+      return clonar(pago);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  /** Soft-anulación vía API: el pago queda en historial como ANULADO. */
+  async anular(id: string, observacion?: string): Promise<Pago> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<PagoApi>(apiUrl(`pagos/${id}/anular`), {
+          observacion: textoOpcional(observacion, 500),
+        }),
+      );
+      const pago = mapPagoApi(dto);
+      this.reemplazar(pago);
+      await this.pedidosApi.refrescar().catch(() => undefined);
+      return clonar(pago);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   private reemplazar(pago: Pago): void {

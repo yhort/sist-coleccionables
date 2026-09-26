@@ -815,7 +815,7 @@ public sealed class ApplicationDbContext : DbContext
             .HasDatabaseName("ix_pagos_empresa_estado_origen");
 
         entity.HasIndex(e => new { e.EmpresaId, e.CodigoOperacion })
-            .HasFilter("codigo_operacion IS NOT NULL AND estado <> 'RECHAZADO'")
+            .HasFilter("codigo_operacion IS NOT NULL AND estado <> 'RECHAZADO' AND estado <> 'ANULADO'")
             .IsUnique()
             .HasDatabaseName("ux_pagos_empresa_codigo_operacion");
     }

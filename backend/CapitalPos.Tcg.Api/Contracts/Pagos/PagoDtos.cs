@@ -66,6 +66,12 @@ public sealed class RechazarPagoRequest
     public string? Observacion { get; set; }
 }
 
+public sealed class AnularPagoRequest
+{
+    [MaxLength(500)]
+    public string? Observacion { get; set; }
+}
+
 public sealed class PagoResponse
 {
     public required Guid Id { get; init; }

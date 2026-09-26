@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
+import { readApiError } from '../../../../core/http/api-error';
 import { AsociarPagoDialogComponent } from '../../components/asociar-pago-dialog/asociar-pago-dialog.component';
 import { PagosFiltersComponent } from '../../components/pagos-filters/pagos-filters.component';
 import { PagosKpisComponent } from '../../components/pagos-kpis/pagos-kpis.component';
@@ -35,6 +36,8 @@ export class PagosBandejaPageComponent implements OnInit {
   readonly pagoEnCurso = signal<Pago | null>(null);
   readonly pedidoIdInicial = signal<string | null>(null);
   readonly error = signal('');
+  readonly cargando = signal(false);
+  readonly accionId = signal<string | null>(null);
 
   readonly kpis = computed(() => {
     this.pagosApi.pagos();
@@ -60,8 +63,22 @@ export class PagosBandejaPageComponent implements OnInit {
     if (estado && ESTADOS_PAGO.includes(estado as EstadoPago)) {
       this.filtros.update((actual) => ({ ...actual, estado: estado as EstadoPago }));
     }
-    if (pedidoId) {
-      this.abrirRegistro(pedidoId);
+    void this.cargar().then(() => {
+      if (pedidoId) {
+        this.abrirRegistro(pedidoId);
+      }
+    });
+  }
+
+  async cargar(): Promise<void> {
+    this.cargando.set(true);
+    this.error.set('');
+    try {
+      await this.pagosApi.refrescar();
+    } catch (err) {
+      this.error.set(readApiError(err));
+    } finally {
+      this.cargando.set(false);
     }
   }
 
@@ -98,26 +115,54 @@ export class PagosBandejaPageComponent implements OnInit {
 
   onGuardado(): void {
     this.cerrarDialog();
+    void this.cargar();
   }
 
-  confirmar(pago: Pago): void {
+  async confirmar(pago: Pago): Promise<void> {
     this.error.set('');
+    this.accionId.set(pago.id);
     try {
-      this.pagosApi.confirmar(pago.id);
+      await this.pagosApi.confirmar(pago.id);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo confirmar el pago.');
+      this.error.set(readApiError(err));
+    } finally {
+      this.accionId.set(null);
     }
   }
 
-  rechazar(pago: Pago): void {
+  async rechazar(pago: Pago): Promise<void> {
     this.error.set('');
     if (!globalThis.confirm('¿Rechazar este pago? No sumará al pedido.')) {
       return;
     }
+    this.accionId.set(pago.id);
     try {
-      this.pagosApi.rechazar(pago.id, 'Rechazado desde la bandeja.');
+      await this.pagosApi.rechazar(pago.id, 'Rechazado desde la bandeja.');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo rechazar el pago.');
+      this.error.set(readApiError(err));
+    } finally {
+      this.accionId.set(null);
+    }
+  }
+
+  async anular(pago: Pago): Promise<void> {
+    this.error.set('');
+    const ok = globalThis.confirm(
+      '¿Anular este pago?\n\n' +
+        'La acción es definitiva para efectos contables: el registro se conserva como ANULADO ' +
+        '(no se elimina) y dejará de contar en caja, cobertura del pedido e ingresos. ' +
+        'Si el pedido solo estaba Pagado, volverá a Pendiente de pago.',
+    );
+    if (!ok) {
+      return;
+    }
+    this.accionId.set(pago.id);
+    try {
+      await this.pagosApi.anular(pago.id, 'Anulado desde la bandeja de pagos.');
+    } catch (err) {
+      this.error.set(readApiError(err));
+    } finally {
+      this.accionId.set(null);
     }
   }
 }

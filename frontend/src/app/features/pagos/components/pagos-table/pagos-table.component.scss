@@ -46,6 +46,17 @@
     background: #fcfcfd;
   }
 
+  tbody tr.fila--anulada td,
+  tbody tr.fila--rechazada td {
+    opacity: 0.72;
+    background: #fafafa;
+  }
+
+  tbody tr.fila--anulada .monto,
+  tbody tr.fila--anulada code {
+    text-decoration: line-through;
+  }
+
   code,
   small {
     display: block;
@@ -135,6 +146,13 @@
     background: #fee2e2;
     border-color: transparent;
   }
+
+  &--ANULADO {
+    color: #7f1d1d;
+    background: #fecaca;
+    border-color: transparent;
+    text-decoration: line-through;
+  }
 }
 
 .acciones {
@@ -149,6 +167,11 @@
 
   &--danger {
     color: var(--color-danger);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: wait;
   }
 
   & + .link-btn {

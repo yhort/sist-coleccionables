@@ -9,7 +9,7 @@ export type OrigenPago =
   | 'TRANSFERENCIA'
   | 'OTRO';
 
-export type EstadoPago = 'NOTIFICADO' | 'ASOCIADO' | 'CONFIRMADO' | 'RECHAZADO';
+export type EstadoPago = 'NOTIFICADO' | 'ASOCIADO' | 'CONFIRMADO' | 'RECHAZADO' | 'ANULADO';
 
 export interface Pago {
   id: string;
@@ -89,6 +89,7 @@ export const ESTADOS_PAGO: readonly EstadoPago[] = [
   'ASOCIADO',
   'CONFIRMADO',
   'RECHAZADO',
+  'ANULADO',
 ];
 
 export const FILTROS_PAGOS_VACIOS: PagosFiltros = {
@@ -114,6 +115,7 @@ export const ETIQUETAS_ESTADO_PAGO: Record<EstadoPago, string> = {
   ASOCIADO: 'Asociado',
   CONFIRMADO: 'Confirmado',
   RECHAZADO: 'Rechazado',
+  ANULADO: 'Anulado',
 };
 
 export function normalizarCodigoOperacion(codigo: string | null | undefined): string {

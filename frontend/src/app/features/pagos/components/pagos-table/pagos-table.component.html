@@ -17,7 +17,10 @@
       </thead>
       <tbody>
         @for (fila of filas(); track fila.pago.id) {
-          <tr>
+          <tr
+            [class.fila--anulada]="fila.pago.estado === 'ANULADO'"
+            [class.fila--rechazada]="fila.pago.estado === 'RECHAZADO'"
+          >
             <td>
               {{ fila.pago.fechaNotificacion | date: 'dd/MM/yyyy HH:mm' }}
               @if (fila.pago.fechaConfirmacion) {
@@ -60,13 +63,33 @@
             </td>
             <td class="acciones">
               @if (puedeConfirmar(fila.pago)) {
-                <button type="button" class="link-btn" (click)="confirmar.emit(fila.pago)">
+                <button
+                  type="button"
+                  class="link-btn"
+                  [disabled]="accionId() === fila.pago.id"
+                  (click)="confirmar.emit(fila.pago)"
+                >
                   Confirmar
                 </button>
               }
               @if (fila.pago.estado === 'NOTIFICADO' || fila.pago.estado === 'ASOCIADO') {
-                <button type="button" class="link-btn link-btn--danger" (click)="rechazar.emit(fila.pago)">
+                <button
+                  type="button"
+                  class="link-btn link-btn--danger"
+                  [disabled]="accionId() === fila.pago.id"
+                  (click)="rechazar.emit(fila.pago)"
+                >
                   Rechazar
+                </button>
+              }
+              @if (puedeAnular(fila)) {
+                <button
+                  type="button"
+                  class="link-btn link-btn--danger"
+                  [disabled]="accionId() === fila.pago.id"
+                  (click)="anular.emit(fila.pago)"
+                >
+                  {{ accionId() === fila.pago.id ? 'Anulando…' : 'Anular pago' }}
                 </button>
               }
             </td>

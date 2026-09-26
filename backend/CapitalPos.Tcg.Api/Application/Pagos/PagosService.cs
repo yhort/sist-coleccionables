@@ -275,9 +275,9 @@ public sealed class PagosService(
         CancellationToken cancellationToken)
     {
         var pago = await CargarAsync(id, cancellationToken);
-        if (pago.Estado == EstadoPago.RECHAZADO)
+        if (pago.Estado is EstadoPago.RECHAZADO or EstadoPago.ANULADO)
         {
-            throw new BusinessRuleException("No se puede asociar un pago rechazado.");
+            throw new BusinessRuleException("No se puede asociar un pago rechazado o anulado.");
         }
 
         if (pago.Estado == EstadoPago.CONFIRMADO)
@@ -304,9 +304,9 @@ public sealed class PagosService(
     public async Task<PagoResponse> ConfirmarAsync(Guid id, CancellationToken cancellationToken)
     {
         var pago = await CargarAsync(id, cancellationToken);
-        if (pago.Estado == EstadoPago.RECHAZADO)
+        if (pago.Estado == EstadoPago.RECHAZADO || pago.Estado == EstadoPago.ANULADO)
         {
-            throw new BusinessRuleException("No se puede confirmar un pago rechazado.");
+            throw new BusinessRuleException("No se puede confirmar un pago rechazado o anulado.");
         }
 
         if (pago.Estado != EstadoPago.CONFIRMADO)
@@ -346,10 +346,11 @@ public sealed class PagosService(
         var pago = await CargarAsync(id, cancellationToken);
         if (pago.Estado == EstadoPago.CONFIRMADO)
         {
-            throw new BusinessRuleException("No se puede rechazar un pago ya confirmado.");
+            throw new BusinessRuleException(
+                "No se puede rechazar un pago ya confirmado. Usa «Anular pago» para registrarlo como anulado.");
         }
 
-        if (pago.Estado == EstadoPago.RECHAZADO)
+        if (pago.Estado is EstadoPago.RECHAZADO or EstadoPago.ANULADO)
         {
             return Map(pago);
         }
@@ -362,6 +363,87 @@ public sealed class PagosService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        return (await ObtenerAsync(id, cancellationToken))!;
+    }
+
+    /// <summary>
+    /// Anulación formal (soft delete contable). No borra el registro.
+    /// Libera cobertura del pedido si aplica; bloquea si ya hay venta/CPE o el pedido avanzó de flujo.
+    /// </summary>
+    public async Task<PagoResponse> AnularAsync(
+        Guid id,
+        string? observacion,
+        CancellationToken cancellationToken)
+    {
+        var pago = await CargarAsync(id, cancellationToken);
+        if (pago.Estado == EstadoPago.ANULADO)
+        {
+            return Map(pago);
+        }
+
+        if (pago.Estado == EstadoPago.RECHAZADO)
+        {
+            throw new BusinessRuleException("El pago ya está rechazado; no requiere anulación.");
+        }
+
+        if (pago.VentaId is not null)
+        {
+            throw new BusinessRuleException(
+                "El pago ya está vinculado a una venta. Para revertirlo usa una nota de crédito; no se anula desde la bandeja.");
+        }
+
+        PedidoDigital? pedido = null;
+        if (pago.PedidoDigitalId is { } pedidoId)
+        {
+            pedido = await db.PedidosDigitales
+                .Include(p => p.Historial)
+                .FirstOrDefaultAsync(p => p.Id == pedidoId, cancellationToken)
+                ?? throw new BusinessRuleException("No se encontró el pedido digital asociado.");
+
+            if (pedido.VentaId is not null)
+            {
+                throw new BusinessRuleException(
+                    "El pedido ya tiene venta asociada. Usa nota de crédito para revertir el cobro.");
+            }
+
+            if (pedido.Estado is EstadoPedidoDigital.Empaquetado
+                or EstadoPedidoDigital.PendienteEntrega
+                or EstadoPedidoDigital.Entregado
+                or EstadoPedidoDigital.Anulado
+                or EstadoPedidoDigital.Devuelto)
+            {
+                throw new BusinessRuleException(
+                    $"No se puede anular el pago: el pedido está en {pedido.Estado}. " +
+                    "Revierte el flujo operativo o emite nota de crédito según corresponda.");
+            }
+        }
+
+        var nota = TextoOpcional(observacion, 500)
+            ?? $"Pago anulado ({pago.Origen}). Registro conservado para auditoría.";
+        var eraConfirmado = pago.Estado == EstadoPago.CONFIRMADO;
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        pago.Estado = EstadoPago.ANULADO;
+        pago.Observacion = nota.Length <= 500 ? nota : nota[..500];
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (eraConfirmado && pedido is { Estado: EstadoPedidoDigital.Pagado })
+        {
+            var cubierto = await MontoCubiertoAsync(
+                pedido.Id,
+                [EstadoPago.CONFIRMADO],
+                excluirPagoId: pago.Id,
+                cancellationToken);
+            if (cubierto + 0.000000001m < pedido.Total)
+            {
+                await pedidos.RevertirAPendientePagoPorAnulacionPagoAsync(
+                    pedido.Id,
+                    $"Pago {pago.Origen} anulado ({pago.CodigoOperacion ?? pago.Id.ToString()}). El pedido vuelve a Pendiente de pago.",
+                    cancellationToken);
+            }
+        }
+
+        await tx.CommitAsync(cancellationToken);
         return (await ObtenerAsync(id, cancellationToken))!;
     }
 
@@ -405,6 +487,7 @@ public sealed class PagosService(
         var existe = await db.Pagos.AnyAsync(
             p => p.CodigoOperacion == codigo
                 && p.Estado != EstadoPago.RECHAZADO
+                && p.Estado != EstadoPago.ANULADO
                 && (excluirId == null || p.Id != excluirId),
             cancellationToken);
         if (existe)

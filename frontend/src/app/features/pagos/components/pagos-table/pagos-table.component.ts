@@ -26,9 +26,11 @@ export interface PagoFila {
 })
 export class PagosTableComponent {
   readonly filas = input.required<PagoFila[]>();
+  readonly accionId = input<string | null>(null);
   readonly asociar = output<Pago>();
   readonly confirmar = output<Pago>();
   readonly rechazar = output<Pago>();
+  readonly anular = output<Pago>();
 
   readonly etiquetasOrigen = ETIQUETAS_ORIGEN_PAGO;
   readonly etiquetasEstado = ETIQUETAS_ESTADO_PAGO;
@@ -38,6 +40,19 @@ export class PagosTableComponent {
       return true;
     }
     return pago.estado === 'NOTIFICADO' && !pago.pedidoDigitalId && !esOrigenDigital(pago.origen);
+  }
+
+  puedeAnular(fila: PagoFila): boolean {
+    const pago = fila.pago;
+    if (pago.estado !== 'CONFIRMADO' || pago.ventaId) {
+      return false;
+    }
+    const estado = fila.pedidoEstado;
+    return (
+      estado == null ||
+      estado === 'PendientePago' ||
+      estado === 'Pagado'
+    );
   }
 
   codigoPedidoDe(fila: PagoFila): string {

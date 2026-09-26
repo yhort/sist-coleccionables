@@ -108,8 +108,8 @@
 
     <footer class="dialog__footer">
       <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
-      <button type="submit" class="primary" [disabled]="codigoDuplicado() && !esAsociacion">
-        {{ esAsociacion ? 'Vincular pago' : 'Registrar pago' }}
+      <button type="submit" class="primary" [disabled]="guardando() || (codigoDuplicado() && !esAsociacion)">
+        {{ guardando() ? 'Guardando…' : esAsociacion ? 'Vincular pago' : 'Registrar pago' }}
       </button>
     </footer>
   </form>

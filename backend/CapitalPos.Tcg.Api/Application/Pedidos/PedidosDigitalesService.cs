@@ -479,6 +479,35 @@ public sealed class PedidosDigitalesService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Tras anular un pago confirmado: si el pedido estaba en Pagado (sin venta),
+    /// vuelve a Pendiente de pago para liberar el flujo de cobro.
+    /// </summary>
+    public async Task RevertirAPendientePagoPorAnulacionPagoAsync(
+        Guid pedidoId,
+        string observacion,
+        CancellationToken cancellationToken)
+    {
+        var pedido = await db.PedidosDigitales
+            .Include(p => p.Historial)
+            .FirstOrDefaultAsync(p => p.Id == pedidoId, cancellationToken)
+            ?? throw new BusinessRuleException("No se encontró el pedido digital.", StatusCodes.Status404NotFound);
+
+        if (pedido.VentaId is not null)
+        {
+            throw new BusinessRuleException(
+                "El pedido ya tiene venta; no se revierte el estado por anulación de pago.");
+        }
+
+        if (pedido.Estado != EstadoPedidoDigital.Pagado)
+        {
+            return;
+        }
+
+        AplicarHistorial(pedido, EstadoPedidoDigital.PendientePago, observacion);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SincronizarSnapshotEntregaAsync(
         PedidoDigital pedido,
         Entrega entrega)

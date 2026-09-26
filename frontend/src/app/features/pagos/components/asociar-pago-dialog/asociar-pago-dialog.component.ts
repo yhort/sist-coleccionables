@@ -1,13 +1,4 @@
-import {
-  Component,
-  HostListener,
-  OnInit,
-  computed,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { startWith } from 'rxjs';
@@ -24,6 +15,7 @@ import {
 } from '../../models/pago.model';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 import { formatearSoles } from '../../../../shared/utils/moneda';
+import { readApiError } from '../../../../core/http/api-error';
 
 @Component({
   selector: 'app-asociar-pago-dialog',
@@ -42,6 +34,7 @@ export class AsociarPagoDialogComponent implements OnInit {
   readonly cancelled = output<void>();
 
   readonly error = signal('');
+  readonly guardando = signal(false);
   readonly busquedaPedido = signal('');
   readonly origenes = ORIGENES_PAGO;
   readonly etiquetasOrigen = ETIQUETAS_ORIGEN_PAGO;
@@ -115,7 +108,9 @@ export class AsociarPagoDialogComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    this.cancelled.emit();
+    if (!this.guardando()) {
+      this.cancelled.emit();
+    }
   }
 
   onPedidoChange(pedidoId: string): void {
@@ -133,14 +128,18 @@ export class AsociarPagoDialogComponent implements OnInit {
     return `${pedido.clienteNombre} - ${pedido.codigo} - saldo ${formatearSoles(this.saldoDe(pedido))}`;
   }
 
-  guardar(): void {
+  async guardar(): Promise<void> {
     this.form.markAllAsTouched();
     this.error.set('');
     if (this.codigoDuplicado() && !this.esAsociacion) {
       this.error.set('Ya existe un pago con ese código de operación.');
       return;
     }
+    if (this.guardando()) {
+      return;
+    }
 
+    this.guardando.set(true);
     try {
       const existente = this.pago();
       const pedidoId = this.form.controls.pedidoDigitalId.value.trim() || null;
@@ -150,16 +149,16 @@ export class AsociarPagoDialogComponent implements OnInit {
         if (!pedidoId) {
           throw new Error('Selecciona un pedido digital pendiente.');
         }
-        this.pagosApi.asociar(existente.id, pedidoId);
+        await this.pagosApi.asociar(existente.id, pedidoId);
         if (confirmar) {
-          this.pagosApi.confirmar(existente.id);
+          await this.pagosApi.confirmar(existente.id);
         }
       } else {
         if (this.form.invalid) {
           return;
         }
         const raw = this.form.getRawValue();
-        this.pagosApi.registrar({
+        await this.pagosApi.registrar({
           origen: raw.origen,
           monto: Number(raw.monto),
           codigoOperacion: raw.codigoOperacion,
@@ -172,7 +171,9 @@ export class AsociarPagoDialogComponent implements OnInit {
       }
       this.saved.emit();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo guardar el pago.');
+      this.error.set(readApiError(err));
+    } finally {
+      this.guardando.set(false);
     }
   }
 

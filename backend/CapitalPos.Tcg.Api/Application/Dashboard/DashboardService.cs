@@ -124,7 +124,7 @@ public sealed class DashboardService(ApplicationDbContext db)
     private static ActividadRecienteItem MapPedido(PedidoDigital pedido)
     {
         var metodos = pedido.Pagos
-            .Where(p => p.Estado != EstadoPago.RECHAZADO)
+            .Where(p => p.Estado is not EstadoPago.RECHAZADO and not EstadoPago.ANULADO)
             .OrderByDescending(p => p.FechaNotificacion)
             .Select(p => EtiquetaOrigen(p.Origen))
             .Distinct()

@@ -4,7 +4,7 @@
       <h2>Pagos</h2>
       <p>
         Bandeja Yape / Izipay / transferencia. Conciliar con un pedido en Pendiente de pago y
-        confirmar para moverlo a Pagado en el Kanban.
+        confirmar para moverlo a Pagado. Los pagos no se eliminan: se anulan y quedan en historial.
       </p>
     </div>
     <button type="button" class="pagos__add" (click)="abrirRegistro()">Registrar pago</button>
@@ -24,9 +24,11 @@
 
   <app-pagos-table
     [filas]="filas()"
+    [accionId]="accionId()"
     (asociar)="abrirAsociar($event)"
     (confirmar)="confirmar($event)"
     (rechazar)="rechazar($event)"
+    (anular)="anular($event)"
   />
 </section>
 

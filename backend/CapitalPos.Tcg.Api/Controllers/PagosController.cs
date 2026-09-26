@@ -114,4 +114,19 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
         var rechazado = await pagos.RechazarAsync(id, request?.Observacion, cancellationToken);
         return Ok(rechazado);
     }
+
+    /// <summary>
+    /// Soft-anulación contable: el pago queda en estado ANULADO (no se borra).
+    /// Si el pedido quedó solo en Pagado y deja de cubrirse, vuelve a Pendiente de pago.
+    /// </summary>
+    [HttpPost("{id:guid}/anular")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<PagoResponse>> Anular(
+        Guid id,
+        [FromBody] AnularPagoRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var anulado = await pagos.AnularAsync(id, request?.Observacion, cancellationToken);
+        return Ok(anulado);
+    }
 }
