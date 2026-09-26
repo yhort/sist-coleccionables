@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { startWith } from 'rxjs';
 
@@ -20,10 +20,14 @@ import { ClientesApiService } from '../../../clientes/data-access/clientes.servi
 import {
   Cliente,
   ETIQUETAS_DOCUMENTO,
+  TELEFONO_MAX_DIGITOS,
   TIPOS_DOCUMENTO,
   TipoDocumentoIdentidad,
+  documentoDuplicadoEnLista,
   etiquetaDocumento,
+  sanitizarTelefono,
   validarDocumento,
+  validarTelefono,
 } from '../../../clientes/models/cliente.model';
 import { CajaApiService } from '../../../caja/data-access/caja.service';
 import { ProductoTcg, precioVigente } from '../../../productos-tcg/models/producto-tcg.model';
@@ -54,6 +58,11 @@ import {
 export interface CrearPedidoSavedEvent {
   pedido: PedidoDigital;
   imprimirTicket: boolean;
+}
+
+function telefonoValidator(control: AbstractControl): ValidationErrors | null {
+  const error = validarTelefono(control.value);
+  return error ? { telefonoInvalido: error } : null;
 }
 
 @Component({
@@ -88,10 +97,11 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
   readonly puntosSugeridos = PUNTOS_ENTREGA_SUGERIDOS;
   readonly origenesPagoPos = ORIGENES_PAGO_POS;
   readonly etiquetasOrigenPago = ETIQUETAS_ORIGEN_PAGO;
+  readonly telefonoMax = TELEFONO_MAX_DIGITOS;
 
   readonly form = this.fb.nonNullable.group({
     clienteNombre: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(160)]],
-    clienteTelefono: [''],
+    clienteTelefono: ['', [telefonoValidator]],
     tipoDocumento: this.fb.nonNullable.control<TipoDocumentoIdentidad>('SIN_DOCUMENTO'),
     numeroDocumento: [''],
     esClienteVarios: [false],
@@ -100,7 +110,7 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
     observacion: [''],
     esRecojoTienda: [true],
     destinatarioNombre: [''],
-    destinatarioTelefono: [''],
+    destinatarioTelefono: ['', [telefonoValidator]],
     puntoEntrega: [''],
     canalContacto: this.fb.control<CanalContactoCliente | ''>(''),
     contactoReferencia: [''],
@@ -243,6 +253,15 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
     }
   }
 
+  onTelefonoInput(control: 'clienteTelefono' | 'destinatarioTelefono', event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const limpio = sanitizarTelefono(input.value);
+    if (input.value !== limpio) {
+      input.value = limpio;
+      this.form.controls[control].setValue(limpio, { emitEvent: false });
+    }
+  }
+
   async buscarCliente(texto: string): Promise<void> {
     this.clienteId.set(null);
     const query = texto.trim();
@@ -262,12 +281,12 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
     this.sugerencias.set([]);
     this.form.patchValue({
       clienteNombre: cliente.nombre,
-      clienteTelefono: cliente.telefono ?? '',
+      clienteTelefono: sanitizarTelefono(cliente.telefono ?? ''),
       tipoDocumento: cliente.tipoDocumento,
       numeroDocumento: cliente.numeroDocumento ?? '',
       esClienteVarios: cliente.esPublicoGeneral,
       destinatarioNombre: cliente.nombre,
-      destinatarioTelefono: cliente.telefono ?? '',
+      destinatarioTelefono: sanitizarTelefono(cliente.telefono ?? ''),
       puntoEntrega: cliente.puntoEntregaPreferido ?? '',
       canalContacto: cliente.canalContacto ?? '',
       contactoReferencia: cliente.contactoReferencia ?? '',
@@ -335,6 +354,25 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
       this.error.set(docError);
       return;
     }
+    const telError =
+      validarTelefono(raw.clienteTelefono) ?? validarTelefono(raw.destinatarioTelefono);
+    if (telError) {
+      this.error.set(telError);
+      return;
+    }
+
+    if (!raw.esClienteVarios && !this.clienteId()) {
+      const duplicado = documentoDuplicadoEnLista(
+        this.clientesApi.clientes(),
+        raw.numeroDocumento,
+      );
+      if (duplicado) {
+        this.error.set(
+          `El cliente ya se encuentra registrado (${duplicado.nombre}). Selecciónalo de la búsqueda.`,
+        );
+        return;
+      }
+    }
 
     if (raw.cobroInmediato) {
       await this.refrescarCaja();
@@ -355,7 +393,7 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
       const pedido = await this.pedidosApi.crear({
         clienteId: this.clienteId(),
         clienteNombre: raw.clienteNombre,
-        clienteTelefono: raw.clienteTelefono,
+        clienteTelefono: raw.clienteTelefono || null,
         tipoDocumento: raw.tipoDocumento,
         numeroDocumento: raw.numeroDocumento || null,
         esClienteVarios: raw.esClienteVarios,
@@ -376,10 +414,10 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
           departamento: raw.departamento || null,
           courier: raw.courier || null,
           esRecojoTienda: raw.esRecojoTienda,
-          puntoEntrega: raw.puntoEntrega || null,
+          puntoEntrega: raw.puntoEntrega?.trim() || null,
           canalContacto: raw.canalContacto || null,
-          contactoReferencia: raw.contactoReferencia || null,
-          agencia: raw.puntoEntrega || null,
+          contactoReferencia: raw.contactoReferencia?.trim() || null,
+          agencia: raw.puntoEntrega?.trim() || null,
         },
         guardarPuntoEnCliente: Boolean(raw.guardarPuntoEnCliente && this.clienteId()),
         cobroInmediato: raw.cobroInmediato

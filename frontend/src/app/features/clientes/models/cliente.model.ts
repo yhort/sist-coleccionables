@@ -14,6 +14,7 @@ export interface Cliente {
   tipoDocumento: TipoDocumentoIdentidad;
   numeroDocumento: string | null;
   esPublicoGeneral: boolean;
+  activo: boolean;
   fechaCreacion: string;
 }
 
@@ -44,6 +45,10 @@ export const ETIQUETAS_DOCUMENTO: Record<TipoDocumentoIdentidad, string> = {
   SIN_DOCUMENTO: 'Sin documento',
 };
 
+/** Teléfono: únicamente dígitos, máximo 9. */
+export const TELEFONO_MAX_DIGITOS = 9;
+export const TELEFONO_PATTERN = /^\d{0,9}$/;
+
 export function etiquetaDocumento(cliente: Pick<Cliente, 'tipoDocumento' | 'numeroDocumento' | 'esPublicoGeneral'>): string {
   if (cliente.esPublicoGeneral) {
     return 'Público general';
@@ -66,4 +71,40 @@ export function validarDocumento(tipo: TipoDocumentoIdentidad, numero: string, e
     return 'El RUC debe tener 11 dígitos.';
   }
   return null;
+}
+
+/** Vacío permitido; si hay valor: solo dígitos y máximo 9. */
+export function validarTelefono(telefono: string | null | undefined): string | null {
+  const texto = (telefono ?? '').trim();
+  if (!texto) {
+    return null;
+  }
+  if (!TELEFONO_PATTERN.test(texto)) {
+    return 'El teléfono solo admite números (dígitos) y un máximo de 9 caracteres.';
+  }
+  return null;
+}
+
+/** Filtra entrada en tiempo real: solo dígitos, máx. 9. */
+export function sanitizarTelefono(valor: string): string {
+  return valor.replace(/\D/g, '').slice(0, TELEFONO_MAX_DIGITOS);
+}
+
+export function documentoDuplicadoEnLista(
+  clientes: readonly Cliente[],
+  numeroDocumento: string | null | undefined,
+  excluirId?: string | null,
+): Cliente | null {
+  const numero = (numeroDocumento ?? '').replace(/\D/g, '');
+  if (!numero || numero === '00000000') {
+    return null;
+  }
+  return (
+    clientes.find(
+      (cliente) =>
+        cliente.activo &&
+        cliente.id !== excluirId &&
+        (cliente.numeroDocumento ?? '').replace(/\D/g, '') === numero,
+    ) ?? null
+  );
 }

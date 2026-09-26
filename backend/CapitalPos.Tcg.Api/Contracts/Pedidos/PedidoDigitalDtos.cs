@@ -20,7 +20,9 @@ public sealed class PedidoDigitalEntregaInput
     [MaxLength(160)]
     public string? DestinatarioNombre { get; set; }
 
-    [MaxLength(32)]
+    /// <summary>Solo dígitos, máximo 9.</summary>
+    [MaxLength(9)]
+    [RegularExpression(@"^\d{0,9}$", ErrorMessage = "El teléfono solo admite números (máximo 9 dígitos).")]
     public string? DestinatarioTelefono { get; set; }
 
     [MaxLength(300)]
@@ -70,7 +72,9 @@ public sealed class CrearPedidoDigitalRequest
     [MaxLength(160)]
     public string ClienteNombre { get; set; } = string.Empty;
 
-    [MaxLength(32)]
+    /// <summary>Solo dígitos, máximo 9.</summary>
+    [MaxLength(9)]
+    [RegularExpression(@"^\d{0,9}$", ErrorMessage = "El teléfono solo admite números (máximo 9 dígitos).")]
     public string? ClienteTelefono { get; set; }
 
     public TipoDocumentoIdentidad? TipoDocumento { get; set; }

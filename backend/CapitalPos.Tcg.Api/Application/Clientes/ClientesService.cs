@@ -12,9 +12,15 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
 {
     public async Task<IReadOnlyList<ClienteResponse>> ListarAsync(
         string? q,
+        bool? activo,
         CancellationToken cancellationToken)
     {
         var query = db.Clientes.AsNoTracking().AsQueryable();
+        if (activo.HasValue)
+        {
+            query = query.Where(c => c.Activo == activo.Value);
+        }
+
         var filtro = q?.Trim() ?? string.Empty;
         if (filtro.Length > 0)
         {
@@ -43,10 +49,50 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
     public async Task<ClienteResponse> CrearAsync(UpsertClienteRequest request, CancellationToken cancellationToken)
     {
         var ahora = DateTimeOffset.UtcNow;
-        var cliente = request.EsPublicoGeneral
-            ? await ResolverPublicoGeneralAsync(ahora, cancellationToken)
-            : await CrearOActualizarPorDocumentoAsync(request, ahora, cancellationToken);
+        if (request.EsPublicoGeneral)
+        {
+            var publico = await ResolverPublicoGeneralAsync(ahora, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return Map(publico);
+        }
 
+        var (tipo, numero, nombre) = DocumentoIdentidad.NormalizarCliente(
+            request.Nombre,
+            request.TipoDocumento,
+            request.NumeroDocumento,
+            request.EsPublicoGeneral);
+        var telefono = TelefonoCliente.Normalizar(request.Telefono);
+        var punto = TextoOpcionalLargo(request.PuntoEntregaPreferido, 80);
+        var contactoRef = TextoOpcionalLargo(request.ContactoReferencia, 160);
+
+        // Si hay un cliente inactivo con el mismo documento, lo reactivamos.
+        var inactivo = await BuscarPorDocumentoAsync(numero, soloActivos: false, cancellationToken);
+        if (inactivo is { Activo: false })
+        {
+            await AsegurarDocumentoLibreAsync(numero, inactivo.Id, cancellationToken);
+            AplicarDatos(inactivo, nombre, telefono, punto, request.CanalContacto, contactoRef, tipo, numero);
+            inactivo.Activo = true;
+            await db.SaveChangesAsync(cancellationToken);
+            return Map(inactivo);
+        }
+
+        await AsegurarDocumentoLibreAsync(numero, excluirId: null, cancellationToken);
+
+        var cliente = new Cliente
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = tenant.EmpresaId,
+            Nombre = nombre,
+            Telefono = telefono,
+            PuntoEntregaPreferido = punto,
+            CanalContacto = request.CanalContacto,
+            ContactoReferencia = contactoRef,
+            TipoDocumento = tipo,
+            NumeroDocumento = numero,
+            Activo = true,
+            FechaCreacion = ahora
+        };
+        db.Clientes.Add(cliente);
         await db.SaveChangesAsync(cancellationToken);
         return Map(cliente);
     }
@@ -69,13 +115,63 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             request.EsPublicoGeneral);
         await AsegurarDocumentoLibreAsync(numero, id, cancellationToken);
 
-        cliente.Nombre = nombre;
-        cliente.Telefono = TextoOpcional(request.Telefono);
-        cliente.PuntoEntregaPreferido = TextoOpcionalLargo(request.PuntoEntregaPreferido, 80);
-        cliente.CanalContacto = request.CanalContacto;
-        cliente.ContactoReferencia = TextoOpcionalLargo(request.ContactoReferencia, 160);
-        cliente.TipoDocumento = tipo;
-        cliente.NumeroDocumento = numero;
+        AplicarDatos(
+            cliente,
+            nombre,
+            TelefonoCliente.Normalizar(request.Telefono),
+            TextoOpcionalLargo(request.PuntoEntregaPreferido, 80),
+            request.CanalContacto,
+            TextoOpcionalLargo(request.ContactoReferencia, 160),
+            tipo,
+            numero);
+        await db.SaveChangesAsync(cancellationToken);
+        return Map(cliente);
+    }
+
+    /// <summary>Soft delete: oculta el cliente de listados activos sin borrar historial.</summary>
+    public async Task<ClienteResponse?> DesactivarAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (cliente is null)
+        {
+            return null;
+        }
+
+        if (DocumentoIdentidad.EsPublicoGeneral(cliente.Nombre, cliente.TipoDocumento, cliente.NumeroDocumento))
+        {
+            throw new BusinessRuleException("No se puede desactivar el cliente varios / público general.");
+        }
+
+        if (!cliente.Activo)
+        {
+            return Map(cliente);
+        }
+
+        cliente.Activo = false;
+        await db.SaveChangesAsync(cancellationToken);
+        return Map(cliente);
+    }
+
+    public async Task<ClienteResponse?> ReactivarAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (cliente is null)
+        {
+            return null;
+        }
+
+        if (cliente.Activo)
+        {
+            return Map(cliente);
+        }
+
+        if (!string.IsNullOrWhiteSpace(cliente.NumeroDocumento)
+            && cliente.NumeroDocumento != DocumentoIdentidad.NumeroSinDocumento)
+        {
+            await AsegurarDocumentoLibreAsync(cliente.NumeroDocumento, id, cancellationToken);
+        }
+
+        cliente.Activo = true;
         await db.SaveChangesAsync(cancellationToken);
         return Map(cliente);
     }
@@ -95,6 +191,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         {
             existente.TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO;
             existente.NumeroDocumento = DocumentoIdentidad.NumeroSinDocumento;
+            existente.Activo = true;
             if (string.IsNullOrWhiteSpace(existente.Nombre))
             {
                 existente.Nombre = DocumentoIdentidad.NombreClienteVarios;
@@ -110,38 +207,53 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             Nombre = DocumentoIdentidad.NombreClienteVarios,
             TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO,
             NumeroDocumento = DocumentoIdentidad.NumeroSinDocumento,
+            Activo = true,
             FechaCreacion = ahora
         };
         db.Clientes.Add(cliente);
         return cliente;
     }
 
-    private async Task<Cliente> CrearOActualizarPorDocumentoAsync(
+    /// <summary>
+    /// Alta desde pedido digital: reutiliza cliente activo por documento o crea uno nuevo
+    /// con teléfono / punto / canal / contacto de referencia del formulario.
+    /// </summary>
+    public async Task<Cliente> ResolverOCrearDesdePedidoAsync(
         UpsertClienteRequest request,
-        DateTimeOffset ahora,
         CancellationToken cancellationToken)
     {
+        var ahora = DateTimeOffset.UtcNow;
+        if (request.EsPublicoGeneral)
+        {
+            return await ResolverPublicoGeneralAsync(ahora, cancellationToken);
+        }
+
         var (tipo, numero, nombre) = DocumentoIdentidad.NormalizarCliente(
             request.Nombre,
             request.TipoDocumento,
             request.NumeroDocumento,
             request.EsPublicoGeneral);
+        var telefono = TelefonoCliente.Normalizar(request.Telefono);
+        var punto = TextoOpcionalLargo(request.PuntoEntregaPreferido, 80);
+        var contactoRef = TextoOpcionalLargo(request.ContactoReferencia, 160);
 
-        var existente = string.IsNullOrWhiteSpace(numero) || numero == DocumentoIdentidad.NumeroSinDocumento
-            ? null
-            : await db.Clientes.FirstOrDefaultAsync(c => c.NumeroDocumento == numero, cancellationToken);
-        if (existente is not null)
+        if (!string.IsNullOrWhiteSpace(numero) && numero != DocumentoIdentidad.NumeroSinDocumento)
         {
-            existente.Nombre = nombre;
-            existente.Telefono = TextoOpcional(request.Telefono) ?? existente.Telefono;
-            existente.PuntoEntregaPreferido =
-                TextoOpcionalLargo(request.PuntoEntregaPreferido, 80) ?? existente.PuntoEntregaPreferido;
-            existente.CanalContacto = request.CanalContacto ?? existente.CanalContacto;
-            existente.ContactoReferencia =
-                TextoOpcionalLargo(request.ContactoReferencia, 160) ?? existente.ContactoReferencia;
-            existente.TipoDocumento = tipo;
-            existente.NumeroDocumento = numero;
-            return existente;
+            var existente = await BuscarPorDocumentoAsync(numero, soloActivos: false, cancellationToken);
+            if (existente is not null)
+            {
+                AplicarDatos(
+                    existente,
+                    nombre,
+                    telefono ?? existente.Telefono,
+                    punto ?? existente.PuntoEntregaPreferido,
+                    request.CanalContacto ?? existente.CanalContacto,
+                    contactoRef ?? existente.ContactoReferencia,
+                    tipo,
+                    numero);
+                existente.Activo = true;
+                return existente;
+            }
         }
 
         var cliente = new Cliente
@@ -149,41 +261,79 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             Id = Guid.NewGuid(),
             EmpresaId = tenant.EmpresaId,
             Nombre = nombre,
-            Telefono = TextoOpcional(request.Telefono),
-            PuntoEntregaPreferido = TextoOpcionalLargo(request.PuntoEntregaPreferido, 80),
+            Telefono = telefono,
+            PuntoEntregaPreferido = punto,
             CanalContacto = request.CanalContacto,
-            ContactoReferencia = TextoOpcionalLargo(request.ContactoReferencia, 160),
+            ContactoReferencia = contactoRef,
             TipoDocumento = tipo,
             NumeroDocumento = numero,
+            Activo = true,
             FechaCreacion = ahora
         };
         db.Clientes.Add(cliente);
         return cliente;
     }
 
-    private async Task AsegurarDocumentoLibreAsync(
+    private async Task<Cliente?> BuscarPorDocumentoAsync(
         string numero,
-        Guid idActual,
+        bool soloActivos,
         CancellationToken cancellationToken)
     {
-        if (numero == DocumentoIdentidad.NumeroSinDocumento)
+        if (string.IsNullOrWhiteSpace(numero) || numero == DocumentoIdentidad.NumeroSinDocumento)
+        {
+            return null;
+        }
+
+        var query = db.Clientes.Where(c => c.NumeroDocumento == numero);
+        if (soloActivos)
+        {
+            query = query.Where(c => c.Activo);
+        }
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task AsegurarDocumentoLibreAsync(
+        string numero,
+        Guid? excluirId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(numero) || numero == DocumentoIdentidad.NumeroSinDocumento)
         {
             return;
         }
 
-        var choque = await db.Clientes.AnyAsync(
-            c => c.NumeroDocumento == numero && c.Id != idActual,
-            cancellationToken);
+        var query = db.Clientes.Where(c => c.Activo && c.NumeroDocumento == numero);
+        if (excluirId.HasValue)
+        {
+            query = query.Where(c => c.Id != excluirId.Value);
+        }
+
+        var choque = await query.AnyAsync(cancellationToken);
         if (choque)
         {
-            throw new BusinessRuleException("Ya existe un cliente con ese documento.");
+            throw new BusinessRuleException(
+                "El cliente ya se encuentra registrado con ese DNI/RUC.");
         }
     }
 
-    private static string? TextoOpcional(string? valor)
+    private static void AplicarDatos(
+        Cliente cliente,
+        string nombre,
+        string? telefono,
+        string? punto,
+        CanalContactoCliente? canal,
+        string? contactoRef,
+        TipoDocumentoIdentidad tipo,
+        string numero)
     {
-        var texto = valor?.Trim() ?? string.Empty;
-        return texto.Length == 0 ? null : texto[..Math.Min(texto.Length, 32)];
+        cliente.Nombre = nombre;
+        cliente.Telefono = telefono;
+        cliente.PuntoEntregaPreferido = punto;
+        cliente.CanalContacto = canal;
+        cliente.ContactoReferencia = contactoRef;
+        cliente.TipoDocumento = tipo;
+        cliente.NumeroDocumento = numero;
     }
 
     private static string? TextoOpcionalLargo(string? valor, int max)
@@ -206,6 +356,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             cliente.Nombre,
             cliente.TipoDocumento,
             cliente.NumeroDocumento),
+        Activo = cliente.Activo,
         FechaCreacion = cliente.FechaCreacion
     };
 }

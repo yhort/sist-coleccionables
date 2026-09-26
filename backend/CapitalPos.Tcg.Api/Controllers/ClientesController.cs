@@ -14,9 +14,11 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ClienteResponse>>> Listar(
         [FromQuery] string? q,
+        [FromQuery] bool? activo,
         CancellationToken cancellationToken)
     {
-        var items = await clientes.ListarAsync(q, cancellationToken);
+        // Por defecto solo activos (soft-delete oculto en listados operativos).
+        var items = await clientes.ListarAsync(q, activo ?? true, cancellationToken);
         return Ok(items);
     }
 
@@ -46,5 +48,22 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
     {
         var actualizado = await clientes.ActualizarAsync(id, request, cancellationToken);
         return actualizado is null ? NotFound() : Ok(actualizado);
+    }
+
+    /// <summary>Soft delete: desactiva el cliente sin borrar historial de pedidos/pagos.</summary>
+    [HttpPost("{id:guid}/desactivar")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<ClienteResponse>> Desactivar(Guid id, CancellationToken cancellationToken)
+    {
+        var desactivado = await clientes.DesactivarAsync(id, cancellationToken);
+        return desactivado is null ? NotFound() : Ok(desactivado);
+    }
+
+    [HttpPost("{id:guid}/reactivar")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<ClienteResponse>> Reactivar(Guid id, CancellationToken cancellationToken)
+    {
+        var reactivado = await clientes.ReactivarAsync(id, cancellationToken);
+        return reactivado is null ? NotFound() : Ok(reactivado);
     }
 }

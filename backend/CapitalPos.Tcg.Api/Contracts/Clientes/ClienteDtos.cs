@@ -10,7 +10,9 @@ public sealed class UpsertClienteRequest
     [MaxLength(160)]
     public string Nombre { get; set; } = string.Empty;
 
-    [MaxLength(32)]
+    /// <summary>Solo dígitos, máximo 9.</summary>
+    [MaxLength(9)]
+    [RegularExpression(@"^\d{0,9}$", ErrorMessage = "El teléfono solo admite números (máximo 9 dígitos).")]
     public string? Telefono { get; set; }
 
     [MaxLength(80)]
@@ -40,5 +42,6 @@ public sealed class ClienteResponse
     public required TipoDocumentoIdentidad TipoDocumento { get; init; }
     public string? NumeroDocumento { get; init; }
     public required bool EsPublicoGeneral { get; init; }
+    public required bool Activo { get; init; }
     public required DateTimeOffset FechaCreacion { get; init; }
 }

@@ -13,7 +13,9 @@ public sealed class ProgramarEntregaRequest
     [MaxLength(160)]
     public string? DestinatarioNombre { get; set; }
 
-    [MaxLength(32)]
+    /// <summary>Solo dígitos, máximo 9.</summary>
+    [MaxLength(9)]
+    [RegularExpression(@"^\d{0,9}$", ErrorMessage = "El teléfono solo admite números (máximo 9 dígitos).")]
     public string? DestinatarioTelefono { get; set; }
 
     [MaxLength(300)]

@@ -275,7 +275,7 @@ public sealed class EntregasService(
         entrega.DestinatarioNombre = string.IsNullOrWhiteSpace(request.DestinatarioNombre)
             ? (string.IsNullOrWhiteSpace(pedido.DestinatarioNombre) ? pedido.ClienteNombre ?? "Cliente" : pedido.DestinatarioNombre)
             : request.DestinatarioNombre.Trim();
-        entrega.DestinatarioTelefono = TextoOpcional(request.DestinatarioTelefono, 32)
+        entrega.DestinatarioTelefono = TelefonoCliente.Normalizar(request.DestinatarioTelefono)
             ?? pedido.DestinatarioTelefono
             ?? pedido.ClienteTelefono;
         entrega.Direccion = TextoOpcional(request.Direccion, 300) ?? pedido.EntregaDireccion;

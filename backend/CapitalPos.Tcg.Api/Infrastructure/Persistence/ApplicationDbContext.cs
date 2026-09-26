@@ -686,6 +686,7 @@ public sealed class ApplicationDbContext : DbContext
         entity.Property(e => e.ContactoReferencia).HasMaxLength(160);
         EnumAsString(entity.Property(e => e.TipoDocumento), 16);
         entity.Property(e => e.NumeroDocumento).HasMaxLength(16);
+        entity.Property(e => e.Activo).HasDefaultValue(true);
 
         entity.HasAlternateKey(e => new { e.EmpresaId, e.Id })
             .HasName("ak_clientes_empresa_id");
@@ -697,6 +698,9 @@ public sealed class ApplicationDbContext : DbContext
 
         entity.HasIndex(e => new { e.EmpresaId, e.NumeroDocumento })
             .HasDatabaseName("ix_clientes_empresa_id_numero_documento");
+
+        entity.HasIndex(e => new { e.EmpresaId, e.Activo })
+            .HasDatabaseName("ix_clientes_empresa_id_activo");
     }
 
     private static void ConfigureProveedor(ModelBuilder modelBuilder)

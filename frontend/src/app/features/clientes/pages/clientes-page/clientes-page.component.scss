@@ -118,4 +118,19 @@ table {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+
+  &--danger {
+    color: var(--color-danger);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
 }

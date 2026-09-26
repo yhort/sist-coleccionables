@@ -67,7 +67,15 @@
       </label>
       <label>
         Teléfono
-        <input type="tel" formControlName="clienteTelefono" maxlength="32" />
+        <input
+          type="tel"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          formControlName="clienteTelefono"
+          [attr.maxlength]="telefonoMax"
+          placeholder="Solo números, máx. 9"
+          (input)="onTelefonoInput('clienteTelefono', $event)"
+        />
       </label>
       <label>
         Canal de contacto
@@ -129,7 +137,15 @@
         </label>
         <label>
           Teléfono destinatario
-          <input type="tel" formControlName="destinatarioTelefono" maxlength="32" />
+          <input
+            type="tel"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            formControlName="destinatarioTelefono"
+            [attr.maxlength]="telefonoMax"
+            placeholder="Solo números, máx. 9"
+            (input)="onTelefonoInput('destinatarioTelefono', $event)"
+          />
         </label>
         <label class="wide">
           Dirección

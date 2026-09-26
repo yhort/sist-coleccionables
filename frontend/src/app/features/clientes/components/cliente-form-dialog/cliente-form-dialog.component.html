@@ -42,7 +42,15 @@
       </label>
       <label class="wide">
         Teléfono
-        <input type="tel" formControlName="telefono" maxlength="32" />
+        <input
+          type="tel"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          formControlName="telefono"
+          [attr.maxlength]="telefonoMax"
+          placeholder="Solo números, máx. 9 dígitos"
+          (input)="onTelefonoInput($event)"
+        />
       </label>
       <label>
         Canal de contacto
@@ -84,7 +92,9 @@
     }
     <footer class="dialog__footer">
       <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
-      <button type="submit" class="primary">Guardar</button>
+      <button type="submit" class="primary" [disabled]="guardando()">
+        {{ guardando() ? 'Guardando…' : 'Guardar' }}
+      </button>
     </footer>
   </form>
 </section>

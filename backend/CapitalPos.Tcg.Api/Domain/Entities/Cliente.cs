@@ -15,6 +15,8 @@ public class Cliente : IEmpresaScoped
     public string? ContactoReferencia { get; set; }
     public TipoDocumentoIdentidad TipoDocumento { get; set; } = TipoDocumentoIdentidad.DNI;
     public string? NumeroDocumento { get; set; }
+    /// <summary>False = soft delete: oculto en listados activos, historial de pedidos/pagos se conserva.</summary>
+    public bool Activo { get; set; } = true;
     public DateTimeOffset FechaCreacion { get; set; }
 
     public Empresa Empresa { get; set; } = null!;

@@ -4,7 +4,7 @@
       <h2>Clientes</h2>
       <p>
         Maestro de clientes: DNI de 8 dígitos, RUC de 11 y Cliente varios / Público general para
-        boletas. La factura exige RUC.
+        boletas. La factura exige RUC. Desactivar oculta al cliente sin borrar su historial.
       </p>
     </div>
     <button type="button" class="maestros__add" (click)="abrir()">Nuevo cliente</button>
@@ -62,12 +62,24 @@
               }
             </td>
             <td>
-              <button type="button" class="link" (click)="abrir(cliente)">Editar</button>
+              <div class="acciones">
+                <button type="button" class="link" (click)="abrir(cliente)">Editar</button>
+                @if (!cliente.esPublicoGeneral) {
+                  <button
+                    type="button"
+                    class="link link--danger"
+                    [disabled]="desactivandoId() === cliente.id"
+                    (click)="desactivar(cliente)"
+                  >
+                    {{ desactivandoId() === cliente.id ? 'Desactivando…' : 'Desactivar' }}
+                  </button>
+                }
+              </div>
             </td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="5">No hay clientes registrados.</td>
+            <td colspan="8">No hay clientes registrados.</td>
           </tr>
         }
       </tbody>

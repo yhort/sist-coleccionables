@@ -96,13 +96,19 @@ public sealed class PedidosDigitalesService(
         }
 
         var entrega = NormalizarEntrega(request.Entrega, clienteNombre);
+        var clienteTelefono = TelefonoCliente.Normalizar(request.ClienteTelefono);
+        request.ClienteTelefono = clienteTelefono;
         var ahora = DateTimeOffset.UtcNow;
         var cliente = await ResolverClienteAltaAsync(request, clienteNombre, ahora, cancellationToken);
 
         // Completa snapshot desde ficha si el formulario dejó vacío.
         if (string.IsNullOrWhiteSpace(entrega.DestinatarioTelefono))
         {
-            entrega.DestinatarioTelefono = TextoOpcional(request.ClienteTelefono, 32) ?? cliente.Telefono;
+            entrega.DestinatarioTelefono = clienteTelefono ?? cliente.Telefono;
+        }
+        else
+        {
+            entrega.DestinatarioTelefono = TelefonoCliente.Normalizar(entrega.DestinatarioTelefono);
         }
 
         if (string.IsNullOrWhiteSpace(entrega.PuntoEntrega))
@@ -116,7 +122,7 @@ public sealed class PedidosDigitalesService(
             entrega.ContactoReferencia = cliente.ContactoReferencia;
         }
 
-        if (string.IsNullOrWhiteSpace(request.ClienteTelefono) && cliente.Telefono is not null)
+        if (clienteTelefono is null && cliente.Telefono is not null)
         {
             request.ClienteTelefono = cliente.Telefono;
         }
@@ -173,7 +179,7 @@ public sealed class PedidosDigitalesService(
             EmpresaId = tenant.EmpresaId,
             ClienteId = cliente.Id,
             ClienteNombre = clienteNombre,
-            ClienteTelefono = TextoOpcional(request.ClienteTelefono, 32),
+            ClienteTelefono = request.ClienteTelefono,
             SedeId = sede.Id,
             CanalPedido = request.CanalPedido,
             Estado = EstadoPedidoDigital.PendientePago,
@@ -196,6 +202,7 @@ public sealed class PedidosDigitalesService(
             CostoEnvio = entrega.CostoEnvio,
             NotasEmpaque = entrega.NotasEmpaque,
             Agencia = entrega.Agencia,
+            // Snapshot de contacto / punto / ref del formulario (persiste al refrescar).
             PuntoEntrega = entrega.PuntoEntrega,
             CanalContacto = entrega.CanalContacto,
             ContactoReferencia = entrega.ContactoReferencia
@@ -207,7 +214,9 @@ public sealed class PedidosDigitalesService(
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
         db.PedidosDigitales.Add(pedido);
 
-        if (request.GuardarPuntoEnCliente)
+        // Persiste preferencias en ficha: al crear cliente nuevo desde el pedido,
+        // o cuando el usuario marca "guardar en ficha del cliente".
+        if (request.GuardarPuntoEnCliente || request.ClienteId is null)
         {
             AplicarPreferenciasCliente(
                 cliente,
@@ -1050,8 +1059,15 @@ public sealed class PedidosDigitalesService(
     {
         if (request.ClienteId is { } clienteId && clienteId != Guid.Empty)
         {
-            return await db.Clientes.FirstOrDefaultAsync(c => c.Id == clienteId, cancellationToken)
+            var existente = await db.Clientes.FirstOrDefaultAsync(c => c.Id == clienteId, cancellationToken)
                 ?? throw new BusinessRuleException("No se encontró el cliente seleccionado.");
+            if (!existente.Activo)
+            {
+                throw new BusinessRuleException(
+                    "El cliente seleccionado está desactivado. Reactívalo o elige otro.");
+            }
+
+            return existente;
         }
 
         if (request.EsClienteVarios)
@@ -1059,11 +1075,15 @@ public sealed class PedidosDigitalesService(
             return await clientes.ResolverPublicoGeneralAsync(ahora, cancellationToken);
         }
 
-        var dto = await clientes.CrearAsync(
+        var entrega = request.Entrega;
+        return await clientes.ResolverOCrearDesdePedidoAsync(
             new Contracts.Clientes.UpsertClienteRequest
             {
                 Nombre = clienteNombre,
                 Telefono = request.ClienteTelefono,
+                PuntoEntregaPreferido = entrega?.PuntoEntrega,
+                CanalContacto = entrega?.CanalContacto,
+                ContactoReferencia = entrega?.ContactoReferencia,
                 TipoDocumento = request.TipoDocumento
                     ?? (string.IsNullOrWhiteSpace(request.NumeroDocumento)
                         ? TipoDocumentoIdentidad.SIN_DOCUMENTO
@@ -1072,7 +1092,6 @@ public sealed class PedidosDigitalesService(
                 EsPublicoGeneral = false
             },
             cancellationToken);
-        return await db.Clientes.FirstAsync(c => c.Id == dto.Id, cancellationToken);
     }
 
     private async Task<Cliente> ResolverClienteAsync(
@@ -1122,7 +1141,7 @@ public sealed class PedidosDigitalesService(
             return new PedidoDigitalEntregaInput
             {
                 DestinatarioNombre = destinatario,
-                DestinatarioTelefono = TextoOpcional(entrega.DestinatarioTelefono, 32),
+                DestinatarioTelefono = TelefonoCliente.Normalizar(entrega.DestinatarioTelefono),
                 EsRecojoTienda = true,
                 Courier = "Recojo en tienda",
                 CostoEnvio = 0,
@@ -1144,7 +1163,7 @@ public sealed class PedidosDigitalesService(
         return new PedidoDigitalEntregaInput
         {
             DestinatarioNombre = destinatario,
-            DestinatarioTelefono = TextoOpcional(entrega.DestinatarioTelefono, 32),
+            DestinatarioTelefono = TelefonoCliente.Normalizar(entrega.DestinatarioTelefono),
             Direccion = direccion.Length >= 5 ? direccion : null,
             Distrito = TextoOpcional(entrega.Distrito, 80),
             Provincia = TextoOpcional(entrega.Provincia, 80),
@@ -1168,9 +1187,10 @@ public sealed class PedidosDigitalesService(
         CanalContactoCliente? canalContacto,
         string? contactoReferencia)
     {
-        if (!string.IsNullOrWhiteSpace(telefono))
+        var tel = TelefonoCliente.Normalizar(telefono);
+        if (tel is not null)
         {
-            cliente.Telefono = telefono.Trim()[..Math.Min(telefono.Trim().Length, 32)];
+            cliente.Telefono = tel;
         }
 
         if (!string.IsNullOrWhiteSpace(puntoEntrega))

@@ -20,6 +20,7 @@ export class ClientesPageComponent {
   readonly error = signal('');
   readonly dialogAbierto = signal(false);
   readonly enCurso = signal<Cliente | null>(null);
+  readonly desactivandoId = signal<string | null>(null);
   readonly clientes = this.api.clientes;
   readonly etiquetaDocumento = etiquetaDocumento;
   readonly etiquetaCanal = etiquetaCanalContacto;
@@ -65,5 +66,28 @@ export class ClientesPageComponent {
   cerrar(): void {
     this.dialogAbierto.set(false);
     this.enCurso.set(null);
+  }
+
+  async desactivar(cliente: Cliente): Promise<void> {
+    if (cliente.esPublicoGeneral) {
+      this.error.set('No se puede desactivar el cliente varios / público general.');
+      return;
+    }
+    const ok = window.confirm(
+      `¿Desactivar a «${cliente.nombre}»?\nSeguirá visible en el historial de pedidos y pagos, pero no en listados activos.`,
+    );
+    if (!ok) {
+      return;
+    }
+    this.error.set('');
+    this.desactivandoId.set(cliente.id);
+    try {
+      await this.api.desactivar(cliente.id);
+      await this.cargar();
+    } catch (err) {
+      this.error.set(readApiError(err));
+    } finally {
+      this.desactivandoId.set(null);
+    }
   }
 }
