@@ -13,6 +13,7 @@ import {
   FILTROS_PAGOS_VACIOS,
   Pago,
   PagosFiltros,
+  crearFiltrosPagosDiaActual,
 } from '../../models/pago.model';
 
 @Component({
@@ -31,18 +32,13 @@ export class PagosBandejaPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  readonly filtros = signal<PagosFiltros>({ ...FILTROS_PAGOS_VACIOS });
+  readonly filtros = signal<PagosFiltros>(crearFiltrosPagosDiaActual());
   readonly dialogAbierto = signal(false);
   readonly pagoEnCurso = signal<Pago | null>(null);
   readonly pedidoIdInicial = signal<string | null>(null);
   readonly error = signal('');
   readonly cargando = signal(false);
   readonly accionId = signal<string | null>(null);
-
-  readonly kpis = computed(() => {
-    this.pagosApi.pagos();
-    return this.pagosApi.kpis();
-  });
 
   readonly filas = computed<PagoFila[]>(() => {
     this.pagosApi.pagos();
@@ -54,6 +50,11 @@ export class PagosBandejaPageComponent implements OnInit {
         pedidoEstado: pedido?.estado ?? null,
       };
     });
+  });
+
+  readonly kpis = computed(() => {
+    this.pagosApi.pagos();
+    return this.pagosApi.kpis(this.pagosApi.listar(this.filtros()));
   });
 
   ngOnInit(): void {
@@ -74,7 +75,7 @@ export class PagosBandejaPageComponent implements OnInit {
     this.cargando.set(true);
     this.error.set('');
     try {
-      await this.pagosApi.refrescar();
+      await this.refrescarPagos();
     } catch (err) {
       this.error.set(readApiError(err));
     } finally {
@@ -83,11 +84,16 @@ export class PagosBandejaPageComponent implements OnInit {
   }
 
   actualizarFiltros(filtros: PagosFiltros): void {
+    const prev = this.filtros();
     this.filtros.set(filtros);
+    if (prev.desde !== filtros.desde || prev.hasta !== filtros.hasta) {
+      void this.refrescarPagos().catch((err) => this.error.set(readApiError(err)));
+    }
   }
 
   limpiarFiltros(): void {
     this.filtros.set({ ...FILTROS_PAGOS_VACIOS });
+    void this.refrescarPagos().catch((err) => this.error.set(readApiError(err)));
   }
 
   abrirRegistro(pedidoId: string | null = null): void {
@@ -164,5 +170,13 @@ export class PagosBandejaPageComponent implements OnInit {
     } finally {
       this.accionId.set(null);
     }
+  }
+
+  private async refrescarPagos(): Promise<void> {
+    const { desde, hasta } = this.filtros();
+    await this.pagosApi.refrescar({
+      desde: desde || null,
+      hasta: hasta || null,
+    });
   }
 }

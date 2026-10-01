@@ -16,7 +16,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (fila of filas(); track fila.pago.id) {
+        @for (fila of pageItems(); track fila.pago.id) {
           <tr
             [class.fila--anulada]="fila.pago.estado === 'ANULADO'"
             [class.fila--rechazada]="fila.pago.estado === 'RECHAZADO'"
@@ -98,4 +98,22 @@
       </tbody>
     </table>
   </div>
+
+  <footer class="tabla__pager">
+    <span>{{ rango().desde }}–{{ rango().hasta }} de {{ rango().total }}</span>
+    <div class="tabla__pager-btns">
+      <button type="button" class="ghost" [disabled]="paginaActual() <= 1" (click)="paginaAnterior()">
+        Anterior
+      </button>
+      <span>Pág. {{ paginaActual() }} / {{ totalPages() }}</span>
+      <button
+        type="button"
+        class="ghost"
+        [disabled]="paginaActual() >= totalPages()"
+        (click)="paginaSiguiente()"
+      >
+        Siguiente
+      </button>
+    </div>
+  </footer>
 }

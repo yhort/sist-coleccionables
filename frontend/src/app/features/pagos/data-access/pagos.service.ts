@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -20,6 +20,12 @@ import {
   normalizarCodigoOperacion,
   round2,
 } from '../models/pago.model';
+
+/** Rango de fechas opcional para GET /api/pagos (`fechaDesde` / `fechaHasta`). */
+export interface PagosRangoFechas {
+  desde?: string | null;
+  hasta?: string | null;
+}
 
 interface PagoApi {
   id: string;
@@ -47,9 +53,20 @@ export class PagosApiService {
   readonly pagos = this.pagosSignal.asReadonly();
 
   /** Carga la bandeja desde el API (incluye anulados para historial). */
-  async refrescar(): Promise<Pago[]> {
+  async refrescar(rango?: PagosRangoFechas): Promise<Pago[]> {
     try {
-      const items = await firstValueFrom(this.http.get<PagoApi[]>(apiUrl('pagos')));
+      let params = new HttpParams();
+      const desde = rango?.desde?.trim();
+      const hasta = rango?.hasta?.trim();
+      if (desde) {
+        params = params.set('fechaDesde', desde);
+      }
+      if (hasta) {
+        params = params.set('fechaHasta', hasta);
+      }
+      const items = await firstValueFrom(
+        this.http.get<PagoApi[]>(apiUrl('pagos'), { params }),
+      );
       const pagos = items.map(mapPagoApi);
       this.pagosSignal.set(pagos);
       return pagos.map(clonar);
@@ -74,6 +91,8 @@ export class PagosApiService {
 
   listar(filtros: PagosFiltros): Pago[] {
     const query = filtros.busqueda.trim().toLowerCase();
+    const desde = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00`) : null;
+    const hasta = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999`) : null;
 
     return this.pagosSignal()
       .filter((pago) => {
@@ -87,6 +106,13 @@ export class PagosApiService {
           return false;
         }
         if (filtros.montoMax !== null && pago.monto > filtros.montoMax) {
+          return false;
+        }
+        const fecha = new Date(pago.fechaNotificacion).getTime();
+        if (desde && fecha < desde) {
+          return false;
+        }
+        if (hasta && fecha > hasta) {
           return false;
         }
         if (!query) {
@@ -163,8 +189,8 @@ export class PagosApiService {
     return round2(Math.max(0, pedido.total - this.montoCubierto(pedido.id)));
   }
 
-  kpis(): PagosKpis {
-    const pagos = this.pagosSignal();
+  /** KPIs sobre el conjunto ya filtrado (periodo / origen / estado / etc.). */
+  kpis(pagos: readonly Pago[]): PagosKpis {
     const desglose = Object.fromEntries(ORIGENES_PAGO.map((origen) => [origen, 0])) as Record<
       OrigenPago,
       number
@@ -177,12 +203,15 @@ export class PagosApiService {
     for (const pago of pagos) {
       if (pago.estado === 'CONFIRMADO') {
         desglose[pago.origen] = round2(desglose[pago.origen] + pago.monto);
-        if (esMismoDiaLocal(pago.fechaConfirmacion ?? pago.fechaNotificacion)) {
-          recaudadoHoy = round2(recaudadoHoy + pago.monto);
-          cantidadHoy += 1;
-        }
+        recaudadoHoy = round2(recaudadoHoy + pago.monto);
+        cantidadHoy += 1;
       }
-      if (esOrigenDigital(pago.origen) && !pago.pedidoDigitalId && pago.estado !== 'RECHAZADO' && pago.estado !== 'ANULADO') {
+      if (
+        esOrigenDigital(pago.origen) &&
+        !pago.pedidoDigitalId &&
+        pago.estado !== 'RECHAZADO' &&
+        pago.estado !== 'ANULADO'
+      ) {
         pendientesConciliar += 1;
         montoPendienteConciliar = round2(montoPendienteConciliar + pago.monto);
       }
@@ -336,16 +365,6 @@ function mapPagoApi(dto: PagoApi): Pago {
 function textoOpcional(valor: string | null | undefined, max: number): string | null {
   const texto = valor?.trim() ?? '';
   return texto.length === 0 ? null : texto.slice(0, max);
-}
-
-function esMismoDiaLocal(iso: string): boolean {
-  const fecha = new Date(iso);
-  const hoy = new Date();
-  return (
-    fecha.getFullYear() === hoy.getFullYear() &&
-    fecha.getMonth() === hoy.getMonth() &&
-    fecha.getDate() === hoy.getDate()
-  );
 }
 
 const SEED_PAGOS: Pago[] = [

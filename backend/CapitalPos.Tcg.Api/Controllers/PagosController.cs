@@ -18,12 +18,13 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     public async Task<ActionResult<IReadOnlyList<PagoResponse>>> Listar(
         [FromQuery] EstadoPago? estado,
         [FromQuery] OrigenPago? origen,
-        [FromQuery] DateTimeOffset? desde,
-        [FromQuery] DateTimeOffset? hasta,
+        [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta,
         [FromQuery] Guid? pedidoDigitalId,
         CancellationToken cancellationToken)
     {
-        var items = await pagos.ListarAsync(estado, origen, desde, hasta, pedidoDigitalId, cancellationToken);
+        var items = await pagos.ListarAsync(
+            estado, origen, fechaDesde, fechaHasta, pedidoDigitalId, cancellationToken);
         return Ok(items);
     }
 

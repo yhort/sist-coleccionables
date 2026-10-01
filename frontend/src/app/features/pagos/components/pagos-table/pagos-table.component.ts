@@ -1,5 +1,5 @@
 import { DatePipe, NgClass } from '@angular/common';
-import { Component, input, output } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { EstadoPedidoDigital } from '../../../pedidos-digitales/models/pedido-digital.model';
@@ -18,6 +18,8 @@ export interface PagoFila {
   pedidoEstado: EstadoPedidoDigital | null;
 }
 
+const PAGE_SIZE = 40;
+
 @Component({
   selector: 'app-pagos-table',
   imports: [SolesPipe, DatePipe, NgClass, RouterLink],
@@ -34,6 +36,37 @@ export class PagosTableComponent {
 
   readonly etiquetasOrigen = ETIQUETAS_ORIGEN_PAGO;
   readonly etiquetasEstado = ETIQUETAS_ESTADO_PAGO;
+  readonly page = signal(1);
+
+  constructor() {
+    effect(() => {
+      this.filas();
+      this.page.set(1);
+    });
+  }
+
+  readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filas().length / PAGE_SIZE)),
+  );
+
+  readonly paginaActual = computed(() => Math.min(this.page(), this.totalPages()));
+
+  readonly pageItems = computed(() => {
+    const pagina = this.paginaActual();
+    const inicio = (pagina - 1) * PAGE_SIZE;
+    return this.filas().slice(inicio, inicio + PAGE_SIZE);
+  });
+
+  readonly rango = computed(() => {
+    const total = this.filas().length;
+    if (total === 0) {
+      return { desde: 0, hasta: 0, total: 0 };
+    }
+    const pagina = this.paginaActual();
+    const desde = (pagina - 1) * PAGE_SIZE + 1;
+    const hasta = Math.min(pagina * PAGE_SIZE, total);
+    return { desde, hasta, total };
+  });
 
   puedeConfirmar(pago: Pago): boolean {
     if (pago.estado === 'ASOCIADO') {
@@ -57,5 +90,13 @@ export class PagosTableComponent {
 
   codigoPedidoDe(fila: PagoFila): string {
     return fila.pago.pedidoCodigo || codigoPedido(fila.pago.pedidoDigitalId);
+  }
+
+  paginaAnterior(): void {
+    this.page.update((p) => Math.max(1, p - 1));
+  }
+
+  paginaSiguiente(): void {
+    this.page.update((p) => Math.min(this.totalPages(), p + 1));
   }
 }

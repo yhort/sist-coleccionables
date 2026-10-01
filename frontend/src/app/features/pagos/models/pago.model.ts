@@ -34,6 +34,10 @@ export interface PagosFiltros {
   busqueda: string;
   montoMin: number | null;
   montoMax: number | null;
+  /** Fecha local `YYYY-MM-DD` (input type="date"). Vacío = sin límite. */
+  desde: string;
+  /** Fecha local `YYYY-MM-DD` (input type="date"). Vacío = sin límite. */
+  hasta: string;
 }
 
 export interface RegistrarPagoRequest {
@@ -98,7 +102,28 @@ export const FILTROS_PAGOS_VACIOS: PagosFiltros = {
   busqueda: '',
   montoMin: null,
   montoMax: null,
+  desde: '',
+  hasta: '',
 };
+
+/** Fecha local en formato `YYYY-MM-DD` (input type="date"). */
+export function fechaLocalHoy(): string {
+  const ahora = new Date();
+  const yyyy = ahora.getFullYear();
+  const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dd = String(ahora.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Filtros iniciales de la bandeja: operación del día en curso (UTC-5 Perú vía zona del navegador). */
+export function crearFiltrosPagosDiaActual(): PagosFiltros {
+  const hoy = fechaLocalHoy();
+  return {
+    ...FILTROS_PAGOS_VACIOS,
+    desde: hoy,
+    hasta: hoy,
+  };
+}
 
 export const ETIQUETAS_ORIGEN_PAGO: Record<OrigenPago, string> = {
   YAPE: 'Yape',
