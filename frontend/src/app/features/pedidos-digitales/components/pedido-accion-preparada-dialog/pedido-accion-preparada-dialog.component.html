@@ -135,6 +135,15 @@
             }
           </select>
         </label>
+        <p class="dialog__muted">
+          @if (tipoSeleccionado() === 'FACTURA') {
+            Factura: RUC obligatorio.
+          } @else if (tipoSeleccionado() === 'BOLETA') {
+            Boleta hasta S/ 700: DNI opcional (basta el nombre). Mayor a S/ 700: DNI obligatorio.
+          } @else {
+            Nota de venta interna: documento de identidad opcional.
+          }
+        </p>
       }
       @if (pedido()?.codigoVenta; as codigoVenta) {
         <p>Venta <code>{{ codigoVenta }}</code>.</p>

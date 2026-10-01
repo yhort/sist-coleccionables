@@ -394,8 +394,12 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
         clienteId: this.clienteId(),
         clienteNombre: raw.clienteNombre,
         clienteTelefono: raw.clienteTelefono || null,
-        tipoDocumento: raw.tipoDocumento,
-        numeroDocumento: raw.numeroDocumento || null,
+        tipoDocumento: raw.esClienteVarios
+          ? 'SIN_DOCUMENTO'
+          : raw.numeroDocumento
+            ? raw.tipoDocumento
+            : 'SIN_DOCUMENTO',
+        numeroDocumento: raw.esClienteVarios ? '00000000' : raw.numeroDocumento || null,
         esClienteVarios: raw.esClienteVarios,
         sedeId: raw.sedeId,
         canalPedido: canalDesdeOrigen(raw.origen),

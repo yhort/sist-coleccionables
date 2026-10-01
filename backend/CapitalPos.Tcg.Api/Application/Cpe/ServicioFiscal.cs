@@ -386,7 +386,8 @@ public sealed class ServicioFiscal(
                 DocumentoIdentidad.ValidarComprobante(
                     tipo,
                     cliente.TipoDocumento,
-                    cliente.NumeroDocumento);
+                    cliente.NumeroDocumento,
+                    venta.Total);
                 break;
             default:
                 throw new BusinessRuleException("Tipo de comprobante no soportado.");
@@ -547,12 +548,7 @@ public sealed class ServicioFiscal(
             FormaPago = "CONTADO",
             MontoPendientePago = 0,
             Cuotas = [],
-            Cliente = new EmitirCpeClienteDto
-            {
-                TipoDocumento = FiscalCodes.CodigoDocumento(cliente.TipoDocumento),
-                NumeroDocumento = cliente.NumeroDocumento ?? "00000000",
-                RazonSocial = cliente.Nombre
-            },
+            Cliente = MapearClienteCpe(cliente),
             Items = items,
             TotalGravada = totalGravada,
             TotalExonerada = totalExonerada,
@@ -566,6 +562,22 @@ public sealed class ServicioFiscal(
             Observacion = venta.EsConsolidacion
                 ? "Boleta consolidada de notas de venta del día."
                 : null
+        };
+    }
+
+    private static EmitirCpeClienteDto MapearClienteCpe(Cliente cliente)
+    {
+        var (tipoCodigo, numero) = DocumentoIdentidad.ReceptorSunat(
+            cliente.TipoDocumento,
+            cliente.NumeroDocumento);
+        var nombre = string.IsNullOrWhiteSpace(cliente.Nombre)
+            ? DocumentoIdentidad.NombreClienteVarios
+            : cliente.Nombre.Trim();
+        return new EmitirCpeClienteDto
+        {
+            TipoDocumento = tipoCodigo,
+            NumeroDocumento = numero,
+            RazonSocial = nombre
         };
     }
 
@@ -667,12 +679,7 @@ public sealed class ServicioFiscal(
             FormaPago = "CONTADO",
             MontoPendientePago = 0,
             Cuotas = [],
-            Cliente = new EmitirCpeClienteDto
-            {
-                TipoDocumento = FiscalCodes.CodigoDocumento(cliente.TipoDocumento),
-                NumeroDocumento = cliente.NumeroDocumento ?? "00000000",
-                RazonSocial = cliente.Nombre
-            },
+            Cliente = MapearClienteCpe(cliente),
             Items = items,
             TotalGravada = IgvCalculo.Round2(items.Where(i => i.CodigoAfectacionIgv == "10").Sum(i => i.Subtotal)),
             TotalExonerada = IgvCalculo.Round2(items.Where(i => i.CodigoAfectacionIgv == "20").Sum(i => i.Subtotal)),

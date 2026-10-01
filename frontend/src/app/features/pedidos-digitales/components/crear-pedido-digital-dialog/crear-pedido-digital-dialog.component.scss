@@ -199,6 +199,13 @@ textarea {
   font-weight: 600;
 }
 
+.hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
 .ghost,
 .primary {
   min-height: 40px;

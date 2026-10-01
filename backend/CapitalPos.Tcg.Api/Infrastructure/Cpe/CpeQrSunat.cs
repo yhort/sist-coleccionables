@@ -54,6 +54,7 @@ public static class CpeQrSunat
         "4" => "C.E.",
         "6" => "RUC",
         "7" => "PASAPORTE",
+        "-" or "0" => "SIN DOC",
         _ => "DOC"
     };
 

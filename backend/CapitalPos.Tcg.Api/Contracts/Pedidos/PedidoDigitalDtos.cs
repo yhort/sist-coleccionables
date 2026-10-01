@@ -79,6 +79,7 @@ public sealed class CrearPedidoDigitalRequest
 
     public TipoDocumentoIdentidad? TipoDocumento { get; set; }
 
+    /// <summary>Opcional. Vacío/nulo → SIN_DOCUMENTO (válido para boletas ≤ S/ 700).</summary>
     [MaxLength(16)]
     public string? NumeroDocumento { get; set; }
 
@@ -177,6 +178,11 @@ public sealed class ConvertirVentaRequest
 
     public TipoDocumentoIdentidad? TipoDocumento { get; set; }
 
+    /// <summary>
+    /// Opcional en boleta o nota de venta con total ≤ S/ 700 (SUNAT no exige identificar al adquirente).
+    /// Vacío/nulo: no rellenar con ceros; se emite como consumidor final sin documento.
+    /// Obligatorio (DNI u otro) si la boleta supera S/ 700. Factura exige RUC.
+    /// </summary>
     [MaxLength(16)]
     public string? NumeroDocumento { get; set; }
 }

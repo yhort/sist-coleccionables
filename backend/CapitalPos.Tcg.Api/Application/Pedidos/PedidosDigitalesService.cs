@@ -758,7 +758,7 @@ public sealed class PedidosDigitalesService(
             throw new BusinessRuleException("La factura exige un cliente con RUC.");
         }
 
-        DocumentoIdentidad.ValidarComprobante(tipo, cliente.TipoDocumento, cliente.NumeroDocumento);
+        DocumentoIdentidad.ValidarComprobante(tipo, cliente.TipoDocumento, cliente.NumeroDocumento, pedido.Total);
 
         var ventaId = Guid.NewGuid();
         var venta = new Venta
@@ -1144,14 +1144,20 @@ public sealed class PedidosDigitalesService(
             }
         }
 
+        var nombreBase = pedido.ClienteNombre?.Trim() is { Length: >= 2 } n ? n : "Cliente";
+        var (tipo, numero, nombre) = DocumentoIdentidad.NormalizarCliente(
+            nombreBase,
+            request.TipoDocumento,
+            request.NumeroDocumento,
+            esPublicoGeneral: false);
         var cliente = new Cliente
         {
             Id = Guid.NewGuid(),
             EmpresaId = tenant.EmpresaId,
-            Nombre = pedido.ClienteNombre?.Trim() is { Length: >= 2 } nombre ? nombre : "Cliente",
+            Nombre = nombre,
             Telefono = pedido.ClienteTelefono,
-            TipoDocumento = request.TipoDocumento ?? TipoDocumentoIdentidad.DNI,
-            NumeroDocumento = TextoOpcional(request.NumeroDocumento, 16) ?? "00000000",
+            TipoDocumento = tipo,
+            NumeroDocumento = string.IsNullOrWhiteSpace(numero) ? null : numero,
             FechaCreacion = ahora
         };
         db.Clientes.Add(cliente);

@@ -20,7 +20,8 @@ public static class FiscalCodes
         TipoDocumentoIdentidad.RUC => "6",
         TipoDocumentoIdentidad.CE => "4",
         TipoDocumentoIdentidad.PASAPORTE => "7",
-        _ => "1"
+        TipoDocumentoIdentidad.SIN_DOCUMENTO => DocumentoIdentidad.CodigoSunatSinDocumento,
+        _ => DocumentoIdentidad.CodigoSunatSinDocumento
     };
 
     public static string SeriePorDefecto(TipoComprobanteSunat tipo) => tipo switch

@@ -143,7 +143,11 @@ export class ClienteFormDialogComponent implements OnInit {
           puntoEntregaPreferido: raw.puntoEntregaPreferido || null,
           canalContacto: raw.canalContacto || null,
           contactoReferencia: raw.contactoReferencia || null,
-          tipoDocumento: raw.esPublicoGeneral ? 'SIN_DOCUMENTO' : raw.tipoDocumento,
+          tipoDocumento: raw.esPublicoGeneral
+            ? 'SIN_DOCUMENTO'
+            : raw.numeroDocumento
+              ? raw.tipoDocumento
+              : 'SIN_DOCUMENTO',
           numeroDocumento: raw.esPublicoGeneral ? '00000000' : raw.numeroDocumento || null,
           esPublicoGeneral: raw.esPublicoGeneral,
         },

@@ -38,6 +38,7 @@
           formControlName="numeroDocumento"
           maxlength="16"
           [readonly]="form.controls.esPublicoGeneral.value"
+          placeholder="Opcional en boleta ≤ S/ 700"
         />
       </label>
       <label class="wide">
@@ -86,7 +87,7 @@
         />
       </label>
     </div>
-    <p class="hint">Factura: RUC obligatorio. Boleta: DNI o sin documento.</p>
+    <p class="hint">Factura: RUC obligatorio. Boleta hasta S/ 700: DNI opcional. Mayor a S/ 700: DNI obligatorio.</p>
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }

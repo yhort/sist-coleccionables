@@ -9,21 +9,53 @@ public static class DocumentoIdentidad
     public const string NombrePublicoGeneral = "PÚBLICO GENERAL";
     public const string NumeroSinDocumento = "00000000";
 
+    /// <summary>Catálogo 06 / guía de llenado SUNAT: adquirente no identificado.</summary>
+    public const string CodigoSunatSinDocumento = "-";
+    public const string NumeroSunatSinDocumento = "-";
+
+    /// <summary>SUNAT no exige identificar al adquirente en boletas de este importe o menor.</summary>
+    public const decimal UmbralIdentificacionBoleta = 700m;
+
     public static bool EsPublicoGeneral(string? nombre, TipoDocumentoIdentidad tipo, string? numero)
+    {
+        var etiqueta = (nombre ?? string.Empty).Trim().ToUpperInvariant();
+        if (etiqueta is NombreClienteVarios or "PUBLICO GENERAL" or "PÚBLICO GENERAL")
+        {
+            return true;
+        }
+
+        return tipo == TipoDocumentoIdentidad.SIN_DOCUMENTO
+            && SoloDigitos(numero) == NumeroSinDocumento
+            && string.IsNullOrWhiteSpace(nombre);
+    }
+
+    public static bool EstaIdentificado(TipoDocumentoIdentidad tipo, string? numero)
     {
         if (tipo == TipoDocumentoIdentidad.SIN_DOCUMENTO)
         {
-            return true;
+            return false;
         }
 
-        var nro = SoloDigitos(numero);
-        if (nro == NumeroSinDocumento)
+        var nro = (numero ?? string.Empty).Trim();
+        return !string.IsNullOrEmpty(nro)
+            && nro != NumeroSunatSinDocumento
+            && nro != NumeroSinDocumento;
+    }
+
+    public static (string TipoCodigo, string Numero) ReceptorSunat(
+        TipoDocumentoIdentidad tipo,
+        string? numero)
+    {
+        if (!EstaIdentificado(tipo, numero))
         {
-            return true;
+            return (CodigoSunatSinDocumento, NumeroSunatSinDocumento);
         }
 
-        var etiqueta = (nombre ?? string.Empty).Trim().ToUpperInvariant();
-        return etiqueta is NombreClienteVarios or "PUBLICO GENERAL" or "PÚBLICO GENERAL";
+        var codigo = FiscalCodes.CodigoDocumento(tipo);
+        var nro = tipo is TipoDocumentoIdentidad.DNI or TipoDocumentoIdentidad.RUC
+            ? SoloDigitos(numero)
+            : (numero ?? string.Empty).Trim();
+        return (codigo, nro);
     }
 
     public static (TipoDocumentoIdentidad Tipo, string Numero, string Nombre) NormalizarCliente(
@@ -33,7 +65,7 @@ public static class DocumentoIdentidad
         bool esPublicoGeneral)
     {
         var nombreTrim = (nombre ?? string.Empty).Trim();
-        if (esPublicoGeneral || tipo == TipoDocumentoIdentidad.SIN_DOCUMENTO)
+        if (esPublicoGeneral)
         {
             return (
                 TipoDocumentoIdentidad.SIN_DOCUMENTO,
@@ -48,9 +80,14 @@ public static class DocumentoIdentidad
 
         var nro = (numero ?? string.Empty).Trim().ToUpperInvariant();
         var tipoFinal = tipo ?? Inferir(nro);
+        if (EsNumeroAusente(nro) && tipoFinal != TipoDocumentoIdentidad.RUC)
+        {
+            return (TipoDocumentoIdentidad.SIN_DOCUMENTO, string.Empty, nombreTrim);
+        }
+
         if (tipoFinal == TipoDocumentoIdentidad.SIN_DOCUMENTO)
         {
-            return (tipoFinal, esPublicoGeneral ? NumeroSinDocumento : string.Empty, nombreTrim);
+            return (tipoFinal, string.Empty, nombreTrim);
         }
 
         Validar(tipoFinal, nro);
@@ -100,7 +137,8 @@ public static class DocumentoIdentidad
     public static void ValidarComprobante(
         TipoComprobanteSunat tipoComprobante,
         TipoDocumentoIdentidad tipoDocumento,
-        string? numero)
+        string? numero,
+        decimal total = 0)
     {
         if (tipoComprobante == TipoComprobanteSunat.FACTURA)
         {
@@ -116,6 +154,14 @@ public static class DocumentoIdentidad
             && tipoDocumento == TipoDocumentoIdentidad.RUC)
         {
             throw new BusinessRuleException("La boleta se emite con DNI o sin documento. Usa factura para un RUC.");
+        }
+
+        if (tipoComprobante == TipoComprobanteSunat.BOLETA
+            && total > UmbralIdentificacionBoleta
+            && !EstaIdentificado(tipoDocumento, numero))
+        {
+            throw new BusinessRuleException(
+                "La boleta mayor a S/ 700 exige DNI u otro documento de identidad del adquirente.");
         }
     }
 
@@ -145,9 +191,14 @@ public static class DocumentoIdentidad
         };
     }
 
+    private static bool EsNumeroAusente(string numero) =>
+        string.IsNullOrWhiteSpace(numero)
+        || numero == NumeroSunatSinDocumento
+        || numero == NumeroSinDocumento;
+
     private static string NormalizarNumero(TipoDocumentoIdentidad tipo, string numero) => tipo switch
     {
-        TipoDocumentoIdentidad.SIN_DOCUMENTO => NumeroSinDocumento,
+        TipoDocumentoIdentidad.SIN_DOCUMENTO => string.Empty,
         TipoDocumentoIdentidad.DNI or TipoDocumentoIdentidad.RUC => SoloDigitos(numero),
         _ => numero.Trim().ToUpperInvariant()
     };

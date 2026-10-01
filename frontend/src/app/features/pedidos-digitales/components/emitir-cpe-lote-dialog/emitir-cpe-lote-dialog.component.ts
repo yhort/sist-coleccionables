@@ -25,6 +25,7 @@ import {
   pedidoTieneCpeEmitido,
   round2,
 } from '../../models/pedido-digital.model';
+import { validarDocumentoParaComprobante } from '../../../clientes/models/cliente.model';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 @Component({
@@ -145,12 +146,25 @@ export class EmitirCpeLoteDialogComponent {
       return;
     }
 
+    const tipo = this.tipoSeleccionado();
+    const pedidoDoc = pedidos[0];
+    const docError = validarDocumentoParaComprobante(
+      tipo,
+      this.total(),
+      pedidoDoc.clienteTipoDocumento,
+      pedidoDoc.clienteNumeroDocumento,
+    );
+    if (docError) {
+      this.error.set(docError);
+      return;
+    }
+
     this.error.set('');
     this.enviando.set(true);
     try {
       const resultado = await this.pedidosApi.emitirComprobanteConsolidado(
         pedidos.map((pedido) => pedido.id),
-        this.tipoSeleccionado(),
+        tipo,
       );
       this.emision.set(mapEmisionConsolidada(resultado, pedidos, this.total()));
       this.saved.emit();

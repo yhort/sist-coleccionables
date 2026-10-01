@@ -75,6 +75,20 @@ public sealed class MaestrosYAuthTests
         var cuerpo = await varios.Content.ReadFromJsonAsync<JsonElement>(Json);
         Assert.True(cuerpo.GetProperty("esPublicoGeneral").GetBoolean());
         Assert.Equal("00000000", cuerpo.GetProperty("numeroDocumento").GetString());
+
+        var soloNombre = await client.PostAsJsonAsync(
+            "/api/clientes",
+            new { nombre = "María López", tipoDocumento = "DNI", numeroDocumento = "", esPublicoGeneral = false },
+            Json);
+        Assert.True(soloNombre.IsSuccessStatusCode, await soloNombre.Content.ReadAsStringAsync());
+        var maria = await soloNombre.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("SIN_DOCUMENTO", maria.GetProperty("tipoDocumento").GetString());
+        Assert.False(maria.GetProperty("esPublicoGeneral").GetBoolean());
+        var numeroMaria = maria.GetProperty("numeroDocumento");
+        Assert.True(
+            numeroMaria.ValueKind is JsonValueKind.Null or JsonValueKind.String
+                && (numeroMaria.ValueKind == JsonValueKind.Null
+                    || string.IsNullOrEmpty(numeroMaria.GetString())));
     }
 
     [Fact]

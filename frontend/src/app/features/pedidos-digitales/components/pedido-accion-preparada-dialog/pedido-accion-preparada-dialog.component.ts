@@ -35,6 +35,7 @@ import {
   pedidoTieneCpeEmitido,
   round2,
 } from '../../models/pedido-digital.model';
+import { validarDocumentoParaComprobante } from '../../../clientes/models/cliente.model';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 
 export interface NcLineaUi {
@@ -268,6 +269,16 @@ export class PedidoAccionPreparadaDialogComponent {
       const tipo = this.tipoSeleccionado();
       if (tipo !== 'BOLETA' && tipo !== 'FACTURA' && tipo !== 'NOTA_VENTA') {
         this.error.set('Selecciona boleta, factura o nota de venta.');
+        return;
+      }
+      const docError = validarDocumentoParaComprobante(
+        tipo,
+        pedido.total,
+        pedido.clienteTipoDocumento,
+        pedido.clienteNumeroDocumento,
+      );
+      if (docError) {
+        this.error.set(docError);
         return;
       }
       const resultado = await this.pedidosApi.emitirComprobanteConsolidado([pedido.id], tipo);

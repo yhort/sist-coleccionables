@@ -59,17 +59,62 @@ export function etiquetaDocumento(cliente: Pick<Cliente, 'tipoDocumento' | 'nume
   return `${cliente.tipoDocumento} ${cliente.numeroDocumento}`;
 }
 
+/** SUNAT no exige identificar al adquirente en boletas de este importe o menor. */
+export const UMBRAL_IDENTIFICACION_BOLETA = 700;
+
+export function clienteIdentificado(
+  tipo: TipoDocumentoIdentidad | null | undefined,
+  numero: string | null | undefined,
+): boolean {
+  if (!tipo || tipo === 'SIN_DOCUMENTO') {
+    return false;
+  }
+  const texto = (numero ?? '').trim();
+  return !!texto && texto !== '-' && texto !== '00000000';
+}
+
 export function validarDocumento(tipo: TipoDocumentoIdentidad, numero: string, esPublicoGeneral: boolean): string | null {
   if (esPublicoGeneral || tipo === 'SIN_DOCUMENTO') {
     return null;
   }
-  const digitos = numero.replace(/\D/g, '');
+  const texto = (numero ?? '').trim();
+  // Vacío permitido (boleta ≤ S/ 700); si hay valor parcial se valida formato.
+  if (!texto) {
+    return null;
+  }
+  const digitos = texto.replace(/\D/g, '');
   if (tipo === 'DNI' && digitos.length !== 8) {
     return 'El DNI debe tener 8 dígitos.';
   }
   if (tipo === 'RUC' && digitos.length !== 11) {
     return 'El RUC debe tener 11 dígitos.';
   }
+  return null;
+}
+
+/** Validación previa a emitir CPE según tipo de comprobante e importe. */
+export function validarDocumentoParaComprobante(
+  tipoComprobante: 'BOLETA' | 'FACTURA' | 'NOTA_VENTA',
+  total: number,
+  tipoDocumento: TipoDocumentoIdentidad | null | undefined,
+  numeroDocumento: string | null | undefined,
+): string | null {
+  if (tipoComprobante === 'FACTURA') {
+    const digitos = (numeroDocumento ?? '').replace(/\D/g, '');
+    if (tipoDocumento !== 'RUC' || digitos.length !== 11) {
+      return 'La factura exige un cliente con RUC de 11 dígitos.';
+    }
+    return null;
+  }
+
+  if (
+    tipoComprobante === 'BOLETA' &&
+    total > UMBRAL_IDENTIFICACION_BOLETA &&
+    !clienteIdentificado(tipoDocumento, numeroDocumento)
+  ) {
+    return 'La boleta mayor a S/ 700 exige DNI u otro documento de identidad del adquirente.';
+  }
+
   return null;
 }
 

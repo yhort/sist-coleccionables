@@ -63,8 +63,16 @@
       </label>
       <label>
         Número
-        <input type="text" formControlName="numeroDocumento" maxlength="16" />
+        <input
+          type="text"
+          formControlName="numeroDocumento"
+          maxlength="16"
+          placeholder="Opcional en boleta ≤ S/ 700"
+        />
       </label>
+      <p class="hint wide">
+        Factura: RUC obligatorio. Boleta hasta S/ 700: DNI opcional (basta el nombre).
+      </p>
       <label>
         Teléfono
         <input
