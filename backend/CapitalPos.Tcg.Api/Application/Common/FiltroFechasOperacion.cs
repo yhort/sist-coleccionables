@@ -3,9 +3,10 @@ using System.Globalization;
 namespace CapitalPos.Tcg.Api.Application.Common;
 
 /// <summary>
-/// Parseo de query params <c>fechaDesde</c>/<c>fechaHasta</c> (YYYY-MM-DD) a
-/// <see cref="DateTime"/> UTC con límites de día operativo en Perú (UTC-5),
-/// aptos para filtros LINQ traducibles por EF Core.
+/// Parseo de query params de fecha (<c>desde</c>/<c>hasta</c> o <c>fechaDesde</c>/<c>fechaHasta</c>)
+/// en formato YYYY-MM-DD (también acepta ISO) a <see cref="DateTime"/> UTC con límites de día
+/// operativo en Perú (UTC-5), aptos para filtros LINQ traducibles por EF Core.
+/// Valores vacíos, nulos o inválidos se ignoran (devuelven null).
 /// </summary>
 public static class FiltroFechasOperacion
 {
@@ -55,6 +56,18 @@ public static class FiltroFechasOperacion
                 DateTimeStyles.None,
                 out fecha))
         {
+            return true;
+        }
+
+        // ISO / DateTimeOffset parciales o con hora (p. ej. "2024-01-01T00:00:00-05:00").
+        if (DateTimeOffset.TryParse(
+                texto,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var instante))
+        {
+            var peru = instante.ToOffset(ZonaHorariaOperacion);
+            fecha = DateOnly.FromDateTime(peru.DateTime);
             return true;
         }
 

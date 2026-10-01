@@ -1,3 +1,4 @@
+using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Application.Inventario;
 using CapitalPos.Tcg.Api.Contracts.Inventario;
 using CapitalPos.Tcg.Api.Domain.Enums;
@@ -68,16 +69,16 @@ public sealed class InventarioController(InventarioService inventario) : Control
     public async Task<ActionResult<IReadOnlyList<KardexMovimientoResponse>>> Kardex(
         [FromQuery] Guid? productoId,
         [FromQuery] Guid? sedeId,
-        [FromQuery] DateTimeOffset? desde,
-        [FromQuery] DateTimeOffset? hasta,
+        [FromQuery] string? desde,
+        [FromQuery] string? hasta,
         [FromQuery] TipoMovimientoInventario? tipoMovimiento,
         CancellationToken cancellationToken)
     {
         var movimientos = await inventario.ListarKardexAsync(
             productoId,
             sedeId,
-            desde,
-            hasta,
+            FiltroFechasOperacion.ParseInicioDia(desde),
+            FiltroFechasOperacion.ParseFinDiaExclusivo(hasta),
             tipoMovimiento,
             cancellationToken);
         return Ok(movimientos);

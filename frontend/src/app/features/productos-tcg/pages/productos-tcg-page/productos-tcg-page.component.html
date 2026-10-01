@@ -33,23 +33,25 @@
         </button>
       </div>
       @if (tab() === 'skus') {
-        <div class="view-toggle" role="group" aria-label="Vista del catálogo">
-          <button
-            type="button"
-            [class.view-toggle__btn--active]="vista() === 'tabla'"
-            (click)="vista.set('tabla')"
-          >
-            Tabla
-          </button>
-          <button
-            type="button"
-            [class.view-toggle__btn--active]="vista() === 'grid'"
-            (click)="vista.set('grid')"
-          >
-            Grid
-          </button>
+        <div class="productos__view-tools">
+          <div class="view-toggle" role="group" aria-label="Vista del catálogo">
+            <button
+              type="button"
+              [class.view-toggle__btn--active]="vista() === 'tabla'"
+              (click)="vista.set('tabla')"
+            >
+              Tabla
+            </button>
+            <button
+              type="button"
+              [class.view-toggle__btn--active]="vista() === 'grid'"
+              (click)="vista.set('grid')"
+            >
+              Grid
+            </button>
+          </div>
+          <button type="button" class="productos__add" (click)="abrirAlta()">Nuevo producto</button>
         </div>
-        <button type="button" class="productos__add" (click)="abrirAlta()">Nuevo producto</button>
       }
     </div>
   </header>

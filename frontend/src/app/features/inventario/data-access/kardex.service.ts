@@ -54,11 +54,13 @@ export class KardexApiService {
     if (filtros.tipoMovimiento !== 'TODOS') {
       params = params.set('tipoMovimiento', filtros.tipoMovimiento);
     }
-    if (filtros.desde) {
-      params = params.set('desde', `${filtros.desde}T00:00:00-05:00`);
+    const desde = fechaFiltroValida(filtros.desde);
+    const hasta = fechaFiltroValida(filtros.hasta);
+    if (desde) {
+      params = params.set('desde', desde);
     }
-    if (filtros.hasta) {
-      params = params.set('hasta', `${filtros.hasta}T23:59:59-05:00`);
+    if (hasta) {
+      params = params.set('hasta', hasta);
     }
 
     try {
@@ -80,8 +82,10 @@ export class KardexApiService {
     }
 
     const query = filtros.busqueda.trim().toLowerCase();
-    const desde = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00`) : null;
-    const hasta = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999`) : null;
+    const desde = fechaFiltroValida(filtros.desde);
+    const hasta = fechaFiltroValida(filtros.hasta);
+    const desdeMs = desde ? Date.parse(`${desde}T00:00:00`) : null;
+    const hastaMs = hasta ? Date.parse(`${hasta}T23:59:59.999`) : null;
 
     return this.store
       .movimientos()
@@ -97,10 +101,10 @@ export class KardexApiService {
           return false;
         }
         const fecha = new Date(fila.fechaCreacion).getTime();
-        if (desde && fecha < desde) {
+        if (desdeMs !== null && fecha < desdeMs) {
           return false;
         }
-        if (hasta && fecha > hasta) {
+        if (hastaMs !== null && fecha > hastaMs) {
           return false;
         }
         if (!query) {
@@ -154,4 +158,10 @@ function coincideBusqueda(fila: KardexFila, busqueda: string): boolean {
   return `${fila.productoNombre} ${fila.codigoSku} ${fila.motivo} ${fila.usuario}`
     .toLowerCase()
     .includes(query);
+}
+
+/** Solo YYYY-MM-DD completo; vacío o incompleto → no filtrar. */
+function fechaFiltroValida(valor: string | null | undefined): string | null {
+  const texto = (valor ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : null;
 }

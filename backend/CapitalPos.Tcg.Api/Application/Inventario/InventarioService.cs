@@ -158,8 +158,8 @@ public sealed class InventarioService(
     public async Task<IReadOnlyList<KardexMovimientoResponse>> ListarKardexAsync(
         Guid? productoId,
         Guid? sedeId,
-        DateTimeOffset? desde,
-        DateTimeOffset? hasta,
+        DateTime? desde,
+        DateTime? hasta,
         TipoMovimientoInventario? tipoMovimiento,
         CancellationToken cancellationToken)
     {
@@ -187,12 +187,14 @@ public sealed class InventarioService(
 
         if (desde.HasValue)
         {
-            query = query.Where(m => m.FechaCreacion >= desde.Value);
+            var inicio = desde.Value;
+            query = query.Where(m => m.FechaCreacion >= inicio);
         }
 
         if (hasta.HasValue)
         {
-            query = query.Where(m => m.FechaCreacion <= hasta.Value);
+            var finExclusivo = hasta.Value;
+            query = query.Where(m => m.FechaCreacion < finExclusivo);
         }
 
         var movimientos = await query

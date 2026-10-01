@@ -109,10 +109,13 @@ export class InventarioPageComponent {
         void this.cargarStock(sedeId, busqueda, page, pageSize);
       }
     });
-    effect(() => {
+    effect((onCleanup) => {
       const filtros = this.filtrosKardex();
       this.tab();
-      void this.kardexApi.refrescar(filtros).catch((err) => this.error.set(readApiError(err)));
+      const handle = setTimeout(() => {
+        void this.kardexApi.refrescar(filtros).catch((err) => this.error.set(readApiError(err)));
+      }, 250);
+      onCleanup(() => clearTimeout(handle));
     });
   }
 
