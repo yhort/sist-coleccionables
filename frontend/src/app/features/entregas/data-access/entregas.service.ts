@@ -350,7 +350,7 @@ const SEED_ENTREGAS: Entrega[] = [
     departamento: null,
     agencia: 'Tienda Miraflores',
     puntoEntrega: 'TCG House',
-    canalContacto: 'TELEFONO',
+    canalContacto: 'MSN',
     contactoReferencia: 'Hermano · Diego Soto',
     numeroTracking: 'RECOJO-052',
     costoEnvio: 0,

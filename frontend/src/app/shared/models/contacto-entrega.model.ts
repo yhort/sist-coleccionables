@@ -4,16 +4,18 @@ export type CanalContactoCliente =
   | 'WHATSAPP'
   | 'FACEBOOK'
   | 'INSTAGRAM'
-  | 'TELEFONO'
-  | 'TELEGRAM'
+  //| 'TELEFONO'
+  //| 'TELEGRAM'
+  | 'MSN'
   | 'OTRO';
 
 export const CANALES_CONTACTO: readonly CanalContactoCliente[] = [
   'WHATSAPP',
   'FACEBOOK',
   'INSTAGRAM',
-  'TELEFONO',
-  'TELEGRAM',
+  //'TELEFONO',
+  //'TELEGRAM',
+  'MSN',
   'OTRO',
 ];
 
@@ -21,8 +23,9 @@ export const ETIQUETAS_CANAL_CONTACTO: Record<CanalContactoCliente, string> = {
   WHATSAPP: 'WhatsApp',
   FACEBOOK: 'Facebook',
   INSTAGRAM: 'Instagram',
-  TELEFONO: 'Teléfono',
-  TELEGRAM: 'Telegram',
+  //TELEFONO: 'Teléfono',
+  //TELEGRAM: 'Telegram',
+  MSN: 'Msn',
   OTRO: 'Otro',
 };
 
