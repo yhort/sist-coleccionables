@@ -33,6 +33,7 @@ import {
   PedidoDigital,
   PedidosDigitalesFiltros,
   EstadoPedidoDigital,
+  crearFiltrosPedidosDiaActual,
   etiquetaCantidadPedidos,
   origenDeCanal,
   pedidoPuedeNotaCredito,
@@ -86,7 +87,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
 
   readonly origenes = ORIGENES_PEDIDO;
   readonly etiquetasOrigen = ETIQUETAS_ORIGEN_PEDIDO;
-  readonly filtros = signal<PedidosDigitalesFiltros>({ ...FILTROS_PEDIDOS_VACIOS });
+  readonly filtros = signal<PedidosDigitalesFiltros>(crearFiltrosPedidosDiaActual());
   readonly vista = signal<PedidosVistaMode>(leerVistaPreferida());
   readonly seleccionadoId = signal<string | null>(null);
   readonly formAbierta = signal(false);
@@ -156,7 +157,11 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
   async cargar(): Promise<void> {
     this.error.set('');
     try {
-      await Promise.all([this.productosApi.refrescar(), this.sedesApi.refrescar(), this.pedidosApi.refrescar()]);
+      await Promise.all([
+        this.productosApi.refrescar(),
+        this.sedesApi.refrescar(),
+        this.refrescarPedidos(),
+      ]);
       const sedeId = this.sedesApi.sedes()[0]?.id;
       if (sedeId) {
         await Promise.all([
@@ -243,6 +248,9 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     valor: PedidosDigitalesFiltros[K],
   ): void {
     this.filtros.update((actual) => ({ ...actual, [clave]: valor }));
+    if (clave === 'desde' || clave === 'hasta') {
+      void this.refrescarPedidos().catch((err) => this.error.set(readApiError(err)));
+    }
   }
 
   actualizarMonto(clave: 'montoMin' | 'montoMax', valor: string | number | null): void {
@@ -252,7 +260,9 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
 
   limpiarFiltros(): void {
     this.filtros.set({ ...FILTROS_PEDIDOS_VACIOS });
-    this.focusBusqueda();
+    void this.refrescarPedidos()
+      .then(() => this.focusBusqueda())
+      .catch((err) => this.error.set(readApiError(err)));
   }
 
   abrirDetalle(pedido: PedidoDigital): void {
@@ -366,7 +376,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     const previo = this.notaCreditoLote();
     const estadoPrevio = previo?.estado;
     this.notaCreditoLote.set(null);
-    void this.pedidosApi.refrescar().then(() => {
+    void this.refrescarPedidos().then(() => {
       const actualizado = previo
         ? this.pedidosApi.pedidos().find((item) => item.id === previo.id)
         : null;
@@ -496,6 +506,14 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     }
     this.error.set(this.cajaApi.mensajeCerrada(sedeId));
     return false;
+  }
+
+  private async refrescarPedidos(): Promise<void> {
+    const { desde, hasta } = this.filtros();
+    await this.pedidosApi.refrescar({
+      desde: desde || null,
+      hasta: hasta || null,
+    });
   }
 
   private aplicarQueryParams(): void {

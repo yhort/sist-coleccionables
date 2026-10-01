@@ -234,6 +234,25 @@ export const FILTROS_PEDIDOS_VACIOS: PedidosDigitalesFiltros = {
   montoMax: null,
 };
 
+/** Fecha local en formato `YYYY-MM-DD` (input type="date"). */
+export function fechaLocalHoy(): string {
+  const ahora = new Date();
+  const yyyy = ahora.getFullYear();
+  const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dd = String(ahora.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Filtros iniciales de la bandeja: operación del día en curso. */
+export function crearFiltrosPedidosDiaActual(): PedidosDigitalesFiltros {
+  const hoy = fechaLocalHoy();
+  return {
+    ...FILTROS_PEDIDOS_VACIOS,
+    desde: hoy,
+    hasta: hoy,
+  };
+}
+
 export const ETIQUETAS_CANAL_PEDIDO: Record<CanalPedidoDigital, string> = {
   FACEBOOK_SUBASTA: 'Facebook subasta',
   FACEBOOK_MARKETPLACE: 'Facebook Marketplace',

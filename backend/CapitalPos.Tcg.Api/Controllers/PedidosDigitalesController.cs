@@ -17,9 +17,17 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
         [FromQuery] EstadoPedidoDigital? estado,
         [FromQuery] CanalPedidoDigital? canalPedido,
         [FromQuery] Guid? sedeId,
+        [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta,
         CancellationToken cancellationToken)
     {
-        var items = await pedidos.ListarAsync(estado, canalPedido, sedeId, cancellationToken);
+        var items = await pedidos.ListarAsync(
+            estado,
+            canalPedido,
+            sedeId,
+            fechaDesde,
+            fechaHasta,
+            cancellationToken);
         return Ok(items);
     }
 

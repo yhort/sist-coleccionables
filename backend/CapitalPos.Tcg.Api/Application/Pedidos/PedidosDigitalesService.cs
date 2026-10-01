@@ -26,10 +26,15 @@ public sealed class PedidosDigitalesService(
     SubastasTcgService subastas,
     ClientesService clientes)
 {
+    /// <summary>Zona horaria operativa del negocio (Perú).</summary>
+    private static readonly TimeSpan ZonaHorariaOperacion = TimeSpan.FromHours(-5);
+
     public async Task<IReadOnlyList<PedidoDigitalResponse>> ListarAsync(
         EstadoPedidoDigital? estado,
         CanalPedidoDigital? canalPedido,
         Guid? sedeId,
+        DateOnly? fechaDesde,
+        DateOnly? fechaHasta,
         CancellationToken cancellationToken)
     {
         var query = QueryBase();
@@ -46,6 +51,22 @@ public sealed class PedidosDigitalesService(
         if (sedeId.HasValue)
         {
             query = query.Where(p => p.SedeId == sedeId.Value);
+        }
+
+        // Día operativo en hora de Perú (UTC-5), alineado con el filtro "Desde"/"Hasta" del frontend.
+        if (fechaDesde.HasValue)
+        {
+            var inicio = new DateTimeOffset(fechaDesde.Value, TimeOnly.MinValue, ZonaHorariaOperacion);
+            query = query.Where(p => p.FechaPedido >= inicio);
+        }
+
+        if (fechaHasta.HasValue)
+        {
+            var finExclusivo = new DateTimeOffset(
+                fechaHasta.Value.AddDays(1),
+                TimeOnly.MinValue,
+                ZonaHorariaOperacion);
+            query = query.Where(p => p.FechaPedido < finExclusivo);
         }
 
         var pedidos = await query

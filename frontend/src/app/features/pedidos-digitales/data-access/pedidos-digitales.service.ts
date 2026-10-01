@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, Injector, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -21,6 +21,11 @@ import {
   PedidosDigitalesFiltros,
   origenDeCanal,
 } from '../models/pedido-digital.model';
+
+export interface PedidosDigitalesRangoFechas {
+  desde?: string | null;
+  hasta?: string | null;
+}
 
 interface PedidoApi {
   id: string;
@@ -110,9 +115,20 @@ export class PedidosDigitalesApiService {
   readonly sedes = this.sedesApi.sedes;
   readonly productos = this.productosApi.productos;
 
-  async refrescar(): Promise<PedidoDigital[]> {
+  async refrescar(rango?: PedidosDigitalesRangoFechas): Promise<PedidoDigital[]> {
     try {
-      const items = await firstValueFrom(this.http.get<PedidoApi[]>(apiUrl('pedidos-digitales')));
+      let params = new HttpParams();
+      const desde = rango?.desde?.trim();
+      const hasta = rango?.hasta?.trim();
+      if (desde) {
+        params = params.set('fechaDesde', desde);
+      }
+      if (hasta) {
+        params = params.set('fechaHasta', hasta);
+      }
+      const items = await firstValueFrom(
+        this.http.get<PedidoApi[]>(apiUrl('pedidos-digitales'), { params }),
+      );
       const pedidos = items.map(mapPedido);
       this.pedidosSignal.set(pedidos);
       return pedidos;
