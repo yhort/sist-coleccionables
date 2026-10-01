@@ -71,7 +71,20 @@ public sealed class CatalogoTcgService(ApplicationDbContext db, ITenantProvider 
             .Where(s => s.SerieId == serieId)
             .OrderBy(s => s.Codigo)
             .ToListAsync(cancellationToken);
-        return sets.Select(MapSet).ToList();
+        var setIds = sets.Select(s => s.Id).ToList();
+        var cartasPorSet = await db.TcgCartas.AsNoTracking()
+            .Where(c => setIds.Contains(c.SetId))
+            .GroupBy(c => c.SetId)
+            .Select(g => new { SetId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.SetId, x => x.Count, cancellationToken);
+        var skusPorSet = await ContarSkusPorSetAsync(setIds, cancellationToken);
+
+        return sets.Select(s =>
+        {
+            cartasPorSet.TryGetValue(s.Id, out var cartasCount);
+            skusPorSet.TryGetValue(s.Id, out var skusCount);
+            return MapSet(s, cartasCount, skusCount);
+        }).ToList();
     }
 
     public async Task<TcgSetResponse> CrearSetAsync(
@@ -109,7 +122,127 @@ public sealed class CatalogoTcgService(ApplicationDbContext db, ITenantProvider 
         };
         db.TcgSets.Add(set);
         await db.SaveChangesAsync(cancellationToken);
-        return MapSet(set);
+        return MapSet(set, cartasCount: 0, skusCount: 0);
+    }
+
+    public async Task<TcgSetResponse> ActualizarSetAsync(
+        Guid id,
+        ActualizarTcgSetRequest request,
+        CancellationToken cancellationToken)
+    {
+        var set = await db.TcgSets
+            .Include(s => s.Serie)
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken)
+            ?? throw new BusinessRuleException("No existe el set.", StatusCodes.Status404NotFound);
+
+        var nombreSerie = request.NombreSerie.Trim();
+        var nombreSet = request.NombreSet.Trim();
+        if (nombreSerie.Length == 0)
+        {
+            throw new BusinessRuleException("El nombre de la serie es obligatorio.");
+        }
+
+        if (nombreSet.Length == 0)
+        {
+            throw new BusinessRuleException("El nombre del set es obligatorio.");
+        }
+
+        var cartasCount = await db.TcgCartas.CountAsync(c => c.SetId == id, cancellationToken);
+        var skusCount = await ContarSkusDeSetAsync(id, cancellationToken);
+        var codigosBloqueados = cartasCount > 0 || skusCount > 0;
+
+        var codigoSerieSolicitado = string.IsNullOrWhiteSpace(request.CodigoSerie)
+            ? set.Serie.Codigo
+            : NormalizarCodigo(request.CodigoSerie);
+        var codigoSetSolicitado = string.IsNullOrWhiteSpace(request.CodigoSet)
+            ? set.Codigo
+            : NormalizarCodigo(request.CodigoSet);
+
+        var cambiaCodigoSerie = !string.Equals(codigoSerieSolicitado, set.Serie.Codigo, StringComparison.Ordinal);
+        var cambiaCodigoSet = !string.Equals(codigoSetSolicitado, set.Codigo, StringComparison.Ordinal);
+        if (codigosBloqueados && (cambiaCodigoSerie || cambiaCodigoSet))
+        {
+            throw new BusinessRuleException(
+                "No se pueden cambiar CodigoSerie ni CodigoSet: el set ya tiene fichas o SKUs creados.",
+                StatusCodes.Status409Conflict);
+        }
+
+        if (cambiaCodigoSerie)
+        {
+            var duplicada = await db.TcgSeries.AnyAsync(
+                s => s.Id != set.SerieId && s.Juego == set.Serie.Juego && s.Codigo == codigoSerieSolicitado,
+                cancellationToken);
+            if (duplicada)
+            {
+                throw new BusinessRuleException(
+                    "Ya existe una serie con ese juego y código.",
+                    StatusCodes.Status409Conflict);
+            }
+
+            set.Serie.Codigo = codigoSerieSolicitado;
+        }
+
+        if (cambiaCodigoSet)
+        {
+            var duplicado = await db.TcgSets.AnyAsync(
+                s => s.Id != id && s.Codigo == codigoSetSolicitado,
+                cancellationToken);
+            if (duplicado)
+            {
+                throw new BusinessRuleException("Ya existe un set con ese código.", StatusCodes.Status409Conflict);
+            }
+
+            set.Codigo = codigoSetSolicitado;
+        }
+
+        set.Serie.Nombre = nombreSerie;
+        set.Nombre = nombreSet;
+        set.NombreEn = TextoOpcional(request.NombreEn);
+
+        if (skusCount > 0)
+        {
+            var fichaIds = await db.TcgCartas
+                .Where(c => c.SetId == id)
+                .Select(c => c.Id)
+                .ToListAsync(cancellationToken);
+            var productos = await db.ProductosCarta
+                .Where(p => p.CartaCatalogoId != null && fichaIds.Contains(p.CartaCatalogoId.Value))
+                .ToListAsync(cancellationToken);
+            foreach (var producto in productos)
+            {
+                producto.SetNombre = nombreSet;
+                if (!codigosBloqueados && cambiaCodigoSet)
+                {
+                    producto.SetCodigo = codigoSetSolicitado;
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return MapSet(set, cartasCount, skusCount);
+    }
+
+    public async Task EliminarSetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var set = await db.TcgSets.FirstOrDefaultAsync(s => s.Id == id, cancellationToken)
+            ?? throw new BusinessRuleException("No existe el set.", StatusCodes.Status404NotFound);
+
+        var skusCount = await ContarSkusDeSetAsync(id, cancellationToken);
+        if (skusCount > 0)
+        {
+            throw new BusinessRuleException(
+                $"No se puede eliminar el set: tiene {skusCount} SKU(s) asociados. Elimina o desvincula las variantes antes de borrar el catálogo.",
+                StatusCodes.Status409Conflict);
+        }
+
+        var cartas = await db.TcgCartas.Where(c => c.SetId == id).ToListAsync(cancellationToken);
+        if (cartas.Count > 0)
+        {
+            db.TcgCartas.RemoveRange(cartas);
+        }
+
+        db.TcgSets.Remove(set);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<TcgCartaResponse>> ListarCartasAsync(
@@ -236,14 +369,42 @@ public sealed class CatalogoTcgService(ApplicationDbContext db, ITenantProvider 
         await db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
 
+        var skusCount = await ContarSkusDeSetAsync(set.Id, cancellationToken);
         return new ImportarSetTcgResponse
         {
             Serie = MapSerie(serie),
-            Set = MapSet(set),
+            Set = MapSet(set, cartasCount: resultado.Count, skusCount),
             CartasCreadas = creadas,
             CartasActualizadas = actualizadas,
             Cartas = resultado.Select(MapCarta).ToList()
         };
+    }
+
+    private async Task<int> ContarSkusDeSetAsync(Guid setId, CancellationToken cancellationToken)
+    {
+        return await db.ProductosCarta.AsNoTracking()
+            .CountAsync(
+                p => p.CartaCatalogoId != null
+                    && db.TcgCartas.Any(c => c.Id == p.CartaCatalogoId && c.SetId == setId),
+                cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, int>> ContarSkusPorSetAsync(
+        IReadOnlyList<Guid> setIds,
+        CancellationToken cancellationToken)
+    {
+        if (setIds.Count == 0)
+        {
+            return new Dictionary<Guid, int>();
+        }
+
+        return await (
+            from p in db.ProductosCarta.AsNoTracking()
+            join c in db.TcgCartas.AsNoTracking() on p.CartaCatalogoId equals c.Id
+            where p.CartaCatalogoId != null && setIds.Contains(c.SetId)
+            group p by c.SetId into g
+            select new { SetId = g.Key, Count = g.Count() }
+        ).ToDictionaryAsync(x => x.SetId, x => x.Count, cancellationToken);
     }
 
     private async Task<TcgSerie> ResolverSerieAsync(
@@ -348,7 +509,7 @@ public sealed class CatalogoTcgService(ApplicationDbContext db, ITenantProvider 
         Activa = serie.Activa
     };
 
-    private static TcgSetResponse MapSet(TcgSet set) => new()
+    private static TcgSetResponse MapSet(TcgSet set, int cartasCount = 0, int skusCount = 0) => new()
     {
         Id = set.Id,
         SerieId = set.SerieId,
@@ -359,7 +520,10 @@ public sealed class CatalogoTcgService(ApplicationDbContext db, ITenantProvider 
         NombreEn = set.NombreEn,
         CodigoImpresion = set.CodigoImpresion,
         TotalCartas = set.TotalCartas,
-        FechaLanzamiento = set.FechaLanzamiento
+        FechaLanzamiento = set.FechaLanzamiento,
+        CartasCount = cartasCount,
+        SkusCount = skusCount,
+        CodigosBloqueados = cartasCount > 0 || skusCount > 0
     };
 
     private static TcgCartaResponse MapCarta(TcgCarta carta) => new()

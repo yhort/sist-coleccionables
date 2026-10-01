@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
 import { RarezaTcg } from '../../productos-tcg/models/producto-tcg.model';
-import { ImportarSetTcgRequest, ImportarSetTcgResponse, TcgCarta, TcgSerie, TcgSet, UpsertTcgSerieRequest, UpsertTcgSetRequest } from '../models/catalogo-tcg.model';
+import { ImportarSetTcgRequest, ImportarSetTcgResponse, TcgCarta, TcgSerie, TcgSet, ActualizarTcgSetRequest, UpsertTcgSerieRequest, UpsertTcgSetRequest } from '../models/catalogo-tcg.model';
 import { parsearCatalogoOficial, ParseCatalogoResultado } from './parse-catalogo-oficial';
 
 @Injectable({ providedIn: 'root' })
@@ -50,6 +50,44 @@ export class CatalogoTcgApiService {
         items.some((item) => item.id === creado.id) ? items : [...items, creado],
       );
       return creado;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async actualizarSet(id: string, request: ActualizarTcgSetRequest): Promise<TcgSet> {
+    try {
+      const actualizado = await firstValueFrom(
+        this.http.put<TcgSet>(apiUrl(`tcg/sets/${id}`), request),
+      );
+      this.setsSignal.update((items) =>
+        items.map((item) => (item.id === actualizado.id ? actualizado : item)),
+      );
+      this.seriesSignal.update((items) =>
+        items.map((item) =>
+          item.id === actualizado.serieId
+            ? { ...item, codigo: actualizado.serieCodigo, nombre: actualizado.serieNombre }
+            : item,
+        ),
+      );
+      this.cartasSignal.update((items) =>
+        items.map((carta) =>
+          carta.setId === actualizado.id
+            ? { ...carta, setCodigo: actualizado.codigo, setNombre: actualizado.nombre }
+            : carta,
+        ),
+      );
+      return actualizado;
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
+  async eliminarSet(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.http.delete(apiUrl(`tcg/sets/${id}`)));
+      this.setsSignal.update((items) => items.filter((item) => item.id !== id));
+      this.cartasSignal.update((items) => items.filter((carta) => carta.setId !== id));
     } catch (error) {
       throw new Error(readApiError(error));
     }

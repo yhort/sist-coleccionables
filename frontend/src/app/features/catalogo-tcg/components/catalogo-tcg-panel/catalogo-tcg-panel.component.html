@@ -41,6 +41,24 @@
     >
       Importar catálogo (CSV / Lista)
     </button>
+    <div class="catalogo__set-actions">
+      <button
+        type="button"
+        class="ghost"
+        [disabled]="!setSeleccionado()"
+        (click)="editorAbierto.set(true)"
+      >
+        Editar set
+      </button>
+      <button
+        type="button"
+        class="danger"
+        [disabled]="!setSeleccionado() || eliminando()"
+        (click)="eliminarSetActual()"
+      >
+        {{ eliminando() ? 'Eliminando…' : 'Eliminar set' }}
+      </button>
+    </div>
   </header>
 
   <p class="catalogo__hint">
@@ -103,6 +121,14 @@
     [setActual]="setSeleccionado()"
     (saved)="onCatalogoImportado($event)"
     (cancelled)="importadorAbierto.set(false)"
+  />
+}
+
+@if (editorAbierto() && setSeleccionado(); as set) {
+  <app-editar-set-dialog
+    [set]="set"
+    (saved)="onSetEditado($event)"
+    (cancelled)="editorAbierto.set(false)"
   />
 }
 

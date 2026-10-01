@@ -47,6 +47,24 @@ public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : Control
         return CreatedAtAction(nameof(ListarSets), new { serieId = creado.SerieId }, creado);
     }
 
+    [HttpPut("sets/{id:guid}")]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<ActionResult<TcgSetResponse>> ActualizarSet(
+        Guid id,
+        [FromBody] ActualizarTcgSetRequest request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await catalogo.ActualizarSetAsync(id, request, cancellationToken));
+    }
+
+    [HttpDelete("sets/{id:guid}")]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<IActionResult> EliminarSet(Guid id, CancellationToken cancellationToken)
+    {
+        await catalogo.EliminarSetAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("cartas")]
     public async Task<ActionResult<IReadOnlyList<TcgCartaResponse>>> ListarCartas(
         [FromQuery] Guid setId,

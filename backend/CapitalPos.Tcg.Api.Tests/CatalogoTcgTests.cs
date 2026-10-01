@@ -122,6 +122,158 @@ public sealed class CatalogoTcgTests
     }
 
     [Fact]
+    public async Task Actualizar_set_permite_nombres_y_bloquea_codigos_con_fichas()
+    {
+        using var client = _factory.CreateClient();
+        await LoginAsync(client);
+
+        var codigoSet = $"E{Guid.NewGuid():N}"[..10].ToUpperInvariant();
+        var importar = await client.PostAsJsonAsync(
+            "/api/tcg/cartas/importar-set",
+            new
+            {
+                serie = new { juego = "Pokemon", codigo = "MEGA", nombre = "Megaevolución", activa = true },
+                set = new
+                {
+                    codigo = codigoSet,
+                    nombre = "Set Editable",
+                    nombreEn = "Editable Set",
+                    totalCartas = 1
+                },
+                cartas = new[]
+                {
+                    new
+                    {
+                        numero = "001",
+                        nombre = "Carta Demo",
+                        tipoCarta = "POKEMON",
+                        rareza = "COMUN",
+                        artista = (string?)null,
+                        imagenOficialUrl = (string?)null
+                    }
+                }
+            },
+            Json);
+        Assert.True(importar.IsSuccessStatusCode, await importar.Content.ReadAsStringAsync());
+        var catalogo = await importar.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var setId = catalogo.GetProperty("set").GetProperty("id").GetGuid();
+
+        var ok = await client.PutAsJsonAsync(
+            $"/api/tcg/sets/{setId}",
+            new
+            {
+                nombreSerie = "Megaevolución Renombrada",
+                nombreSet = "Set Renombrado",
+                nombreEn = "Renamed Set",
+                codigoSerie = "MEGA",
+                codigoSet = codigoSet
+            },
+            Json);
+        Assert.True(ok.IsSuccessStatusCode, await ok.Content.ReadAsStringAsync());
+        var actualizado = await ok.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("Megaevolución Renombrada", actualizado.GetProperty("serieNombre").GetString());
+        Assert.Equal("Set Renombrado", actualizado.GetProperty("nombre").GetString());
+        Assert.Equal("Renamed Set", actualizado.GetProperty("nombreEn").GetString());
+        Assert.True(actualizado.GetProperty("codigosBloqueados").GetBoolean());
+
+        var bloqueado = await client.PutAsJsonAsync(
+            $"/api/tcg/sets/{setId}",
+            new
+            {
+                nombreSerie = "Megaevolución Renombrada",
+                nombreSet = "Set Renombrado",
+                nombreEn = "Renamed Set",
+                codigoSerie = "OTRO",
+                codigoSet = codigoSet
+            },
+            Json);
+        Assert.Equal(HttpStatusCode.Conflict, bloqueado.StatusCode);
+    }
+
+    [Fact]
+    public async Task Eliminar_set_sin_skus_borra_fichas_y_con_skus_falla()
+    {
+        using var client = _factory.CreateClient();
+        await LoginAsync(client);
+
+        var codigoLibre = $"L{Guid.NewGuid():N}"[..10].ToUpperInvariant();
+        var libre = await client.PostAsJsonAsync(
+            "/api/tcg/cartas/importar-set",
+            new
+            {
+                serie = new { juego = "Pokemon", codigo = "MEGA", nombre = "Megaevolución", activa = true },
+                set = new { codigo = codigoLibre, nombre = "Set Libre", totalCartas = 1 },
+                cartas = new[]
+                {
+                    new
+                    {
+                        numero = "010",
+                        nombre = "Ficha Libre",
+                        tipoCarta = "POKEMON",
+                        rareza = "COMUN",
+                        artista = (string?)null,
+                        imagenOficialUrl = (string?)null
+                    }
+                }
+            },
+            Json);
+        Assert.True(libre.IsSuccessStatusCode, await libre.Content.ReadAsStringAsync());
+        var libreBody = await libre.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var setLibreId = libreBody.GetProperty("set").GetProperty("id").GetGuid();
+
+        var deleteOk = await client.DeleteAsync($"/api/tcg/sets/{setLibreId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteOk.StatusCode);
+
+        var cartas = await client.GetAsync($"/api/tcg/cartas?setId={setLibreId}");
+        Assert.Equal(HttpStatusCode.NotFound, cartas.StatusCode);
+
+        var codigoConSku = $"S{Guid.NewGuid():N}"[..10].ToUpperInvariant();
+        var conSku = await client.PostAsJsonAsync(
+            "/api/tcg/cartas/importar-set",
+            new
+            {
+                serie = new { juego = "Pokemon", codigo = "MEGA", nombre = "Megaevolución", activa = true },
+                set = new { codigo = codigoConSku, nombre = "Set Con SKU", totalCartas = 1 },
+                cartas = new[]
+                {
+                    new
+                    {
+                        numero = "020",
+                        nombre = "Ficha Con SKU",
+                        tipoCarta = "POKEMON",
+                        rareza = "COMUN",
+                        artista = (string?)null,
+                        imagenOficialUrl = (string?)null
+                    }
+                }
+            },
+            Json);
+        Assert.True(conSku.IsSuccessStatusCode, await conSku.Content.ReadAsStringAsync());
+        var conSkuBody = await conSku.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var setConSkuId = conSkuBody.GetProperty("set").GetProperty("id").GetGuid();
+        var cartaId = conSkuBody.GetProperty("cartas")[0].GetProperty("id").GetGuid();
+
+        var variante = await client.PostAsJsonAsync(
+            "/api/productos-tcg/variantes",
+            new
+            {
+                cartaCatalogoId = cartaId,
+                esFoil = false,
+                condicion = "NM",
+                idioma = "ES",
+                precioVenta = 10m,
+                sedeId = DevelopmentDataSeeder.SedeId,
+                stockInicial = 1m,
+                tipoIngresoStock = "AJUSTE"
+            },
+            Json);
+        Assert.True(variante.IsSuccessStatusCode, await variante.Content.ReadAsStringAsync());
+
+        var deleteFail = await client.DeleteAsync($"/api/tcg/sets/{setConSkuId}");
+        Assert.Equal(HttpStatusCode.Conflict, deleteFail.StatusCode);
+    }
+
+    [Fact]
     public async Task Importar_set_exige_serieId_en_listado_de_sets()
     {
         using var client = _factory.CreateClient();

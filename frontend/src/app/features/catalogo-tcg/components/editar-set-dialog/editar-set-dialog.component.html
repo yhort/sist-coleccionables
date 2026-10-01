@@ -1,0 +1,73 @@
+<div class="dialog-backdrop" (click)="guardando() ? null : cancelled.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="editar-set-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="editar-set-title">Editar set / serie</h2>
+      <p>
+        Puedes corregir los nombres en cualquier momento. Los códigos base se bloquean cuando el set
+        ya tiene fichas o SKUs.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="dialog__close"
+      aria-label="Cerrar"
+      [disabled]="guardando()"
+      (click)="cancelled.emit()"
+    >
+      ×
+    </button>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()">
+    <div class="dialog__grid">
+      <label>
+        Nombre de serie
+        <input formControlName="nombreSerie" maxlength="120" />
+      </label>
+      <label>
+        Código de serie
+        <input formControlName="codigoSerie" maxlength="32" />
+      </label>
+      <label>
+        Nombre de set
+        <input formControlName="nombreSet" maxlength="120" />
+      </label>
+      <label>
+        Código de set
+        <input formControlName="codigoSet" maxlength="32" />
+      </label>
+      <label class="wide">
+        Nombre EN
+        <input formControlName="nombreEn" maxlength="120" placeholder="Opcional" />
+      </label>
+    </div>
+
+    @if (codigosBloqueados()) {
+      <p class="hint">
+        Códigos bloqueados: este set tiene
+        {{ set().cartasCount ?? 0 }} ficha(s) y {{ set().skusCount ?? 0 }} SKU(s).
+      </p>
+    }
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <footer class="dialog__footer">
+      <button type="button" class="ghost" [disabled]="guardando()" (click)="cancelled.emit()">
+        Cancelar
+      </button>
+      <button type="submit" class="primary" [disabled]="guardando()">
+        {{ guardando() ? 'Guardando…' : 'Guardar cambios' }}
+      </button>
+    </footer>
+  </form>
+</section>

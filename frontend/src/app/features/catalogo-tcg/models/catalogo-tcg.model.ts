@@ -24,6 +24,17 @@ export interface TcgSet {
   codigoImpresion: string | null;
   totalCartas: number;
   fechaLanzamiento: string | null;
+  cartasCount?: number;
+  skusCount?: number;
+  codigosBloqueados?: boolean;
+}
+
+export interface ActualizarTcgSetRequest {
+  nombreSerie: string;
+  nombreSet: string;
+  nombreEn?: string | null;
+  codigoSerie?: string | null;
+  codigoSet?: string | null;
 }
 
 export interface TcgCarta {

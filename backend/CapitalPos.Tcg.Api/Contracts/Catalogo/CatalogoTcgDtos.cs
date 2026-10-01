@@ -45,6 +45,30 @@ public sealed class UpsertTcgSetRequest
     public DateTimeOffset? FechaLanzamiento { get; set; }
 }
 
+/// <summary>
+/// Edición de set/serie. Los nombres siempre se pueden cambiar.
+/// <see cref="CodigoSerie"/> / <see cref="CodigoSet"/> solo si el set aún no tiene fichas ni SKUs.
+/// </summary>
+public sealed class ActualizarTcgSetRequest
+{
+    [Required]
+    [MaxLength(120)]
+    public string NombreSerie { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(120)]
+    public string NombreSet { get; set; } = string.Empty;
+
+    [MaxLength(120)]
+    public string? NombreEn { get; set; }
+
+    [MaxLength(32)]
+    public string? CodigoSerie { get; set; }
+
+    [MaxLength(32)]
+    public string? CodigoSet { get; set; }
+}
+
 public sealed class UpsertTcgCartaRequest
 {
     [Required]
@@ -122,6 +146,12 @@ public sealed class TcgSetResponse
     public string? CodigoImpresion { get; init; }
     public required int TotalCartas { get; init; }
     public DateTimeOffset? FechaLanzamiento { get; init; }
+    /// <summary>Fichas oficiales del set.</summary>
+    public int CartasCount { get; init; }
+    /// <summary>SKUs (variantes) vinculados a fichas del set.</summary>
+    public int SkusCount { get; init; }
+    /// <summary>True si hay fichas o SKUs: no se pueden cambiar CodigoSerie / CodigoSet.</summary>
+    public bool CodigosBloqueados { get; init; }
 }
 
 public sealed class TcgCartaResponse
