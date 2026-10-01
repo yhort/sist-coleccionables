@@ -92,6 +92,22 @@
         }
       </select>
     </label>
+    <label>
+      <span>Desde</span>
+      <input
+        type="date"
+        [ngModel]="filtros().desde"
+        (ngModelChange)="actualizarFiltro('desde', $event)"
+      />
+    </label>
+    <label>
+      <span>Hasta</span>
+      <input
+        type="date"
+        [ngModel]="filtros().hasta"
+        (ngModelChange)="actualizarFiltro('hasta', $event)"
+      />
+    </label>
     <button type="button" class="toolbar__clear" (click)="limpiarFiltros()">Limpiar</button>
   </section>
 

@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -28,6 +28,12 @@ import {
   pujaMaxima,
   pujasOrdenadas,
 } from '../models/subasta-tcg.model';
+
+/** Rango de fechas opcional para GET /api/subastas-tcg (`fechaDesde` / `fechaHasta`). */
+export interface SubastasTcgRangoFechas {
+  desde?: string | null;
+  hasta?: string | null;
+}
 
 interface SubastaDetalleApi {
   id: string;
@@ -85,9 +91,20 @@ export class SubastasTcgApiService {
   readonly sedes = this.sedesApi.sedes;
   readonly productos = this.productosApi.productos;
 
-  async refrescar(): Promise<SubastaTcg[]> {
+  async refrescar(rango?: SubastasTcgRangoFechas): Promise<SubastaTcg[]> {
     try {
-      const items = await firstValueFrom(this.http.get<SubastaApi[]>(apiUrl('subastas-tcg')));
+      let params = new HttpParams();
+      const desde = rango?.desde?.trim();
+      const hasta = rango?.hasta?.trim();
+      if (desde) {
+        params = params.set('fechaDesde', desde);
+      }
+      if (hasta) {
+        params = params.set('fechaHasta', hasta);
+      }
+      const items = await firstValueFrom(
+        this.http.get<SubastaApi[]>(apiUrl('subastas-tcg'), { params }),
+      );
       const subastas = items.map(mapSubasta);
       this.subastasSignal.set(subastas);
       return subastas;
@@ -99,6 +116,8 @@ export class SubastasTcgApiService {
   listar(filtros: SubastasTcgFiltros): SubastaTcg[] {
     const q = filtros.busqueda.trim().toLowerCase();
     const qNorm = q.replace(/^#/, '');
+    const desde = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00`) : null;
+    const hasta = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999`) : null;
 
     return this.subastasSignal()
       .filter((subasta) => {
@@ -118,6 +137,13 @@ export class SubastasTcgApiService {
           if (!tipos.has(filtros.tipoProducto)) {
             return false;
           }
+        }
+        const fecha = new Date(subasta.fechaInicio).getTime();
+        if (desde && fecha < desde) {
+          return false;
+        }
+        if (hasta && fecha > hasta) {
+          return false;
         }
         if (q) {
           const haystack = [

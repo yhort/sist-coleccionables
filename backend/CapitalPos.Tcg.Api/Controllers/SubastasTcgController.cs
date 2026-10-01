@@ -19,9 +19,12 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
         [FromQuery] EstadoSubastaTcg? estado,
         [FromQuery] CanalSubastaTcg? canal,
         [FromQuery] Guid? sedeId,
+        [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta,
         CancellationToken cancellationToken)
     {
-        var items = await subastas.ListarAsync(estado, canal, sedeId, cancellationToken);
+        var items = await subastas.ListarAsync(
+            estado, canal, sedeId, fechaDesde, fechaHasta, cancellationToken);
         return Ok(items);
     }
 

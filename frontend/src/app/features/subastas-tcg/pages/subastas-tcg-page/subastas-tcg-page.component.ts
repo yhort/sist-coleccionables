@@ -26,6 +26,7 @@ import {
   SubastaTcg,
   SubastasTcgFiltros,
   calcularMargenSubasta,
+  crearFiltrosSubastasDiaActual,
   esEventoIndividuales,
   etiquetaLoteSubasta,
   subastaVencida,
@@ -73,7 +74,7 @@ export class SubastasTcgPageComponent {
   readonly tiposProducto: readonly TipoProductoTcg[] = ['CARTA', 'SELLADO', 'ACCESORIO', 'COMPUESTO'];
   readonly etiquetasTipo = ETIQUETAS_TIPO;
 
-  readonly filtros = signal<SubastasTcgFiltros>({ ...FILTROS_SUBASTAS_VACIOS });
+  readonly filtros = signal<SubastasTcgFiltros>(crearFiltrosSubastasDiaActual());
   readonly vista = signal<SubastasVistaMode>(leerVistaPreferida());
   readonly seleccionadaId = signal<string | null>(null);
   readonly pujaSubasta = signal<SubastaTcg | null>(null);
@@ -90,7 +91,7 @@ export class SubastasTcgPageComponent {
       await Promise.all([
         this.productosApi.refrescar(),
         this.sedesApi.refrescar(),
-        this.subastasApi.refrescar(),
+        this.refrescarSubastas(),
         this.pedidosApi.refrescar().catch(() => undefined),
       ]);
       const sedeId = this.sedesApi.sedes()[0]?.id;
@@ -155,10 +156,14 @@ export class SubastasTcgPageComponent {
     valor: SubastasTcgFiltros[K],
   ): void {
     this.filtros.update((actual) => ({ ...actual, [clave]: valor }));
+    if (clave === 'desde' || clave === 'hasta') {
+      void this.refrescarSubastas().catch((err) => this.error.set(readApiError(err)));
+    }
   }
 
   limpiarFiltros(): void {
     this.filtros.set({ ...FILTROS_SUBASTAS_VACIOS });
+    void this.refrescarSubastas().catch((err) => this.error.set(readApiError(err)));
   }
 
   abrirDetalle(subasta: SubastaTcg): void {
@@ -239,6 +244,14 @@ export class SubastasTcgPageComponent {
 
   onPujaGuardada(): void {
     this.cerrarPuja();
+  }
+
+  private async refrescarSubastas(): Promise<void> {
+    const { desde, hasta } = this.filtros();
+    await this.subastasApi.refrescar({
+      desde: desde || null,
+      hasta: hasta || null,
+    });
   }
 
   private aplicarQueryParams(): void {

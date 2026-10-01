@@ -125,7 +125,12 @@ app-subasta-margen-card {
 .toolbar {
   display: grid;
   flex-shrink: 0;
-  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(0, 1fr)) auto;
+  /* Búsqueda | Canal | Categoría | Sede | Desde | Hasta | Limpiar */
+  grid-template-columns:
+    minmax(160px, 1.7fr)
+    repeat(3, minmax(100px, 1fr))
+    repeat(2, minmax(128px, 0.85fr))
+    auto;
   gap: 0.75rem;
   align-items: end;
   padding: var(--spacing-md) var(--spacing-lg);
@@ -138,6 +143,7 @@ app-subasta-margen-card {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    min-width: 0;
     color: var(--color-text-secondary);
     font-size: 0.75rem;
     font-weight: 600;
@@ -145,6 +151,8 @@ app-subasta-margen-card {
 
   select,
   input {
+    width: 100%;
+    min-width: 0;
     min-height: 40px;
     padding: 0 0.75rem;
     color: var(--color-text-primary);
@@ -152,11 +160,17 @@ app-subasta-margen-card {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     outline: none;
+    box-sizing: border-box;
 
     &:focus {
       border-color: var(--color-primary);
       box-shadow: 0 0 0 3px rgb(37 99 235 / 12%);
     }
+  }
+
+  input[type='date'] {
+    /* Evita que el datepicker nativo fuerce un ancho mínimo y rompa el grid */
+    max-width: 100%;
   }
 
   &__busqueda input {
@@ -166,6 +180,7 @@ app-subasta-margen-card {
   &__clear {
     min-height: 40px;
     padding: 0 0.9rem;
+    white-space: nowrap;
     color: var(--color-primary);
     font-weight: 600;
     cursor: pointer;
@@ -192,6 +207,17 @@ app-subastas-tabla {
   min-height: 0;
 }
 
+@media (max-width: 1280px) {
+  /* Dos filas simétricas: 4 + 3 (Desde, Hasta, Limpiar) */
+  .toolbar {
+    grid-template-columns: minmax(160px, 1.5fr) repeat(3, minmax(0, 1fr));
+
+    &__clear {
+      justify-self: stretch;
+    }
+  }
+}
+
 @media (max-width: 1024px) {
   :host {
     height: calc(100dvh - var(--topbar-height) - (2 * var(--spacing-md)));
@@ -199,9 +225,20 @@ app-subastas-tabla {
 }
 
 @media (max-width: 900px) {
-  .kpis,
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    &__busqueda {
+      grid-column: 1 / -1;
+    }
+
+    &__clear {
+      justify-self: stretch;
+    }
   }
 }
 
@@ -209,5 +246,9 @@ app-subastas-tabla {
   .kpis,
   .toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .toolbar__busqueda {
+    grid-column: auto;
   }
 }

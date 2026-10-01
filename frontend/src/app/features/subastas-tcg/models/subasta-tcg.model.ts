@@ -77,6 +77,10 @@ export interface SubastasTcgFiltros {
   canal: CanalSubastaTcg | 'TODOS';
   tipoProducto: TipoProductoTcg | 'TODOS';
   sedeId: string | 'TODAS';
+  /** Fecha local `YYYY-MM-DD` (input type="date"). Vacío = sin límite. */
+  desde: string;
+  /** Fecha local `YYYY-MM-DD` (input type="date"). Vacío = sin límite. */
+  hasta: string;
 }
 
 export interface SubastaDetalleInput {
@@ -141,7 +145,28 @@ export const FILTROS_SUBASTAS_VACIOS: SubastasTcgFiltros = {
   canal: 'TODOS',
   tipoProducto: 'TODOS',
   sedeId: 'TODAS',
+  desde: '',
+  hasta: '',
 };
+
+/** Fecha local en formato `YYYY-MM-DD` (input type="date"). */
+export function fechaLocalHoy(): string {
+  const ahora = new Date();
+  const yyyy = ahora.getFullYear();
+  const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dd = String(ahora.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Filtros iniciales del tablero: operación del día en curso (UTC-5 Perú vía zona del navegador). */
+export function crearFiltrosSubastasDiaActual(): SubastasTcgFiltros {
+  const hoy = fechaLocalHoy();
+  return {
+    ...FILTROS_SUBASTAS_VACIOS,
+    desde: hoy,
+    hasta: hoy,
+  };
+}
 
 export const ESTADOS_TABLERO_SUBASTA: readonly EstadoSubastaTcg[] = [
   'BORRADOR',
