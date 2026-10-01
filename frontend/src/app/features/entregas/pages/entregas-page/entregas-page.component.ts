@@ -13,6 +13,7 @@ import {
   EntregaFila,
   EntregasFiltros,
   FILTROS_ENTREGAS_VACIOS,
+  crearFiltrosEntregasDiaActual,
 } from '../../models/entrega.model';
 
 @Component({
@@ -33,7 +34,7 @@ export class EntregasPageComponent {
   private readonly cajaApi = inject(CajaApiService);
 
   readonly sedes = this.entregasApi.sedes;
-  readonly filtros = signal<EntregasFiltros>({ ...FILTROS_ENTREGAS_VACIOS });
+  readonly filtros = signal<EntregasFiltros>(crearFiltrosEntregasDiaActual());
   readonly error = signal('');
   readonly dialogModo = signal<'empaque' | 'despacho' | null>(null);
   readonly filaActiva = signal<EntregaFila | null>(null);
@@ -49,7 +50,7 @@ export class EntregasPageComponent {
   readonly kpis = computed(() => {
     this.entregasApi.entregas();
     this.entregasApi.sedes();
-    return this.entregasApi.kpis();
+    return this.entregasApi.kpis(this.filas());
   });
 
   constructor() {
@@ -59,7 +60,7 @@ export class EntregasPageComponent {
   async cargar(): Promise<void> {
     this.error.set('');
     try {
-      await this.entregasApi.refrescar();
+      await this.refrescarEntregas();
       await this.cajaApi.refrescarEstados(this.sedes().map((sede) => sede.id));
     } catch (err) {
       this.error.set(readApiError(err));
@@ -67,11 +68,16 @@ export class EntregasPageComponent {
   }
 
   actualizarFiltros(filtros: EntregasFiltros): void {
+    const prev = this.filtros();
     this.filtros.set(filtros);
+    if (prev.desde !== filtros.desde || prev.hasta !== filtros.hasta) {
+      void this.refrescarEntregas().catch((err) => this.error.set(readApiError(err)));
+    }
   }
 
   limpiarFiltros(): void {
     this.filtros.set({ ...FILTROS_ENTREGAS_VACIOS });
+    void this.refrescarEntregas().catch((err) => this.error.set(readApiError(err)));
   }
 
   abrirEmpaque(fila: EntregaFila): void {
@@ -133,5 +139,13 @@ export class EntregasPageComponent {
 
   onCajaChanged(): void {
     void this.cajaApi.refrescarEstados(this.sedes().map((sede) => sede.id));
+  }
+
+  private async refrescarEntregas(): Promise<void> {
+    const { desde, hasta } = this.filtros();
+    await this.entregasApi.refrescar({
+      desde: desde || null,
+      hasta: hasta || null,
+    });
   }
 }

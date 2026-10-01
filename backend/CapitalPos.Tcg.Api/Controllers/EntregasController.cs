@@ -17,9 +17,12 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     public async Task<ActionResult<IReadOnlyList<EntregaResponse>>> Listar(
         [FromQuery] EstadoLogistica? estado,
         [FromQuery] Guid? sedeOrigenId,
+        [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta,
         CancellationToken cancellationToken)
     {
-        var items = await entregas.ListarAsync(estado, sedeOrigenId, cancellationToken);
+        var items = await entregas.ListarAsync(
+            estado, sedeOrigenId, fechaDesde, fechaHasta, cancellationToken);
         return Ok(items);
     }
 

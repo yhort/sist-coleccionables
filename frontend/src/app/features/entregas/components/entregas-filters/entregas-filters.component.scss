@@ -4,7 +4,12 @@
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(140px, 1fr)) minmax(0, 1.4fr) auto;
+  /* Método | Estado | Sede | Desde | Hasta | Búsqueda | Limpiar */
+  grid-template-columns:
+    repeat(3, minmax(120px, 1fr))
+    repeat(2, minmax(128px, 0.85fr))
+    minmax(160px, 1.4fr)
+    auto;
   gap: 0.75rem;
   align-items: end;
   padding: var(--spacing-md) var(--spacing-lg);
@@ -17,6 +22,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    min-width: 0;
     color: var(--color-text-secondary);
     font-size: 0.75rem;
     font-weight: 600;
@@ -25,6 +31,7 @@
   input,
   select {
     width: 100%;
+    min-width: 0;
     min-height: 40px;
     padding: 0 0.75rem;
     color: var(--color-text-primary);
@@ -32,6 +39,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     outline: none;
+    box-sizing: border-box;
 
     &:focus {
       border-color: var(--color-primary);
@@ -39,9 +47,14 @@
     }
   }
 
+  input[type='date'] {
+    max-width: 100%;
+  }
+
   &__clear {
     min-height: 40px;
     padding: 0 0.9rem;
+    white-space: nowrap;
     color: var(--color-primary);
     font-weight: 600;
     cursor: pointer;
@@ -54,14 +67,36 @@
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1280px) {
+  .filters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+
+    &__search {
+      grid-column: 1 / -2;
+    }
+
+    &__clear {
+      justify-self: stretch;
+    }
+  }
+}
+
+@media (max-width: 900px) {
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    &__search {
+      grid-column: 1 / -1;
+    }
   }
 }
 
 @media (max-width: 640px) {
   .filters {
     grid-template-columns: 1fr;
+
+    &__search {
+      grid-column: auto;
+    }
   }
 }

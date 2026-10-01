@@ -26,6 +26,22 @@
       }
     </select>
   </label>
+  <label>
+    <span>Desde</span>
+    <input
+      type="date"
+      [ngModel]="filtros().desde"
+      (ngModelChange)="actualizar('desde', $event)"
+    />
+  </label>
+  <label>
+    <span>Hasta</span>
+    <input
+      type="date"
+      [ngModel]="filtros().hasta"
+      (ngModelChange)="actualizar('hasta', $event)"
+    />
+  </label>
   <label class="filters__search">
     <span>Pedido, cliente o tracking</span>
     <input

@@ -1,6 +1,9 @@
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
 import { SedesApiService } from '../../../core/data-access/sedes-api.service';
+import { apiUrl } from '../../../core/http/api-url';
 import { codigoPedido } from '../../../core/ui/codigo-amigable';
 import { PedidosDigitalesApiService } from '../../pedidos-digitales/data-access/pedidos-digitales.service';
 import { PedidoDigital } from '../../pedidos-digitales/models/pedido-digital.model';
@@ -11,16 +14,47 @@ import {
   EntregaFila,
   EntregasFiltros,
   EstadoLogistica,
+  MetodoEnvio,
   metodoDesdeSnapshot,
   nombreSedeDe,
   remitenteDe,
   snapshotDesdeMetodo,
 } from '../models/entrega.model';
 
-const USUARIO_DESPACHO = 'Despacho';
+/** Rango de fechas opcional para GET /api/entregas y pedidos (`fechaDesde` / `fechaHasta`). */
+export interface EntregasRangoFechas {
+  desde?: string | null;
+  hasta?: string | null;
+}
+
+interface EntregaApi {
+  id: string;
+  pedidoDigitalId: string;
+  sedeOrigenId: string;
+  metodoEnvio: MetodoEnvio;
+  estado: EstadoLogistica;
+  destinatarioNombre: string;
+  destinatarioTelefono?: string | null;
+  direccion?: string | null;
+  distrito?: string | null;
+  provincia?: string | null;
+  departamento?: string | null;
+  agencia?: string | null;
+  puntoEntrega?: string | null;
+  canalContacto?: Entrega['canalContacto'];
+  contactoReferencia?: string | null;
+  numeroTracking?: string | null;
+  costoEnvio: number;
+  notasEmpaque?: string | null;
+  fechaProgramada?: string | null;
+  fechaDespacho?: string | null;
+  fechaEntrega?: string | null;
+  observacion?: string | null;
+}
 
 @Injectable({ providedIn: 'root' })
 export class EntregasApiService {
+  private readonly http = inject(HttpClient);
   private readonly entregasSignal = signal<Entrega[]>(SEED_ENTREGAS.map(clonar));
   private readonly pedidosApi = inject(PedidosDigitalesApiService);
   private readonly sedesApi = inject(SedesApiService);
@@ -28,14 +62,24 @@ export class EntregasApiService {
   readonly entregas = this.entregasSignal.asReadonly();
   readonly sedes = this.sedesApi.sedes;
 
-  async refrescar(): Promise<void> {
-    await Promise.all([this.sedesApi.refrescar(), this.pedidosApi.refrescar()]);
+  async refrescar(rango?: EntregasRangoFechas): Promise<void> {
+    const desde = rango?.desde?.trim() || null;
+    const hasta = rango?.hasta?.trim() || null;
+
+    await Promise.all([
+      this.sedesApi.refrescar(),
+      this.pedidosApi.refrescar({ desde, hasta }),
+      this.refrescarEntregasApi({ desde, hasta }).catch(() => undefined),
+    ]);
   }
 
   listar(filtros: EntregasFiltros): EntregaFila[] {
     this.pedidosApi.pedidos();
     this.sedesApi.sedes();
+    this.entregasSignal();
     const query = filtros.busqueda.trim().toLowerCase();
+    const desde = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00`) : null;
+    const hasta = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999`) : null;
 
     return this.pedidosApi
       .listarParaDespacho()
@@ -48,6 +92,13 @@ export class EntregasApiService {
           return false;
         }
         if (filtros.sedeId !== 'TODAS' && fila.entrega.sedeOrigenId !== filtros.sedeId) {
+          return false;
+        }
+        const fechaOperativa = fechaOperativaFila(fila);
+        if (desde && fechaOperativa < desde) {
+          return false;
+        }
+        if (hasta && fechaOperativa > hasta) {
           return false;
         }
         if (!query) {
@@ -68,18 +119,29 @@ export class EntregasApiService {
     return remitenteDe(sedeId);
   }
 
-  kpis() {
-    const filas = this.listar({
-      metodoEnvio: 'TODOS',
-      estado: 'TODOS',
-      sedeId: 'TODAS',
-      busqueda: '',
-    });
+  /** KPIs sobre el conjunto ya filtrado. */
+  kpis(filas: readonly EntregaFila[]) {
     return {
       porEmpaquetar: filas.filter((fila) => fila.pedido.estado === 'Pagado').length,
       porDespachar: filas.filter((fila) => fila.pedido.estado === 'Empaquetado').length,
       enTransito: filas.filter((fila) => fila.pedido.estado === 'PendienteEntrega').length,
     };
+  }
+
+  private async refrescarEntregasApi(rango: EntregasRangoFechas): Promise<void> {
+    let params = new HttpParams();
+    const desde = rango.desde?.trim();
+    const hasta = rango.hasta?.trim();
+    if (desde) {
+      params = params.set('fechaDesde', desde);
+    }
+    if (hasta) {
+      params = params.set('fechaHasta', hasta);
+    }
+    const items = await firstValueFrom(
+      this.http.get<EntregaApi[]>(apiUrl('entregas'), { params }),
+    );
+    this.entregasSignal.set(items.map(mapEntregaApi));
   }
 
   empaquetar(pedidoId: string, request: EmpaquetarEntregaRequest): Entrega {
@@ -269,6 +331,39 @@ export class EntregasApiService {
 
 function clonar(entrega: Entrega): Entrega {
   return { ...entrega };
+}
+
+function mapEntregaApi(dto: EntregaApi): Entrega {
+  return {
+    id: dto.id,
+    pedidoDigitalId: dto.pedidoDigitalId,
+    sedeOrigenId: dto.sedeOrigenId,
+    metodoEnvio: dto.metodoEnvio,
+    estado: dto.estado,
+    destinatarioNombre: dto.destinatarioNombre,
+    destinatarioTelefono: dto.destinatarioTelefono ?? null,
+    direccion: dto.direccion ?? null,
+    distrito: dto.distrito ?? null,
+    provincia: dto.provincia ?? null,
+    departamento: dto.departamento ?? null,
+    agencia: dto.agencia ?? null,
+    puntoEntrega: dto.puntoEntrega ?? null,
+    canalContacto: dto.canalContacto ?? null,
+    contactoReferencia: dto.contactoReferencia ?? null,
+    numeroTracking: dto.numeroTracking ?? null,
+    costoEnvio: dto.costoEnvio,
+    notasEmpaque: dto.notasEmpaque ?? null,
+    fechaProgramada: dto.fechaProgramada ?? null,
+    fechaDespacho: dto.fechaDespacho ?? null,
+    fechaEntrega: dto.fechaEntrega ?? null,
+    observacion: dto.observacion ?? null,
+  };
+}
+
+/** Fecha operativa: despacho si existe; si no, pedido (creación operativa del día). */
+function fechaOperativaFila(fila: EntregaFila): number {
+  const iso = fila.entrega.fechaDespacho ?? fila.pedido.fechaPedido;
+  return new Date(iso).getTime();
 }
 
 function textoOpcional(valor: string | null | undefined, max: number): string | null {

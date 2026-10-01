@@ -34,6 +34,10 @@ export interface EntregasFiltros {
   estado: EstadoLogistica | 'TODOS';
   sedeId: string | 'TODAS';
   busqueda: string;
+  /** Fecha local `YYYY-MM-DD` (input type="date"). Vacío = sin límite. */
+  desde: string;
+  /** Fecha local `YYYY-MM-DD` (input type="date"). Vacío = sin límite. */
+  hasta: string;
 }
 
 export interface EmpaquetarEntregaRequest {
@@ -82,7 +86,28 @@ export const FILTROS_ENTREGAS_VACIOS: EntregasFiltros = {
   estado: 'TODOS',
   sedeId: 'TODAS',
   busqueda: '',
+  desde: '',
+  hasta: '',
 };
+
+/** Fecha local en formato `YYYY-MM-DD` (input type="date"). */
+export function fechaLocalHoy(): string {
+  const ahora = new Date();
+  const yyyy = ahora.getFullYear();
+  const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dd = String(ahora.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Filtros iniciales de la cola: operación del día en curso (UTC-5 Perú vía zona del navegador). */
+export function crearFiltrosEntregasDiaActual(): EntregasFiltros {
+  const hoy = fechaLocalHoy();
+  return {
+    ...FILTROS_ENTREGAS_VACIOS,
+    desde: hoy,
+    hasta: hoy,
+  };
+}
 
 export const ETIQUETAS_METODO_ENVIO: Record<MetodoEnvio, string> = {
   RECOJO_TIENDA: 'RECOJO_TIENDA',
