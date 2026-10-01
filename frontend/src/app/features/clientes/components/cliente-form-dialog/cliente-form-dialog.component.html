@@ -25,7 +25,7 @@
       </label>
       <label>
         Tipo de documento
-        <select formControlName="tipoDocumento">
+        <select formControlName="tipoDocumento" (change)="onTipoDocumentoChange()">
           @for (tipo of tipos; track tipo) {
             <option [value]="tipo">{{ etiquetas[tipo] }}</option>
           }
@@ -37,7 +37,6 @@
           type="text"
           formControlName="numeroDocumento"
           maxlength="16"
-          [readonly]="form.controls.esPublicoGeneral.value"
           placeholder="Opcional en boleta ≤ S/ 700"
         />
       </label>

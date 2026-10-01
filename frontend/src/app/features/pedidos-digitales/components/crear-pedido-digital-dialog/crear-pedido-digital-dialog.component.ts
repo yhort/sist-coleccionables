@@ -207,6 +207,7 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
   });
 
   ngAfterViewInit(): void {
+    this.sincronizarCampoNumero();
     queueMicrotask(() => this.clienteInput()?.nativeElement.focus());
     void this.refrescarCaja();
   }
@@ -282,8 +283,11 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
     this.form.patchValue({
       clienteNombre: cliente.nombre,
       clienteTelefono: sanitizarTelefono(cliente.telefono ?? ''),
-      tipoDocumento: cliente.tipoDocumento,
-      numeroDocumento: cliente.numeroDocumento ?? '',
+      tipoDocumento: cliente.esPublicoGeneral ? 'SIN_DOCUMENTO' : cliente.tipoDocumento,
+      numeroDocumento:
+        cliente.esPublicoGeneral || cliente.tipoDocumento === 'SIN_DOCUMENTO'
+          ? ''
+          : (cliente.numeroDocumento ?? ''),
       esClienteVarios: cliente.esPublicoGeneral,
       destinatarioNombre: cliente.nombre,
       destinatarioTelefono: sanitizarTelefono(cliente.telefono ?? ''),
@@ -292,6 +296,7 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
       contactoReferencia: cliente.contactoReferencia ?? '',
       guardarPuntoEnCliente: false,
     });
+    this.sincronizarCampoNumero();
   }
 
   marcarVarios(activo: boolean): void {
@@ -300,12 +305,30 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
       this.form.patchValue({
         clienteNombre: 'CLIENTES VARIOS',
         tipoDocumento: 'SIN_DOCUMENTO',
-        numeroDocumento: '00000000',
+        numeroDocumento: '',
       });
-      this.form.controls.tipoDocumento.disable();
+      this.form.controls.tipoDocumento.disable({ emitEvent: false });
+      this.form.controls.numeroDocumento.disable({ emitEvent: false });
       return;
     }
-    this.form.controls.tipoDocumento.enable();
+    this.form.controls.tipoDocumento.enable({ emitEvent: false });
+    this.sincronizarCampoNumero();
+  }
+
+  onTipoDocumentoChange(): void {
+    this.sincronizarCampoNumero();
+  }
+
+  /** Sin documento / cliente varios: deshabilita y limpia el número (se envía null). */
+  private sincronizarCampoNumero(): void {
+    const raw = this.form.getRawValue();
+    const sinDoc = raw.esClienteVarios || raw.tipoDocumento === 'SIN_DOCUMENTO';
+    if (sinDoc) {
+      this.form.controls.numeroDocumento.setValue('', { emitEvent: false });
+      this.form.controls.numeroDocumento.disable({ emitEvent: false });
+    } else {
+      this.form.controls.numeroDocumento.enable({ emitEvent: false });
+    }
   }
 
   agregarLinea(): void {
@@ -396,10 +419,15 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
         clienteTelefono: raw.clienteTelefono || null,
         tipoDocumento: raw.esClienteVarios
           ? 'SIN_DOCUMENTO'
-          : raw.numeroDocumento
+          : raw.numeroDocumento?.trim()
             ? raw.tipoDocumento
             : 'SIN_DOCUMENTO',
-        numeroDocumento: raw.esClienteVarios ? '00000000' : raw.numeroDocumento || null,
+        numeroDocumento:
+          raw.esClienteVarios ||
+          raw.tipoDocumento === 'SIN_DOCUMENTO' ||
+          !raw.numeroDocumento?.trim()
+            ? null
+            : raw.numeroDocumento.trim(),
         esClienteVarios: raw.esClienteVarios,
         sedeId: raw.sedeId,
         canalPedido: canalDesdeOrigen(raw.origen),

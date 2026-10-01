@@ -7,7 +7,15 @@ public static class DocumentoIdentidad
 {
     public const string NombreClienteVarios = "CLIENTES VARIOS";
     public const string NombrePublicoGeneral = "PÚBLICO GENERAL";
-    public const string NumeroSinDocumento = "00000000";
+
+    /// <summary>
+    /// Valor legado usado históricamente para «sin documento» / cliente varios.
+    /// Ya no se persiste; se reconoce solo para migraciones y datos antiguos.
+    /// </summary>
+    public const string NumeroSinDocumentoLegado = "00000000";
+
+    /// <summary>Alias de compatibilidad; preferir <see cref="NumeroSinDocumentoLegado"/>.</summary>
+    public const string NumeroSinDocumento = NumeroSinDocumentoLegado;
 
     /// <summary>Catálogo 06 / guía de llenado SUNAT: adquirente no identificado.</summary>
     public const string CodigoSunatSinDocumento = "-";
@@ -24,8 +32,9 @@ public static class DocumentoIdentidad
             return true;
         }
 
+        // Legado: registros antiguos con 00000000 / 0000000 y sin nombre.
         return tipo == TipoDocumentoIdentidad.SIN_DOCUMENTO
-            && SoloDigitos(numero) == NumeroSinDocumento
+            && EsNumeroLegadoSinDocumento(numero)
             && string.IsNullOrWhiteSpace(nombre);
     }
 
@@ -39,7 +48,7 @@ public static class DocumentoIdentidad
         var nro = (numero ?? string.Empty).Trim();
         return !string.IsNullOrEmpty(nro)
             && nro != NumeroSunatSinDocumento
-            && nro != NumeroSinDocumento;
+            && !EsNumeroLegadoSinDocumento(nro);
     }
 
     public static (string TipoCodigo, string Numero) ReceptorSunat(
@@ -58,7 +67,10 @@ public static class DocumentoIdentidad
         return (codigo, nro);
     }
 
-    public static (TipoDocumentoIdentidad Tipo, string Numero, string Nombre) NormalizarCliente(
+    /// <summary>
+    /// Normaliza datos de cliente. Sin documento / público general → Numero = null (persistir NULL).
+    /// </summary>
+    public static (TipoDocumentoIdentidad Tipo, string? Numero, string Nombre) NormalizarCliente(
         string? nombre,
         TipoDocumentoIdentidad? tipo,
         string? numero,
@@ -69,7 +81,7 @@ public static class DocumentoIdentidad
         {
             return (
                 TipoDocumentoIdentidad.SIN_DOCUMENTO,
-                NumeroSinDocumento,
+                null,
                 nombreTrim.Length >= 2 ? nombreTrim : NombreClienteVarios);
         }
 
@@ -82,17 +94,21 @@ public static class DocumentoIdentidad
         var tipoFinal = tipo ?? Inferir(nro);
         if (EsNumeroAusente(nro) && tipoFinal != TipoDocumentoIdentidad.RUC)
         {
-            return (TipoDocumentoIdentidad.SIN_DOCUMENTO, string.Empty, nombreTrim);
+            return (TipoDocumentoIdentidad.SIN_DOCUMENTO, null, nombreTrim);
         }
 
         if (tipoFinal == TipoDocumentoIdentidad.SIN_DOCUMENTO)
         {
-            return (tipoFinal, string.Empty, nombreTrim);
+            return (tipoFinal, null, nombreTrim);
         }
 
         Validar(tipoFinal, nro);
         return (tipoFinal, NormalizarNumero(tipoFinal, nro), nombreTrim);
     }
+
+    /// <summary>Convierte vacío / legado 00000000 / 0000000 a null para persistencia.</summary>
+    public static string? NumeroParaPersistir(string? numero) =>
+        EsNumeroAusente(numero ?? string.Empty) ? null : (numero ?? string.Empty).Trim();
 
     public static void Validar(TipoDocumentoIdentidad tipo, string? numero)
     {
@@ -194,7 +210,14 @@ public static class DocumentoIdentidad
     private static bool EsNumeroAusente(string numero) =>
         string.IsNullOrWhiteSpace(numero)
         || numero == NumeroSunatSinDocumento
-        || numero == NumeroSinDocumento;
+        || EsNumeroLegadoSinDocumento(numero);
+
+    /// <summary>Valores históricos que significaban «sin documento» (8 o 7 ceros).</summary>
+    public static bool EsNumeroLegadoSinDocumento(string? numero)
+    {
+        var digitos = SoloDigitos(numero);
+        return digitos is "00000000" or "0000000";
+    }
 
     private static string NormalizarNumero(TipoDocumentoIdentidad tipo, string numero) => tipo switch
     {

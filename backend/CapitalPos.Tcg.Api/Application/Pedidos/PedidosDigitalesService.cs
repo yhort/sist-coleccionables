@@ -1151,7 +1151,7 @@ public sealed class PedidosDigitalesService(
             {
                 if (!string.IsNullOrWhiteSpace(request.NumeroDocumento))
                 {
-                    existente.NumeroDocumento = request.NumeroDocumento.Trim();
+                    existente.NumeroDocumento = DocumentoIdentidad.NumeroParaPersistir(request.NumeroDocumento);
                     existente.TipoDocumento = request.TipoDocumento ?? existente.TipoDocumento;
                 }
 
@@ -1172,7 +1172,7 @@ public sealed class PedidosDigitalesService(
             Nombre = nombre,
             Telefono = pedido.ClienteTelefono,
             TipoDocumento = tipo,
-            NumeroDocumento = string.IsNullOrWhiteSpace(numero) ? null : numero,
+            NumeroDocumento = DocumentoIdentidad.NumeroParaPersistir(numero),
             FechaCreacion = ahora
         };
         db.Clientes.Add(cliente);

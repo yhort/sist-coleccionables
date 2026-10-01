@@ -73,8 +73,33 @@ public sealed class DocumentoIdentidadBoletaTests
             esPublicoGeneral: false);
 
         Assert.Equal(TipoDocumentoIdentidad.SIN_DOCUMENTO, tipo);
-        Assert.Equal(string.Empty, numero);
+        Assert.True(string.IsNullOrEmpty(numero));
         Assert.Equal("Juan Pérez", nombre);
         Assert.False(DocumentoIdentidad.EsPublicoGeneral(nombre, tipo, numero));
+    }
+
+    [Fact]
+    public void NormalizarCliente_publico_general_guarda_numero_null()
+    {
+        var (tipo, numero, nombre) = DocumentoIdentidad.NormalizarCliente(
+            "CLIENTES VARIOS",
+            TipoDocumentoIdentidad.SIN_DOCUMENTO,
+            "00000000",
+            esPublicoGeneral: true);
+
+        Assert.Equal(TipoDocumentoIdentidad.SIN_DOCUMENTO, tipo);
+        Assert.Null(numero);
+        Assert.Equal("CLIENTES VARIOS", nombre);
+        Assert.True(DocumentoIdentidad.EsPublicoGeneral(nombre, tipo, numero));
+    }
+
+    [Fact]
+    public void NumeroParaPersistir_legado_cero_queda_null()
+    {
+        Assert.Null(DocumentoIdentidad.NumeroParaPersistir("00000000"));
+        Assert.Null(DocumentoIdentidad.NumeroParaPersistir("0000000"));
+        Assert.Null(DocumentoIdentidad.NumeroParaPersistir(""));
+        Assert.Null(DocumentoIdentidad.NumeroParaPersistir(null));
+        Assert.Equal("12345678", DocumentoIdentidad.NumeroParaPersistir("12345678"));
     }
 }

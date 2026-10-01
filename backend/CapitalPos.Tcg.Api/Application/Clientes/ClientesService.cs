@@ -88,7 +88,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             CanalContacto = request.CanalContacto,
             ContactoReferencia = contactoRef,
             TipoDocumento = tipo,
-            NumeroDocumento = numero,
+            NumeroDocumento = DocumentoIdentidad.NumeroParaPersistir(numero),
             Activo = true,
             FechaCreacion = ahora
         };
@@ -166,7 +166,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         }
 
         if (!string.IsNullOrWhiteSpace(cliente.NumeroDocumento)
-            && cliente.NumeroDocumento != DocumentoIdentidad.NumeroSinDocumento)
+            && !DocumentoIdentidad.EsNumeroLegadoSinDocumento(cliente.NumeroDocumento))
         {
             await AsegurarDocumentoLibreAsync(cliente.NumeroDocumento, id, cancellationToken);
         }
@@ -180,17 +180,26 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         DateTimeOffset ahora,
         CancellationToken cancellationToken)
     {
+        // Buscar por nombre (y legado 00000000) — el número ya no se usa como clave.
         var existente = await db.Clientes.FirstOrDefaultAsync(
-            c => c.NumeroDocumento == DocumentoIdentidad.NumeroSinDocumento
+            c => (c.Nombre == DocumentoIdentidad.NombreClienteVarios
+                    || c.Nombre == DocumentoIdentidad.NombrePublicoGeneral)
                 && (c.TipoDocumento == TipoDocumentoIdentidad.SIN_DOCUMENTO
-                    || c.TipoDocumento == TipoDocumentoIdentidad.DNI)
-                && (c.Nombre == DocumentoIdentidad.NombreClienteVarios
-                    || c.Nombre == DocumentoIdentidad.NombrePublicoGeneral),
+                    || c.TipoDocumento == TipoDocumentoIdentidad.DNI),
             cancellationToken);
+        if (existente is null)
+        {
+            // Transición: registros antiguos identificados solo por 00000000 / 0000000.
+            existente = await db.Clientes.FirstOrDefaultAsync(
+                c => c.NumeroDocumento == DocumentoIdentidad.NumeroSinDocumentoLegado
+                    || c.NumeroDocumento == "0000000",
+                cancellationToken);
+        }
+
         if (existente is not null)
         {
             existente.TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO;
-            existente.NumeroDocumento = DocumentoIdentidad.NumeroSinDocumento;
+            existente.NumeroDocumento = null;
             existente.Activo = true;
             if (string.IsNullOrWhiteSpace(existente.Nombre))
             {
@@ -206,7 +215,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             EmpresaId = tenant.EmpresaId,
             Nombre = DocumentoIdentidad.NombreClienteVarios,
             TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO,
-            NumeroDocumento = DocumentoIdentidad.NumeroSinDocumento,
+            NumeroDocumento = null,
             Activo = true,
             FechaCreacion = ahora
         };
@@ -237,7 +246,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         var punto = TextoOpcionalLargo(request.PuntoEntregaPreferido, 80);
         var contactoRef = TextoOpcionalLargo(request.ContactoReferencia, 160);
 
-        if (!string.IsNullOrWhiteSpace(numero) && numero != DocumentoIdentidad.NumeroSinDocumento)
+        if (!string.IsNullOrWhiteSpace(numero))
         {
             var existente = await BuscarPorDocumentoAsync(numero, soloActivos: false, cancellationToken);
             if (existente is not null)
@@ -266,7 +275,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             CanalContacto = request.CanalContacto,
             ContactoReferencia = contactoRef,
             TipoDocumento = tipo,
-            NumeroDocumento = numero,
+            NumeroDocumento = DocumentoIdentidad.NumeroParaPersistir(numero),
             Activo = true,
             FechaCreacion = ahora
         };
@@ -275,11 +284,11 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
     }
 
     private async Task<Cliente?> BuscarPorDocumentoAsync(
-        string numero,
+        string? numero,
         bool soloActivos,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(numero) || numero == DocumentoIdentidad.NumeroSinDocumento)
+        if (string.IsNullOrWhiteSpace(numero) || DocumentoIdentidad.EsNumeroLegadoSinDocumento(numero))
         {
             return null;
         }
@@ -294,11 +303,11 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
     }
 
     private async Task AsegurarDocumentoLibreAsync(
-        string numero,
+        string? numero,
         Guid? excluirId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(numero) || numero == DocumentoIdentidad.NumeroSinDocumento)
+        if (string.IsNullOrWhiteSpace(numero) || DocumentoIdentidad.EsNumeroLegadoSinDocumento(numero))
         {
             return;
         }
@@ -325,7 +334,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         CanalContactoCliente? canal,
         string? contactoRef,
         TipoDocumentoIdentidad tipo,
-        string numero)
+        string? numero)
     {
         cliente.Nombre = nombre;
         cliente.Telefono = telefono;
@@ -333,7 +342,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         cliente.CanalContacto = canal;
         cliente.ContactoReferencia = contactoRef;
         cliente.TipoDocumento = tipo;
-        cliente.NumeroDocumento = numero;
+        cliente.NumeroDocumento = DocumentoIdentidad.NumeroParaPersistir(numero);
     }
 
     private static string? TextoOpcionalLargo(string? valor, int max)

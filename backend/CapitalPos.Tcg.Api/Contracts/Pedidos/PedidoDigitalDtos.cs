@@ -79,7 +79,7 @@ public sealed class CrearPedidoDigitalRequest
 
     public TipoDocumentoIdentidad? TipoDocumento { get; set; }
 
-    /// <summary>Opcional. Vacío/nulo → SIN_DOCUMENTO (válido para boletas ≤ S/ 700).</summary>
+    /// <summary>Opcional. Vacío/nulo → SIN_DOCUMENTO con NumeroDocumento = NULL (boletas ≤ S/ 700).</summary>
     [MaxLength(16)]
     public string? NumeroDocumento { get; set; }
 

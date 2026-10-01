@@ -1,3 +1,4 @@
+using CapitalPos.Tcg.Api.Application.Comercial;
 using CapitalPos.Tcg.Api.Domain.Entities;
 using CapitalPos.Tcg.Api.Domain.Enums;
 using CapitalPos.Tcg.Api.Infrastructure.Persistence.Tenant;
@@ -192,7 +193,11 @@ public static class DevelopmentDataSeeder
 
     private static async Task EnsureClienteVariosAsync(ApplicationDbContext db)
     {
-        if (await db.Clientes.AnyAsync(c => c.NumeroDocumento == "00000000"))
+        if (await db.Clientes.AnyAsync(c =>
+                c.Nombre == DocumentoIdentidad.NombreClienteVarios
+                || c.Nombre == DocumentoIdentidad.NombrePublicoGeneral
+                || c.NumeroDocumento == DocumentoIdentidad.NumeroSinDocumentoLegado
+                || c.NumeroDocumento == "0000000"))
         {
             return;
         }
@@ -201,9 +206,9 @@ public static class DevelopmentDataSeeder
         {
             Id = Guid.Parse("c0a1e001-0000-4000-8000-000000000700"),
             EmpresaId = EmpresaId,
-            Nombre = "CLIENTES VARIOS",
+            Nombre = DocumentoIdentidad.NombreClienteVarios,
             TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO,
-            NumeroDocumento = "00000000",
+            NumeroDocumento = null,
             FechaCreacion = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();

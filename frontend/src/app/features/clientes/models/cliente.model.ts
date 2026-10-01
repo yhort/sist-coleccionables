@@ -85,7 +85,8 @@ export function clienteIdentificado(
     return false;
   }
   const texto = (numero ?? '').trim();
-  return !!texto && texto !== '-' && texto !== '00000000';
+  const digitos = texto.replace(/\D/g, '');
+  return !!texto && texto !== '-' && digitos !== '00000000' && digitos !== '0000000';
 }
 
 export function validarDocumento(tipo: TipoDocumentoIdentidad, numero: string, esPublicoGeneral: boolean): string | null {
@@ -156,7 +157,7 @@ export function documentoDuplicadoEnLista(
   excluirId?: string | null,
 ): Cliente | null {
   const numero = (numeroDocumento ?? '').replace(/\D/g, '');
-  if (!numero || numero === '00000000') {
+  if (!numero || numero === '00000000' || numero === '0000000') {
     return null;
   }
   return (

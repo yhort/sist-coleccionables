@@ -55,7 +55,7 @@
       }
       <label>
         Tipo de documento
-        <select formControlName="tipoDocumento">
+        <select formControlName="tipoDocumento" (change)="onTipoDocumentoChange()">
           @for (tipo of tiposDocumento; track tipo) {
             <option [value]="tipo">{{ etiquetasDocumento[tipo] }}</option>
           }

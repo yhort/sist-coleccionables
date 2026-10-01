@@ -26,8 +26,9 @@ public sealed class UpsertClienteRequest
     public TipoDocumentoIdentidad TipoDocumento { get; set; } = TipoDocumentoIdentidad.DNI;
 
     /// <summary>
-    /// Opcional: vacío o nulo queda como SIN_DOCUMENTO (válido para boletas ≤ S/ 700).
-    /// No enviar "00000000" salvo Cliente varios / Público general.
+    /// Opcional: vacío o nulo queda como SIN_DOCUMENTO con NumeroDocumento = NULL
+    /// (válido para boletas ≤ S/ 700 y Cliente varios / Público general).
+    /// No enviar valores placeholder como "00000000".
     /// </summary>
     [MaxLength(16)]
     public string? NumeroDocumento { get; set; }

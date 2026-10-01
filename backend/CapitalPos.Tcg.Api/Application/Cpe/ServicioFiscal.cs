@@ -930,14 +930,22 @@ public sealed class ServicioFiscal(
     private async Task<Cliente> ResolverClienteVariosAsync(DateTimeOffset ahora, CancellationToken cancellationToken)
     {
         var existente = await db.Clientes.FirstOrDefaultAsync(
-            c => c.NumeroDocumento == DocumentoIdentidad.NumeroSinDocumento
-                && (c.Nombre == DocumentoIdentidad.NombreClienteVarios
-                    || c.Nombre == DocumentoIdentidad.NombrePublicoGeneral),
+            c => (c.Nombre == DocumentoIdentidad.NombreClienteVarios
+                    || c.Nombre == DocumentoIdentidad.NombrePublicoGeneral)
+                && c.TipoDocumento == TipoDocumentoIdentidad.SIN_DOCUMENTO,
             cancellationToken);
+        if (existente is null)
+        {
+            existente = await db.Clientes.FirstOrDefaultAsync(
+                c => c.NumeroDocumento == DocumentoIdentidad.NumeroSinDocumentoLegado
+                    || c.NumeroDocumento == "0000000",
+                cancellationToken);
+        }
+
         if (existente is not null)
         {
             existente.TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO;
-            existente.NumeroDocumento = DocumentoIdentidad.NumeroSinDocumento;
+            existente.NumeroDocumento = null;
             return existente;
         }
 
@@ -947,7 +955,7 @@ public sealed class ServicioFiscal(
             EmpresaId = tenant.EmpresaId,
             Nombre = DocumentoIdentidad.NombreClienteVarios,
             TipoDocumento = TipoDocumentoIdentidad.SIN_DOCUMENTO,
-            NumeroDocumento = DocumentoIdentidad.NumeroSinDocumento,
+            NumeroDocumento = null,
             FechaCreacion = ahora
         };
         db.Clientes.Add(cliente);

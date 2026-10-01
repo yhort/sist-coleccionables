@@ -63,20 +63,21 @@ export class ClienteFormDialogComponent implements OnInit {
   ngOnInit(): void {
     const actual = this.cliente();
     if (actual) {
+      const sinDocumento =
+        actual.esPublicoGeneral ||
+        actual.tipoDocumento === 'SIN_DOCUMENTO' ||
+        !actual.numeroDocumento;
       this.form.patchValue({
         nombre: actual.nombre,
         telefono: actual.telefono ?? '',
         puntoEntregaPreferido: actual.puntoEntregaPreferido ?? '',
         canalContacto: actual.canalContacto ?? '',
         contactoReferencia: actual.contactoReferencia ?? '',
-        tipoDocumento: actual.tipoDocumento,
-        numeroDocumento: actual.numeroDocumento ?? '',
+        tipoDocumento: actual.esPublicoGeneral ? 'SIN_DOCUMENTO' : actual.tipoDocumento,
+        numeroDocumento: sinDocumento ? '' : (actual.numeroDocumento ?? ''),
         esPublicoGeneral: actual.esPublicoGeneral,
       });
-      if (actual.esPublicoGeneral) {
-        this.form.controls.tipoDocumento.disable();
-        this.form.controls.numeroDocumento.disable();
-      }
+      this.sincronizarCampoNumero();
     }
   }
 
@@ -90,13 +91,29 @@ export class ClienteFormDialogComponent implements OnInit {
       this.form.patchValue({
         nombre: 'CLIENTES VARIOS',
         tipoDocumento: 'SIN_DOCUMENTO',
-        numeroDocumento: '00000000',
+        numeroDocumento: '',
       });
-      this.form.controls.tipoDocumento.disable();
-      this.form.controls.numeroDocumento.disable();
+      this.form.controls.tipoDocumento.disable({ emitEvent: false });
+      this.form.controls.numeroDocumento.disable({ emitEvent: false });
     } else {
-      this.form.controls.tipoDocumento.enable();
-      this.form.controls.numeroDocumento.enable();
+      this.form.controls.tipoDocumento.enable({ emitEvent: false });
+      this.sincronizarCampoNumero();
+    }
+  }
+
+  onTipoDocumentoChange(): void {
+    this.sincronizarCampoNumero();
+  }
+
+  /** Sin documento / público general: deshabilita y limpia el número (se envía null). */
+  private sincronizarCampoNumero(): void {
+    const raw = this.form.getRawValue();
+    const sinDoc = raw.esPublicoGeneral || raw.tipoDocumento === 'SIN_DOCUMENTO';
+    if (sinDoc) {
+      this.form.controls.numeroDocumento.setValue('', { emitEvent: false });
+      this.form.controls.numeroDocumento.disable({ emitEvent: false });
+    } else {
+      this.form.controls.numeroDocumento.enable({ emitEvent: false });
     }
   }
 
@@ -136,6 +153,10 @@ export class ClienteFormDialogComponent implements OnInit {
 
     this.guardando.set(true);
     try {
+      const sinDocumento =
+        raw.esPublicoGeneral ||
+        raw.tipoDocumento === 'SIN_DOCUMENTO' ||
+        !raw.numeroDocumento?.trim();
       const cliente = await this.api.guardar(
         {
           nombre: raw.nombre,
@@ -143,12 +164,8 @@ export class ClienteFormDialogComponent implements OnInit {
           puntoEntregaPreferido: raw.puntoEntregaPreferido || null,
           canalContacto: raw.canalContacto || null,
           contactoReferencia: raw.contactoReferencia || null,
-          tipoDocumento: raw.esPublicoGeneral
-            ? 'SIN_DOCUMENTO'
-            : raw.numeroDocumento
-              ? raw.tipoDocumento
-              : 'SIN_DOCUMENTO',
-          numeroDocumento: raw.esPublicoGeneral ? '00000000' : raw.numeroDocumento || null,
+          tipoDocumento: sinDocumento ? 'SIN_DOCUMENTO' : raw.tipoDocumento,
+          numeroDocumento: sinDocumento ? null : raw.numeroDocumento.trim() || null,
           esPublicoGeneral: raw.esPublicoGeneral,
         },
         this.cliente()?.id,
