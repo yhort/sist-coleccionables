@@ -109,6 +109,48 @@ public sealed class ProveedoresService(ApplicationDbContext db, ITenantProvider 
         return Map(proveedor);
     }
 
+    /// <summary>Soft delete: oculta el proveedor en listados activos; conserva historial de compras.</summary>
+    public async Task<ProveedorResponse?> DesactivarAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var proveedor = await db.Proveedores.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (proveedor is null)
+        {
+            return null;
+        }
+
+        if (!proveedor.Activo)
+        {
+            return Map(proveedor);
+        }
+
+        proveedor.Activo = false;
+        await db.SaveChangesAsync(cancellationToken);
+        return Map(proveedor);
+    }
+
+    public async Task<ProveedorResponse?> ReactivarAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var proveedor = await db.Proveedores.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (proveedor is null)
+        {
+            return null;
+        }
+
+        if (proveedor.Activo)
+        {
+            return Map(proveedor);
+        }
+
+        if (await db.Proveedores.AnyAsync(p => p.Ruc == proveedor.Ruc && p.Id != id && p.Activo, cancellationToken))
+        {
+            throw new BusinessRuleException("Ya existe un proveedor activo con ese RUC.");
+        }
+
+        proveedor.Activo = true;
+        await db.SaveChangesAsync(cancellationToken);
+        return Map(proveedor);
+    }
+
     private static string? TextoOpcional(string? valor, int max)
     {
         var texto = valor?.Trim() ?? string.Empty;

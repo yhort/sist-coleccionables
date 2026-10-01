@@ -48,4 +48,21 @@ public sealed class ProveedoresController(ProveedoresService proveedores) : Cont
         var actualizado = await proveedores.ActualizarAsync(id, request, cancellationToken);
         return actualizado is null ? NotFound() : Ok(actualizado);
     }
+
+    /// <summary>Soft delete: desactiva el proveedor sin borrar historial de compras/kardex.</summary>
+    [HttpPost("{id:guid}/desactivar")]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<ActionResult<ProveedorResponse>> Desactivar(Guid id, CancellationToken cancellationToken)
+    {
+        var desactivado = await proveedores.DesactivarAsync(id, cancellationToken);
+        return desactivado is null ? NotFound() : Ok(desactivado);
+    }
+
+    [HttpPost("{id:guid}/reactivar")]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<ActionResult<ProveedorResponse>> Reactivar(Guid id, CancellationToken cancellationToken)
+    {
+        var reactivado = await proveedores.ReactivarAsync(id, cancellationToken);
+        return reactivado is null ? NotFound() : Ok(reactivado);
+    }
 }

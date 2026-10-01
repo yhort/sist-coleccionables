@@ -17,8 +17,8 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
         [FromQuery] bool? activo,
         CancellationToken cancellationToken)
     {
-        // Por defecto solo activos (soft-delete oculto en listados operativos).
-        var items = await clientes.ListarAsync(q, activo ?? true, cancellationToken);
+        // activo=true/false filtra; sin param = todos (maestros). Los selectores operativos pasan activo=true.
+        var items = await clientes.ListarAsync(q, activo, cancellationToken);
         return Ok(items);
     }
 

@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
-import { Cliente, UpsertClienteRequest } from '../models/cliente.model';
+import { Cliente, FiltroActivoMaestro, UpsertClienteRequest } from '../models/cliente.model';
 
 @Injectable({ providedIn: 'root' })
 export class ClientesApiService {
@@ -13,15 +13,9 @@ export class ClientesApiService {
 
   readonly clientes = this.clientesSignal.asReadonly();
 
-  async refrescar(q = '', soloActivos = true): Promise<Cliente[]> {
+  async refrescar(q = '', filtro: FiltroActivoMaestro = 'activos'): Promise<Cliente[]> {
     try {
-      const params: Record<string, string> = {};
-      if (q.trim()) {
-        params['q'] = q.trim();
-      }
-      if (soloActivos) {
-        params['activo'] = 'true';
-      }
+      const params = paramsDeFiltro(q, filtro);
       const items = await firstValueFrom(this.http.get<Cliente[]>(apiUrl('clientes'), { params }));
       this.clientesSignal.set(items);
       return items;
@@ -30,15 +24,10 @@ export class ClientesApiService {
     }
   }
 
+  /** Búsqueda operativa (pedidos/subastas): solo activos. */
   async buscar(q: string, soloActivos = true): Promise<Cliente[]> {
     try {
-      const params: Record<string, string> = {};
-      if (q.trim()) {
-        params['q'] = q.trim();
-      }
-      if (soloActivos) {
-        params['activo'] = 'true';
-      }
+      const params = paramsDeFiltro(q, soloActivos ? 'activos' : 'todos');
       return await firstValueFrom(this.http.get<Cliente[]>(apiUrl('clientes'), { params }));
     } catch (error) {
       throw new Error(readApiError(error));
@@ -58,10 +47,7 @@ export class ClientesApiService {
       const cliente = id
         ? await firstValueFrom(this.http.put<Cliente>(apiUrl(`clientes/${id}`), request))
         : await firstValueFrom(this.http.post<Cliente>(apiUrl('clientes'), request));
-      this.clientesSignal.update((items) => {
-        const resto = items.filter((item) => item.id !== cliente.id);
-        return cliente.activo ? [cliente, ...resto] : resto;
-      });
+      this.upsert(cliente);
       return cliente;
     } catch (error) {
       throw new Error(readApiError(error));
@@ -73,7 +59,7 @@ export class ClientesApiService {
       const cliente = await firstValueFrom(
         this.http.post<Cliente>(apiUrl(`clientes/${id}/desactivar`), {}),
       );
-      this.clientesSignal.update((items) => items.filter((item) => item.id !== id));
+      this.upsert(cliente);
       return cliente;
     } catch (error) {
       throw new Error(readApiError(error));
@@ -85,13 +71,30 @@ export class ClientesApiService {
       const cliente = await firstValueFrom(
         this.http.post<Cliente>(apiUrl(`clientes/${id}/reactivar`), {}),
       );
-      this.clientesSignal.update((items) => {
-        const resto = items.filter((item) => item.id !== cliente.id);
-        return [cliente, ...resto];
-      });
+      this.upsert(cliente);
       return cliente;
     } catch (error) {
       throw new Error(readApiError(error));
     }
   }
+
+  private upsert(cliente: Cliente): void {
+    this.clientesSignal.update((items) => {
+      const resto = items.filter((item) => item.id !== cliente.id);
+      return [cliente, ...resto];
+    });
+  }
+}
+
+function paramsDeFiltro(q: string, filtro: FiltroActivoMaestro): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (q.trim()) {
+    params['q'] = q.trim();
+  }
+  if (filtro === 'activos') {
+    params['activo'] = 'true';
+  } else if (filtro === 'inactivos') {
+    params['activo'] = 'false';
+  }
+  return params;
 }

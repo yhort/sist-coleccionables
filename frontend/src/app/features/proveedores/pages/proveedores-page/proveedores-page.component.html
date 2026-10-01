@@ -3,14 +3,28 @@
     <div>
       <h2>Proveedores</h2>
       <p>
-        Maestro de proveedores con RUC y razón social. El ingreso de mercadería se registra en
-        Inventario y queda asentado en el kardex como Ingreso por compra.
+        Maestro de proveedores con RUC y razón social. Desactivar oculta el proveedor sin borrar
+        su historial de compras en Inventario / kardex.
       </p>
     </div>
     <button type="button" class="maestros__add" (click)="abrir()">Nuevo proveedor</button>
   </header>
 
-  <section class="toolbar">
+  <section class="toolbar" aria-label="Filtros de proveedores">
+    <div class="toolbar__tabs" role="tablist" aria-label="Estado del registro">
+      @for (filtro of filtrosActivo; track filtro) {
+        <button
+          type="button"
+          role="tab"
+          class="toolbar__tab"
+          [class.toolbar__tab--active]="filtroActivo() === filtro"
+          [attr.aria-selected]="filtroActivo() === filtro"
+          (click)="setFiltroActivo(filtro)"
+        >
+          {{ etiquetasFiltro[filtro] }}
+        </button>
+      }
+    </div>
     <label class="toolbar__search">
       <span>Buscar</span>
       <input
@@ -26,41 +40,84 @@
     <p class="maestros__error">{{ error() }}</p>
   }
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Proveedor</th>
-          <th>RUC</th>
-          <th>Teléfono</th>
-          <th>Estado</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (proveedor of filtrados(); track proveedor.id) {
+  @if (filtrados().length === 0) {
+    <div class="empty">No hay proveedores con esos filtros.</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td>
-              <strong>{{ proveedor.razonSocial }}</strong>
-              @if (proveedor.nombreComercial) {
-                <small>{{ proveedor.nombreComercial }}</small>
-              }
-            </td>
-            <td>{{ proveedor.ruc }}</td>
-            <td>{{ proveedor.telefono || '—' }}</td>
-            <td>{{ proveedor.activo ? 'Activo' : 'Inactivo' }}</td>
-            <td>
-              <button type="button" class="link" (click)="abrir(proveedor)">Editar</button>
-            </td>
+            <th>Proveedor</th>
+            <th>RUC</th>
+            <th>Teléfono</th>
+            <th>Estado</th>
+            <th></th>
           </tr>
-        } @empty {
-          <tr>
-            <td colspan="5">No hay proveedores registrados.</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          @for (proveedor of pageItems(); track proveedor.id) {
+            <tr [class.fila--inactiva]="!proveedor.activo">
+              <td>
+                <strong>{{ proveedor.razonSocial }}</strong>
+                @if (proveedor.nombreComercial) {
+                  <small>{{ proveedor.nombreComercial }}</small>
+                }
+              </td>
+              <td>{{ proveedor.ruc }}</td>
+              <td>{{ proveedor.telefono || '—' }}</td>
+              <td>
+                <span class="estado" [class.estado--inactivo]="!proveedor.activo">
+                  {{ proveedor.activo ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+              <td>
+                <div class="acciones">
+                  <button type="button" class="link" (click)="abrir(proveedor)">Editar</button>
+                  @if (proveedor.activo) {
+                    <button
+                      type="button"
+                      class="link link--danger"
+                      [disabled]="accionId() === proveedor.id"
+                      (click)="desactivar(proveedor)"
+                    >
+                      {{ accionId() === proveedor.id ? 'Desactivando…' : 'Desactivar' }}
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="link"
+                      [disabled]="accionId() === proveedor.id"
+                      (click)="activar(proveedor)"
+                    >
+                      {{ accionId() === proveedor.id ? 'Activando…' : 'Activar' }}
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="tabla__pager">
+      <span>{{ rango().desde }}–{{ rango().hasta }} de {{ rango().total }}</span>
+      <div class="tabla__pager-btns">
+        <button type="button" class="ghost" [disabled]="paginaActual() <= 1" (click)="paginaAnterior()">
+          Anterior
+        </button>
+        <span>Pág. {{ paginaActual() }} / {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="paginaActual() >= totalPages()"
+          (click)="paginaSiguiente()"
+        >
+          Siguiente
+        </button>
+      </div>
+    </footer>
+  }
 </section>
 
 @if (dialogAbierto()) {

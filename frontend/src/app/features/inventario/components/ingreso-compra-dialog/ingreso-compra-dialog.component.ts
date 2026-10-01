@@ -68,7 +68,7 @@ export class IngresoCompraDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    void this.proveedoresApi.refrescar('', true).catch((err) => this.error.set(readApiError(err)));
+    void this.proveedoresApi.refrescar('', 'activos').catch((err) => this.error.set(readApiError(err)));
     const sede = this.sedes()[0];
     if (sede) {
       this.form.controls.sedeId.setValue(sede.id);

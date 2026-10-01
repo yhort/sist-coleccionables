@@ -29,6 +29,21 @@ export interface UpsertClienteRequest {
   esPublicoGeneral: boolean;
 }
 
+/** Filtro de maestros: activos (operativo), inactivos (reactivación) o todos. */
+export type FiltroActivoMaestro = 'activos' | 'inactivos' | 'todos';
+
+export const FILTROS_ACTIVO_MAESTRO: readonly FiltroActivoMaestro[] = [
+  'activos',
+  'inactivos',
+  'todos',
+];
+
+export const ETIQUETAS_FILTRO_ACTIVO: Record<FiltroActivoMaestro, string> = {
+  activos: 'Activos',
+  inactivos: 'Inactivos',
+  todos: 'Todos',
+};
+
 export const TIPOS_DOCUMENTO: readonly TipoDocumentoIdentidad[] = [
   'DNI',
   'RUC',

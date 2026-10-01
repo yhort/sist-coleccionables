@@ -10,7 +10,21 @@
     <button type="button" class="maestros__add" (click)="abrir()">Nuevo cliente</button>
   </header>
 
-  <section class="toolbar">
+  <section class="toolbar" aria-label="Filtros de clientes">
+    <div class="toolbar__tabs" role="tablist" aria-label="Estado del registro">
+      @for (filtro of filtrosActivo; track filtro) {
+        <button
+          type="button"
+          role="tab"
+          class="toolbar__tab"
+          [class.toolbar__tab--active]="filtroActivo() === filtro"
+          [attr.aria-selected]="filtroActivo() === filtro"
+          (click)="setFiltroActivo(filtro)"
+        >
+          {{ etiquetasFiltro[filtro] }}
+        </button>
+      }
+    </div>
     <label class="toolbar__search">
       <span>Buscar</span>
       <input
@@ -26,65 +40,99 @@
     <p class="maestros__error">{{ error() }}</p>
   }
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Cliente</th>
-          <th>Documento</th>
-          <th>Teléfono</th>
-          <th>Contacto</th>
-          <th>Punto entrega</th>
-          <th>Contacto ref.</th>
-          <th>Comprobante</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (cliente of filtrados(); track cliente.id) {
+  @if (filtrados().length === 0) {
+    <div class="empty">No hay clientes con esos filtros.</div>
+  } @else {
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td>
-              <strong>{{ cliente.nombre }}</strong>
-              @if (cliente.esPublicoGeneral) {
-                <small>Público general</small>
-              }
-            </td>
-            <td>{{ etiquetaDocumento(cliente) }}</td>
-            <td>{{ cliente.telefono || '—' }}</td>
-            <td>{{ etiquetaCanal(cliente.canalContacto) }}</td>
-            <td>{{ cliente.puntoEntregaPreferido || '—' }}</td>
-            <td>{{ cliente.contactoReferencia || '—' }}</td>
-            <td>
-              @if (cliente.tipoDocumento === 'RUC') {
-                Factura / Boleta
-              } @else {
-                Boleta
-              }
-            </td>
-            <td>
-              <div class="acciones">
-                <button type="button" class="link" (click)="abrir(cliente)">Editar</button>
-                @if (!cliente.esPublicoGeneral) {
-                  <button
-                    type="button"
-                    class="link link--danger"
-                    [disabled]="desactivandoId() === cliente.id"
-                    (click)="desactivar(cliente)"
-                  >
-                    {{ desactivandoId() === cliente.id ? 'Desactivando…' : 'Desactivar' }}
-                  </button>
+            <th>Cliente</th>
+            <th>Documento</th>
+            <th>Teléfono</th>
+            <th>Contacto</th>
+            <th>Punto entrega</th>
+            <th>Contacto ref.</th>
+            <th>Comprobante</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (cliente of pageItems(); track cliente.id) {
+            <tr [class.fila--inactiva]="!cliente.activo">
+              <td>
+                <strong>{{ cliente.nombre }}</strong>
+                @if (cliente.esPublicoGeneral) {
+                  <small>Público general</small>
                 }
-              </div>
-            </td>
-          </tr>
-        } @empty {
-          <tr>
-            <td colspan="8">No hay clientes registrados.</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
+              </td>
+              <td>{{ etiquetaDocumento(cliente) }}</td>
+              <td>{{ cliente.telefono || '—' }}</td>
+              <td>{{ etiquetaCanal(cliente.canalContacto) }}</td>
+              <td>{{ cliente.puntoEntregaPreferido || '—' }}</td>
+              <td>{{ cliente.contactoReferencia || '—' }}</td>
+              <td>
+                @if (cliente.tipoDocumento === 'RUC') {
+                  Factura / Boleta
+                } @else {
+                  Boleta
+                }
+              </td>
+              <td>
+                <span class="estado" [class.estado--inactivo]="!cliente.activo">
+                  {{ cliente.activo ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+              <td>
+                <div class="acciones">
+                  <button type="button" class="link" (click)="abrir(cliente)">Editar</button>
+                  @if (cliente.activo && !cliente.esPublicoGeneral) {
+                    <button
+                      type="button"
+                      class="link link--danger"
+                      [disabled]="accionId() === cliente.id"
+                      (click)="desactivar(cliente)"
+                    >
+                      {{ accionId() === cliente.id ? 'Desactivando…' : 'Desactivar' }}
+                    </button>
+                  }
+                  @if (!cliente.activo) {
+                    <button
+                      type="button"
+                      class="link"
+                      [disabled]="accionId() === cliente.id"
+                      (click)="activar(cliente)"
+                    >
+                      {{ accionId() === cliente.id ? 'Activando…' : 'Activar' }}
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="tabla__pager">
+      <span>{{ rango().desde }}–{{ rango().hasta }} de {{ rango().total }}</span>
+      <div class="tabla__pager-btns">
+        <button type="button" class="ghost" [disabled]="paginaActual() <= 1" (click)="paginaAnterior()">
+          Anterior
+        </button>
+        <span>Pág. {{ paginaActual() }} / {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="ghost"
+          [disabled]="paginaActual() >= totalPages()"
+          (click)="paginaSiguiente()"
+        >
+          Siguiente
+        </button>
+      </div>
+    </footer>
+  }
 </section>
 
 @if (dialogAbierto()) {

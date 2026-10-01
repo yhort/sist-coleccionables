@@ -16,6 +16,21 @@ export interface UpsertProveedorRequest {
   activo: boolean;
 }
 
+/** Filtro de maestros: activos (operativo), inactivos (reactivación) o todos. */
+export type FiltroActivoMaestro = 'activos' | 'inactivos' | 'todos';
+
+export const FILTROS_ACTIVO_MAESTRO: readonly FiltroActivoMaestro[] = [
+  'activos',
+  'inactivos',
+  'todos',
+];
+
+export const ETIQUETAS_FILTRO_ACTIVO: Record<FiltroActivoMaestro, string> = {
+  activos: 'Activos',
+  inactivos: 'Inactivos',
+  todos: 'Todos',
+};
+
 export function etiquetaProveedor(proveedor: Pick<Proveedor, 'ruc' | 'razonSocial' | 'nombreComercial'>): string {
   const nombre = proveedor.nombreComercial && proveedor.nombreComercial !== proveedor.razonSocial
     ? `${proveedor.nombreComercial} · ${proveedor.razonSocial}`
