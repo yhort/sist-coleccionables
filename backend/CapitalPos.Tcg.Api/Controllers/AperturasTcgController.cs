@@ -1,4 +1,5 @@
 using CapitalPos.Tcg.Api.Application.Aperturas;
+using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Contracts.Aperturas;
 using CapitalPos.Tcg.Api.Domain.Enums;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
@@ -16,12 +17,16 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     public async Task<ActionResult<IReadOnlyList<AperturaTcgResponse>>> Listar(
         [FromQuery] Guid? sedeId,
         [FromQuery] EstadoAperturaTcg? estado,
-        [FromQuery] DateOnly? fechaDesde,
-        [FromQuery] DateOnly? fechaHasta,
+        [FromQuery] string? fechaDesde,
+        [FromQuery] string? fechaHasta,
         CancellationToken cancellationToken)
     {
         var items = await aperturas.ListarAsync(
-            sedeId, estado, fechaDesde, fechaHasta, cancellationToken);
+            sedeId,
+            estado,
+            FiltroFechasOperacion.ParseInicioDia(fechaDesde),
+            FiltroFechasOperacion.ParseFinDiaExclusivo(fechaHasta),
+            cancellationToken);
         return Ok(items);
     }
 

@@ -1,4 +1,5 @@
 using CapitalPos.Tcg.Api.Application;
+using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Application.Subastas;
 using CapitalPos.Tcg.Api.Contracts.Subastas;
 using CapitalPos.Tcg.Api.Domain.Enums;
@@ -19,12 +20,17 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
         [FromQuery] EstadoSubastaTcg? estado,
         [FromQuery] CanalSubastaTcg? canal,
         [FromQuery] Guid? sedeId,
-        [FromQuery] DateOnly? fechaDesde,
-        [FromQuery] DateOnly? fechaHasta,
+        [FromQuery] string? fechaDesde,
+        [FromQuery] string? fechaHasta,
         CancellationToken cancellationToken)
     {
         var items = await subastas.ListarAsync(
-            estado, canal, sedeId, fechaDesde, fechaHasta, cancellationToken);
+            estado,
+            canal,
+            sedeId,
+            FiltroFechasOperacion.ParseInicioDia(fechaDesde),
+            FiltroFechasOperacion.ParseFinDiaExclusivo(fechaHasta),
+            cancellationToken);
         return Ok(items);
     }
 

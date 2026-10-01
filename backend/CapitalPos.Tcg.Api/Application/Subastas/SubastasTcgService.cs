@@ -18,15 +18,12 @@ public sealed class SubastasTcgService(
     ICurrentUser currentUser,
     KardexWriter kardex)
 {
-    /// <summary>Zona horaria operativa del negocio (Perú).</summary>
-    private static readonly TimeSpan ZonaHorariaOperacion = TimeSpan.FromHours(-5);
-
     public async Task<IReadOnlyList<SubastaTcgResponse>> ListarAsync(
         EstadoSubastaTcg? estado,
         CanalSubastaTcg? canal,
         Guid? sedeId,
-        DateOnly? fechaDesde,
-        DateOnly? fechaHasta,
+        DateTime? fechaDesde,
+        DateTime? fechaHasta,
         CancellationToken cancellationToken)
     {
         var query = QueryBase();
@@ -46,19 +43,16 @@ public sealed class SubastasTcgService(
             query = query.Where(s => s.SedeId == sedeId.Value);
         }
 
-        // Día operativo en hora de Perú (UTC-5), alineado con el filtro "Desde"/"Hasta" del frontend.
+        // Límites ya convertidos a UTC (inicio inclusivo / fin exclusivo del día operativo).
         if (fechaDesde.HasValue)
         {
-            var inicio = new DateTimeOffset(fechaDesde.Value, TimeOnly.MinValue, ZonaHorariaOperacion);
+            var inicio = fechaDesde.Value;
             query = query.Where(s => s.FechaInicio >= inicio);
         }
 
         if (fechaHasta.HasValue)
         {
-            var finExclusivo = new DateTimeOffset(
-                fechaHasta.Value.AddDays(1),
-                TimeOnly.MinValue,
-                ZonaHorariaOperacion);
+            var finExclusivo = fechaHasta.Value;
             query = query.Where(s => s.FechaInicio < finExclusivo);
         }
 

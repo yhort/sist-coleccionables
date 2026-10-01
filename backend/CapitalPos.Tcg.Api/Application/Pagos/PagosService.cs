@@ -17,14 +17,11 @@ public sealed class PagosService(
     ICurrentUser currentUser,
     PedidosDigitalesService pedidos)
 {
-    /// <summary>Zona horaria operativa del negocio (Perú).</summary>
-    private static readonly TimeSpan ZonaHorariaOperacion = TimeSpan.FromHours(-5);
-
     public async Task<IReadOnlyList<PagoResponse>> ListarAsync(
         EstadoPago? estado,
         OrigenPago? origen,
-        DateOnly? fechaDesde,
-        DateOnly? fechaHasta,
+        DateTime? fechaDesde,
+        DateTime? fechaHasta,
         Guid? pedidoDigitalId,
         CancellationToken cancellationToken)
     {
@@ -39,19 +36,16 @@ public sealed class PagosService(
             query = query.Where(p => p.Origen == origen.Value);
         }
 
-        // Día operativo en hora de Perú (UTC-5), alineado con el filtro "Desde"/"Hasta" del frontend.
+        // Límites ya convertidos a UTC (inicio inclusivo / fin exclusivo del día operativo).
         if (fechaDesde.HasValue)
         {
-            var inicio = new DateTimeOffset(fechaDesde.Value, TimeOnly.MinValue, ZonaHorariaOperacion);
+            var inicio = fechaDesde.Value;
             query = query.Where(p => p.FechaNotificacion >= inicio);
         }
 
         if (fechaHasta.HasValue)
         {
-            var finExclusivo = new DateTimeOffset(
-                fechaHasta.Value.AddDays(1),
-                TimeOnly.MinValue,
-                ZonaHorariaOperacion);
+            var finExclusivo = fechaHasta.Value;
             query = query.Where(p => p.FechaNotificacion < finExclusivo);
         }
 

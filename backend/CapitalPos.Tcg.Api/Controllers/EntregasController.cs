@@ -1,3 +1,4 @@
+using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Application.Entregas;
 using CapitalPos.Tcg.Api.Contracts.Entregas;
 using CapitalPos.Tcg.Api.Contracts.Pedidos;
@@ -17,12 +18,16 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     public async Task<ActionResult<IReadOnlyList<EntregaResponse>>> Listar(
         [FromQuery] EstadoLogistica? estado,
         [FromQuery] Guid? sedeOrigenId,
-        [FromQuery] DateOnly? fechaDesde,
-        [FromQuery] DateOnly? fechaHasta,
+        [FromQuery] string? fechaDesde,
+        [FromQuery] string? fechaHasta,
         CancellationToken cancellationToken)
     {
         var items = await entregas.ListarAsync(
-            estado, sedeOrigenId, fechaDesde, fechaHasta, cancellationToken);
+            estado,
+            sedeOrigenId,
+            FiltroFechasOperacion.ParseInicioDia(fechaDesde),
+            FiltroFechasOperacion.ParseFinDiaExclusivo(fechaHasta),
+            cancellationToken);
         return Ok(items);
     }
 

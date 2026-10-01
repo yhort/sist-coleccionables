@@ -14,14 +14,11 @@ public sealed class EntregasService(
     ApplicationDbContext db,
     PedidosDigitalesService pedidos)
 {
-    /// <summary>Zona horaria operativa del negocio (Perú).</summary>
-    private static readonly TimeSpan ZonaHorariaOperacion = TimeSpan.FromHours(-5);
-
     public async Task<IReadOnlyList<EntregaResponse>> ListarAsync(
         EstadoLogistica? estado,
         Guid? sedeOrigenId,
-        DateOnly? fechaDesde,
-        DateOnly? fechaHasta,
+        DateTime? fechaDesde,
+        DateTime? fechaHasta,
         CancellationToken cancellationToken)
     {
         var query = QueryBase();
@@ -35,19 +32,16 @@ public sealed class EntregasService(
             query = query.Where(e => e.SedeOrigenId == sedeOrigenId.Value);
         }
 
-        // Día operativo en UTC-5: fecha de despacho si existe; si no, fecha de creación.
+        // Despacho si existe; si no, creación. Límites UTC (inicio inclusivo / fin exclusivo).
         if (fechaDesde.HasValue)
         {
-            var inicio = new DateTimeOffset(fechaDesde.Value, TimeOnly.MinValue, ZonaHorariaOperacion);
+            var inicio = fechaDesde.Value;
             query = query.Where(e => (e.FechaDespacho ?? e.FechaCreacion) >= inicio);
         }
 
         if (fechaHasta.HasValue)
         {
-            var finExclusivo = new DateTimeOffset(
-                fechaHasta.Value.AddDays(1),
-                TimeOnly.MinValue,
-                ZonaHorariaOperacion);
+            var finExclusivo = fechaHasta.Value;
             query = query.Where(e => (e.FechaDespacho ?? e.FechaCreacion) < finExclusivo);
         }
 

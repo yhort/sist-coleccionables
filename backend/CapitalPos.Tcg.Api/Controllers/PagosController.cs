@@ -1,3 +1,4 @@
+using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Application.Izipay;
 using CapitalPos.Tcg.Api.Application.Pagos;
 using CapitalPos.Tcg.Api.Contracts.Izipay;
@@ -18,13 +19,18 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     public async Task<ActionResult<IReadOnlyList<PagoResponse>>> Listar(
         [FromQuery] EstadoPago? estado,
         [FromQuery] OrigenPago? origen,
-        [FromQuery] DateOnly? fechaDesde,
-        [FromQuery] DateOnly? fechaHasta,
+        [FromQuery] string? fechaDesde,
+        [FromQuery] string? fechaHasta,
         [FromQuery] Guid? pedidoDigitalId,
         CancellationToken cancellationToken)
     {
         var items = await pagos.ListarAsync(
-            estado, origen, fechaDesde, fechaHasta, pedidoDigitalId, cancellationToken);
+            estado,
+            origen,
+            FiltroFechasOperacion.ParseInicioDia(fechaDesde),
+            FiltroFechasOperacion.ParseFinDiaExclusivo(fechaHasta),
+            pedidoDigitalId,
+            cancellationToken);
         return Ok(items);
     }
 
