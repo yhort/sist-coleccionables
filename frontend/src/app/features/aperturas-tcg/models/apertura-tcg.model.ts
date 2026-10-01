@@ -70,6 +70,25 @@ export const FILTROS_APERTURAS_VACIOS: AperturaTcgFiltros = {
   hasta: '',
 };
 
+/** Fecha local en formato `YYYY-MM-DD` (input type="date"). */
+export function fechaLocalHoy(): string {
+  const ahora = new Date();
+  const yyyy = ahora.getFullYear();
+  const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dd = String(ahora.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Filtros iniciales del historial: operación del día en curso (UTC-5 Perú vía zona del navegador). */
+export function crearFiltrosAperturasDiaActual(): AperturaTcgFiltros {
+  const hoy = fechaLocalHoy();
+  return {
+    ...FILTROS_APERTURAS_VACIOS,
+    desde: hoy,
+    hasta: hoy,
+  };
+}
+
 export const ESTADOS_CARTA_OBTENIDA: readonly EstadoCartaObtenida[] = ['NM', 'EX', 'GD'];
 
 export const ETIQUETAS_ESTADO_APERTURA: Record<EstadoAperturaTcg, string> = {

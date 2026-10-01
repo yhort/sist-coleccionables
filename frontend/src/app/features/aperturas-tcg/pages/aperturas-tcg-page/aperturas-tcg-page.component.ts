@@ -20,6 +20,7 @@ import {
   EstadoAperturaTcg,
   FILTROS_APERTURAS_VACIOS,
   calcularRendimiento,
+  crearFiltrosAperturasDiaActual,
   totalCartasObtenidas,
 } from '../../models/apertura-tcg.model';
 
@@ -44,7 +45,7 @@ export class AperturasTcgPageComponent {
   readonly sedes = this.aperturasApi.sedes;
   readonly estados = ETIQUETAS_ESTADO_APERTURA;
   readonly estadosOpciones: readonly EstadoAperturaTcg[] = ['BORRADOR', 'CONFIRMADA', 'ANULADA'];
-  readonly filtros = signal<AperturaTcgFiltros>({ ...FILTROS_APERTURAS_VACIOS });
+  readonly filtros = signal<AperturaTcgFiltros>(crearFiltrosAperturasDiaActual());
   readonly wizardAbierto = signal(false);
   readonly aperturaEnCurso = signal<string | null>(null);
   readonly error = signal('');
@@ -59,7 +60,7 @@ export class AperturasTcgPageComponent {
       await Promise.all([
         this.productosApi.refrescar(),
         this.sedesApi.refrescar(),
-        this.aperturasApi.refrescar(),
+        this.refrescarAperturas(),
       ]);
       const sedeId = this.sedesApi.sedes()[0]?.id;
       if (sedeId) {
@@ -104,10 +105,14 @@ export class AperturasTcgPageComponent {
 
   actualizarFiltro<K extends keyof AperturaTcgFiltros>(clave: K, valor: AperturaTcgFiltros[K]): void {
     this.filtros.update((actual) => ({ ...actual, [clave]: valor }));
+    if (clave === 'desde' || clave === 'hasta') {
+      void this.refrescarAperturas().catch((err) => this.error.set(readApiError(err)));
+    }
   }
 
   limpiarFiltros(): void {
     this.filtros.set({ ...FILTROS_APERTURAS_VACIOS });
+    void this.refrescarAperturas().catch((err) => this.error.set(readApiError(err)));
   }
 
   abrirWizard(apertura?: AperturaTcg): void {
@@ -136,5 +141,13 @@ export class AperturasTcgPageComponent {
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo anular la apertura.');
     }
+  }
+
+  private async refrescarAperturas(): Promise<void> {
+    const { desde, hasta } = this.filtros();
+    await this.aperturasApi.refrescar({
+      desde: desde || null,
+      hasta: hasta || null,
+    });
   }
 }

@@ -16,11 +16,12 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     public async Task<ActionResult<IReadOnlyList<AperturaTcgResponse>>> Listar(
         [FromQuery] Guid? sedeId,
         [FromQuery] EstadoAperturaTcg? estado,
-        [FromQuery] DateTimeOffset? desde,
-        [FromQuery] DateTimeOffset? hasta,
+        [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta,
         CancellationToken cancellationToken)
     {
-        var items = await aperturas.ListarAsync(sedeId, estado, desde, hasta, cancellationToken);
+        var items = await aperturas.ListarAsync(
+            sedeId, estado, fechaDesde, fechaHasta, cancellationToken);
         return Ok(items);
     }
 

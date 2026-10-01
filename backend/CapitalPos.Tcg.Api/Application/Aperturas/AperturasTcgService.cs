@@ -15,11 +15,14 @@ public sealed class AperturasTcgService(
     ICurrentUser currentUser,
     KardexWriter kardex)
 {
+    /// <summary>Zona horaria operativa del negocio (Perú).</summary>
+    private static readonly TimeSpan ZonaHorariaOperacion = TimeSpan.FromHours(-5);
+
     public async Task<IReadOnlyList<AperturaTcgResponse>> ListarAsync(
         Guid? sedeId,
         EstadoAperturaTcg? estado,
-        DateTimeOffset? desde,
-        DateTimeOffset? hasta,
+        DateOnly? fechaDesde,
+        DateOnly? fechaHasta,
         CancellationToken cancellationToken)
     {
         var query = QueryBase();
@@ -34,14 +37,20 @@ public sealed class AperturasTcgService(
             query = query.Where(a => a.Estado == estado.Value);
         }
 
-        if (desde.HasValue)
+        // Día operativo en hora de Perú (UTC-5), alineado con el filtro "Desde"/"Hasta" del frontend.
+        if (fechaDesde.HasValue)
         {
-            query = query.Where(a => a.FechaCreacion >= desde.Value);
+            var inicio = new DateTimeOffset(fechaDesde.Value, TimeOnly.MinValue, ZonaHorariaOperacion);
+            query = query.Where(a => a.FechaCreacion >= inicio);
         }
 
-        if (hasta.HasValue)
+        if (fechaHasta.HasValue)
         {
-            query = query.Where(a => a.FechaCreacion <= hasta.Value);
+            var finExclusivo = new DateTimeOffset(
+                fechaHasta.Value.AddDays(1),
+                TimeOnly.MinValue,
+                ZonaHorariaOperacion);
+            query = query.Where(a => a.FechaCreacion < finExclusivo);
         }
 
         var aperturas = await query

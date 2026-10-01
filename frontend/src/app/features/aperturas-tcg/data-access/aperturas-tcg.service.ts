@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -22,6 +22,12 @@ import {
   costoSelladoDe,
   valorEstimadoCartas,
 } from '../models/apertura-tcg.model';
+
+/** Rango de fechas opcional para GET /api/aperturas-tcg (`fechaDesde` / `fechaHasta`). */
+export interface AperturasTcgRangoFechas {
+  desde?: string | null;
+  hasta?: string | null;
+}
 
 interface AperturaApi {
   id: string;
@@ -57,9 +63,20 @@ export class AperturasTcgApiService {
   readonly aperturas = this.aperturasSignal.asReadonly();
   readonly sedes = this.sedesApi.sedes;
 
-  async refrescar(): Promise<AperturaTcg[]> {
+  async refrescar(rango?: AperturasTcgRangoFechas): Promise<AperturaTcg[]> {
     try {
-      const items = await firstValueFrom(this.http.get<AperturaApi[]>(apiUrl('aperturas-tcg')));
+      let params = new HttpParams();
+      const desde = rango?.desde?.trim();
+      const hasta = rango?.hasta?.trim();
+      if (desde) {
+        params = params.set('fechaDesde', desde);
+      }
+      if (hasta) {
+        params = params.set('fechaHasta', hasta);
+      }
+      const items = await firstValueFrom(
+        this.http.get<AperturaApi[]>(apiUrl('aperturas-tcg'), { params }),
+      );
       const aperturas = items.map(mapApertura);
       this.aperturasSignal.set(aperturas);
       return aperturas;
