@@ -8,5 +8,6 @@ public enum CanalContactoCliente
     INSTAGRAM,
     TELEFONO,
     TELEGRAM,
+    MSN, 
     OTRO
 }
