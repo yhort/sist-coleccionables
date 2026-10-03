@@ -114,7 +114,7 @@ export class ProductoTcgFormDialogComponent implements OnInit {
 
   readonly form: FormGroup = this.fb.nonNullable.group({
     nombre: ['', Validators.required],
-    codigoSku: ['', Validators.required],
+    codigoSku: [''],
     tipoProducto: this.fb.nonNullable.control<TipoProductoTcg>('CARTA'),
     juego: this.fb.nonNullable.control<string>(''),
     codigoBarras: [''],
@@ -405,16 +405,22 @@ export class ProductoTcgFormDialogComponent implements OnInit {
     }
 
     const sku = String(this.form.controls['codigoSku'].value).trim();
-    if (this.productosApi.skuExiste(sku, this.producto()?.id)) {
-      this.errorSku = 'Ese SKU ya existe en el catálogo.';
-      this.tabActiva = 'tcg';
-      return;
-    }
-
     const raw = this.form.getRawValue();
     const stockLocal = Number(raw.stockLocal) || 0;
     const sedeId = String(raw.sedeId || '').trim();
     const esAlta = this.producto() === null;
+
+    if (!esAlta && !sku) {
+      this.errorSku = 'El SKU es obligatorio al editar.';
+      this.tabActiva = 'tcg';
+      return;
+    }
+
+    if (sku && this.productosApi.skuExiste(sku, this.producto()?.id)) {
+      this.errorSku = 'Ese SKU ya existe en el catálogo.';
+      this.tabActiva = 'tcg';
+      return;
+    }
 
     if (esAlta && stockLocal > 0 && !sedeId) {
       this.errorSku = 'Selecciona la sede del stock inicial.';

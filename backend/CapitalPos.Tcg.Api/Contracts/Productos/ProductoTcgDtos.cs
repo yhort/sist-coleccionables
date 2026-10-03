@@ -12,9 +12,9 @@ public sealed class UpsertProductoTcgRequest
     [MaxLength(200)]
     public string Nombre { get; set; } = string.Empty;
 
-    [Required]
+    /// <summary>Opcional en alta: si llega vacío/null, el servicio genera un SKU automático.</summary>
     [MaxLength(64)]
-    public string CodigoSku { get; set; } = string.Empty;
+    public string? CodigoSku { get; set; }
 
     [MaxLength(64)]
     public string? CodigoBarras { get; set; }

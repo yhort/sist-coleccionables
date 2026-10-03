@@ -109,7 +109,11 @@ public sealed class ProductosTcgService(
         CancellationToken cancellationToken)
     {
         ValidarTipoSoportado(request.TipoProducto);
-        await AsegurarSkuDisponibleAsync(request.CodigoSku, excluirId: null, cancellationToken);
+        var sku = string.IsNullOrWhiteSpace(request.CodigoSku)
+            ? GenerarSkuProductoLibre(request)
+            : request.CodigoSku.Trim();
+        request.CodigoSku = sku;
+        await AsegurarSkuDisponibleAsync(sku, excluirId: null, cancellationToken);
 
         if (request.StockInicial > 0 && (request.SedeId is null || request.SedeId == Guid.Empty))
         {
@@ -302,7 +306,14 @@ public sealed class ProductosTcgService(
             throw new BusinessRuleException("No se puede cambiar el tipo de producto.");
         }
 
-        await AsegurarSkuDisponibleAsync(request.CodigoSku, id, cancellationToken);
+        if (string.IsNullOrWhiteSpace(request.CodigoSku))
+        {
+            throw new BusinessRuleException("El SKU es obligatorio al actualizar.");
+        }
+
+        var sku = request.CodigoSku.Trim();
+        request.CodigoSku = sku;
+        await AsegurarSkuDisponibleAsync(sku, id, cancellationToken);
         CopiarComunes(producto, request);
 
         switch (producto)
@@ -436,6 +447,46 @@ public sealed class ProductosTcgService(
         }
     }
 
+    /// <summary>
+    /// SKU por defecto para productos libres (alta manual). No altera el flujo de variantes de catálogo.
+    /// </summary>
+    private static string GenerarSkuProductoLibre(UpsertProductoTcgRequest request)
+    {
+        if (request.TipoProducto == TipoProducto.CARTA && request.Carta is not null)
+        {
+            var c = request.Carta;
+            return SkuVarianteTcg.Generar(
+                c.SetCodigo,
+                c.NumeroCarta,
+                c.Rareza,
+                c.EsFoil,
+                c.Condicion,
+                c.Idioma);
+        }
+
+        if (request.TipoProducto == TipoProducto.SELLADO && request.Sellado is not null)
+        {
+            var s = request.Sellado;
+            var juego = SanearParteSku(s.Juego, 12);
+            var edicion = SanearParteSku(s.Edicion, 16);
+            var sufijo = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+            return $"{juego}-{s.TipoSellado}-{edicion}-{sufijo}";
+        }
+
+        return $"SKU-{Guid.NewGuid():N}"[..20].ToUpperInvariant();
+    }
+
+    private static string SanearParteSku(string valor, int max)
+    {
+        var limpio = new string(valor.Trim().Where(c => !char.IsWhiteSpace(c)).ToArray());
+        if (limpio.Length == 0)
+        {
+            return "X";
+        }
+
+        return limpio.Length <= max ? limpio : limpio[..max];
+    }
+
     private ProductoCarta CrearCarta(UpsertProductoTcgRequest request, DateTimeOffset ahora)
     {
         var carta = new ProductoCarta { TipoProducto = TipoProducto.CARTA };
@@ -463,7 +514,7 @@ public sealed class ProductosTcgService(
     private static void CopiarComunes(Producto producto, UpsertProductoTcgRequest request)
     {
         producto.Nombre = request.Nombre.Trim();
-        producto.CodigoSku = request.CodigoSku.Trim();
+        producto.CodigoSku = (request.CodigoSku ?? string.Empty).Trim();
         producto.CodigoBarras = string.IsNullOrWhiteSpace(request.CodigoBarras) ? null : request.CodigoBarras.Trim();
         producto.PrecioVenta = request.PrecioVenta;
         producto.Costo = request.Costo;

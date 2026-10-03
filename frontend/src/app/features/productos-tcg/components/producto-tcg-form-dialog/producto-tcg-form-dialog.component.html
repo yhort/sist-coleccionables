@@ -24,8 +24,8 @@
         <input formControlName="nombre" maxlength="200" />
       </label>
       <label>
-        SKU
-        <input formControlName="codigoSku" maxlength="64" />
+        SKU (opcional)
+        <input formControlName="codigoSku" maxlength="64" placeholder="Se genera si queda vacío" />
         @if (errorSku) {
           <small class="field-error">{{ errorSku }}</small>
         }

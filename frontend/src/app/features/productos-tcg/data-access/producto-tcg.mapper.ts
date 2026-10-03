@@ -83,7 +83,8 @@ export interface EliminarProductoTcgApi {
 export interface UpsertProductoTcgRequest {
   tipoProducto: TipoProductoTcg;
   nombre: string;
-  codigoSku: string;
+  /** Vacío/null en alta: el backend genera un SKU automático. */
+  codigoSku?: string | null;
   codigoBarras?: string | null;
   precioVenta: number;
   costo?: number | null;
@@ -236,7 +237,7 @@ export function mapProductoToUpsert(
   const request: UpsertProductoTcgRequest = {
     tipoProducto: producto.tipoProducto,
     nombre: producto.nombre.trim(),
-    codigoSku: producto.codigoSku.trim(),
+    codigoSku: producto.codigoSku.trim() || null,
     codigoBarras: producto.codigoBarras,
     precioVenta: producto.precioVenta,
     costo: producto.costo,
