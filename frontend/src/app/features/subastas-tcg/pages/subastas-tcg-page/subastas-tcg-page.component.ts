@@ -13,16 +13,14 @@ import { SubastaFormDialogComponent } from '../../components/subasta-form-dialog
 import { SubastaDetallePanelComponent } from '../../components/subasta-detalle-panel/subasta-detalle-panel.component';
 import { SubastaMargenCardComponent } from '../../components/subasta-margen-card/subasta-margen-card.component';
 import { SubastaTableroItem } from '../../components/subasta-card/subasta-card.component';
-import {
-  PedidoVinculoSubasta,
-  SubastasTablaComponent,
-} from '../../components/subastas-tabla/subastas-tabla.component';
+import { SubastasTablaComponent } from '../../components/subastas-tabla/subastas-tabla.component';
 import { SubastasTableroComponent } from '../../components/subastas-tablero/subastas-tablero.component';
 import { SubastasTcgApiService } from '../../data-access/subastas-tcg.service';
 import {
   CANALES_SUBASTA,
   ETIQUETAS_CANAL_SUBASTA,
   FILTROS_SUBASTAS_VACIOS,
+  PedidoVinculoSubasta,
   SubastaTcg,
   SubastasTcgFiltros,
   calcularMargenSubasta,

@@ -71,14 +71,29 @@
                     {{ etiquetasEstado[item.subasta.estado] }}
                   </span>
                   @if (item.subasta.estado === 'ADJUDICADA') {
-                    @for (pedido of pedidosVinculados(item.subasta); track pedido.id) {
-                      <a
-                        class="pedido-badge"
-                        [routerLink]="['/app/pedidos-digitales']"
-                        [queryParams]="{ pedidoId: pedido.id }"
-                      >
-                        {{ pedido.codigo }}
-                      </a>
+                    @if (pedidosResumen(item.subasta); as resumen) {
+                      @if (resumen.total > 0) {
+                        <div class="pedidos-inline">
+                          @for (pedido of resumen.visibles; track pedido.id) {
+                            <a
+                              class="pedido-badge"
+                              [routerLink]="['/app/pedidos-digitales']"
+                              [queryParams]="{ pedidoId: pedido.id }"
+                            >
+                              {{ pedido.codigo }}
+                            </a>
+                          }
+                          @if (resumen.restantes > 0) {
+                            <button
+                              type="button"
+                              class="pedido-more"
+                              (click)="abrirPedidosModal(item.subasta)"
+                            >
+                              +{{ resumen.restantes }} pedido{{ resumen.restantes === 1 ? '' : 's' }}
+                            </button>
+                          }
+                        </div>
+                      }
                     }
                   }
                 </div>
@@ -122,9 +137,9 @@
                         <button
                           type="button"
                           class="accion-btn"
-                          (click)="irPedido.emit(pedidos[0])"
+                          (click)="abrirPedidosModal(item.subasta)"
                         >
-                          Ir a Pedido
+                          Ver pedidos
                         </button>
                       }
                     }
@@ -176,3 +191,11 @@
     </footer>
   }
 </section>
+
+@if (pedidosModal(); as modal) {
+  <app-subasta-pedidos-dialog
+    [subasta]="modal.subasta"
+    [pedidos]="modal.pedidos"
+    (closed)="cerrarPedidosModal()"
+  />
+}

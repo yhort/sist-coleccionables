@@ -2,34 +2,32 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
 import {
   ESTADOS_TABLERO_SUBASTA,
   ETIQUETAS_CANAL_SUBASTA,
   ETIQUETAS_ESTADO_SUBASTA,
   EstadoSubastaTcg,
+  PedidoVinculoSubasta,
   SubastaTcg,
-  esEventoIndividuales,
   etiquetaLoteSubasta,
   nombreVisibleLinea,
   pujaGanadoraActual,
   ultimaPuja,
 } from '../../models/subasta-tcg.model';
+import { SubastaPedidosDialogComponent } from '../subasta-pedidos-dialog/subasta-pedidos-dialog.component';
 import { SubastaTableroItem } from '../subasta-card/subasta-card.component';
 
 export type SubastasTablaSort = 'fecha' | 'codigo' | 'producto' | 'precioBase' | 'oferta' | 'estado';
 export type SubastasTablaSortDir = 'asc' | 'desc';
 
-export interface PedidoVinculoSubasta {
-  id: string;
-  codigo: string;
-}
+export type { PedidoVinculoSubasta };
 
 const PAGE_SIZE = 40;
+const PEDIDOS_VISIBLES_EN_CELDA = 2;
 
 @Component({
   selector: 'app-subastas-tabla',
-  imports: [SolesPipe, DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, SubastaPedidosDialogComponent],
   templateUrl: './subastas-tabla.component.html',
   styleUrl: './subastas-tabla.component.scss',
 })
@@ -54,6 +52,9 @@ export class SubastasTablaComponent {
   readonly sortKey = signal<SubastasTablaSort>('fecha');
   readonly sortDir = signal<SubastasTablaSortDir>('desc');
   readonly page = signal(1);
+  readonly pedidosModal = signal<{ subasta: SubastaTcg; pedidos: PedidoVinculoSubasta[] } | null>(
+    null,
+  );
 
   readonly ultima = ultimaPuja;
   readonly ganadora = pujaGanadoraActual;
@@ -228,6 +229,31 @@ export class SubastasTablaComponent {
       push(linea.pedidoDigitalId, linea.pedidoCodigo);
     }
     return result;
+  }
+
+  pedidosResumen(subasta: SubastaTcg): {
+    visibles: PedidoVinculoSubasta[];
+    restantes: number;
+    total: number;
+  } {
+    const todos = this.pedidosVinculados(subasta);
+    return {
+      visibles: todos.slice(0, PEDIDOS_VISIBLES_EN_CELDA),
+      restantes: Math.max(0, todos.length - PEDIDOS_VISIBLES_EN_CELDA),
+      total: todos.length,
+    };
+  }
+
+  abrirPedidosModal(subasta: SubastaTcg): void {
+    const pedidos = this.pedidosVinculados(subasta);
+    if (pedidos.length === 0) {
+      return;
+    }
+    this.pedidosModal.set({ subasta, pedidos });
+  }
+
+  cerrarPedidosModal(): void {
+    this.pedidosModal.set(null);
   }
 
   etiquetaPujas(n: number): string {

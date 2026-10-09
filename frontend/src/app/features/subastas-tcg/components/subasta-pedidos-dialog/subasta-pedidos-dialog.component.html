@@ -1,0 +1,53 @@
+<div class="dialog-backdrop" (click)="closed.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="subasta-pedidos-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="subasta-pedidos-title">Pedidos de la subasta</h2>
+      <p>
+        <code>{{ subasta().codigo }}</code>
+        · {{ pedidos().length }} pedido{{ pedidos().length === 1 ? '' : 's' }} generado{{
+          pedidos().length === 1 ? '' : 's'
+        }}
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">
+      ×
+    </button>
+  </header>
+
+  <div class="dialog__body">
+    @if (pedidos().length === 0) {
+      <p class="dialog__empty">No hay pedidos vinculados a esta subasta.</p>
+    } @else {
+      <ul class="pedidos-lista">
+        @for (pedido of pedidos(); track pedido.id; let i = $index) {
+          <li>
+            <div class="pedidos-lista__info">
+              <span class="pedidos-lista__n">{{ i + 1 }}</span>
+              <strong>{{ pedido.codigo }}</strong>
+            </div>
+            <a
+              class="link"
+              [routerLink]="['/app/pedidos-digitales']"
+              [queryParams]="{ pedidoId: pedido.id }"
+              (click)="closed.emit()"
+            >
+              Abrir en Pedidos
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+
+  <footer class="dialog__footer">
+    <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+  </footer>
+</section>

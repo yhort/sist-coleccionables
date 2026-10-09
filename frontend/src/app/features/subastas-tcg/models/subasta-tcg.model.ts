@@ -72,6 +72,12 @@ export interface SubastaTcg {
   pujas: PujaTcg[];
 }
 
+/** Pedido digital generado desde una subasta (cabecera o línea de lote). */
+export interface PedidoVinculoSubasta {
+  id: string;
+  codigo: string;
+}
+
 export interface SubastasTcgFiltros {
   busqueda: string;
   canal: CanalSubastaTcg | 'TODOS';
