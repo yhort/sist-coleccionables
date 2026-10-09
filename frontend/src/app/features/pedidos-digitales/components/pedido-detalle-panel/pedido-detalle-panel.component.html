@@ -131,6 +131,9 @@
             <th>Cant.</th>
             <th>P. unit.</th>
             <th>Total</th>
+            @if (puedeDevolverItem(pedido)) {
+              <th class="acciones-col">Acciones</th>
+            }
           </tr>
         </thead>
         <tbody>
@@ -144,6 +147,18 @@
               <td>{{ item.detalle.cantidad }}</td>
               <td>{{ item.detalle.precioUnitario | soles }}</td>
               <td>{{ item.detalle.total | soles }}</td>
+              @if (puedeDevolverItem(pedido)) {
+                <td class="acciones-col">
+                  <button
+                    type="button"
+                    class="item-devolver-btn"
+                    title="Devolver ítem al inventario"
+                    (click)="abrirDevolverItem(item.detalle)"
+                  >
+                    Devolver ítem
+                  </button>
+                </td>
+              }
             </tr>
           }
         </tbody>
@@ -186,6 +201,10 @@
         </tbody>
       </table>
     </section>
+
+    @if (aviso()) {
+      <p class="aviso">{{ aviso() }}</p>
+    }
 
     @if (error()) {
       <p class="error">{{ error() }}</p>
@@ -241,6 +260,15 @@
           PDF
         </button>
       }
+      @if (puedeLiberarStock(pedido)) {
+        <button
+          type="button"
+          class="ghost ghost--danger"
+          (click)="liberarStockAbandono.emit(pedido)"
+        >
+          Liberar stock por abandono (No recogido)
+        </button>
+      }
       @for (estado of transicionesDe(pedido); track estado) {
         <button
           type="button"
@@ -277,4 +305,17 @@
     [pagos]="pagosVinculados()"
     (closed)="cerrarAccion()"
   />
+}
+
+@if (devolverDetalle(); as detalle) {
+  @if (pedido(); as pedidoDevolver) {
+    <app-devolver-item-pedido-dialog
+      [pedido]="pedidoDevolver"
+      [detalle]="detalle"
+      [guardando]="devolverGuardando()"
+      [error]="devolverError()"
+      (confirmed)="confirmarDevolverItem()"
+      (cancelled)="cerrarDevolverItem()"
+    />
+  }
 }

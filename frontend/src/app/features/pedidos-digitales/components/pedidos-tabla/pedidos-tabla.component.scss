@@ -473,6 +473,20 @@
   &:hover {
     filter: brightness(0.97);
   }
+
+  &--abandono {
+    max-width: 12.5rem;
+    color: #991b1b;
+    line-height: 1.25;
+    text-align: left;
+    white-space: normal;
+    background: #fef2f2;
+
+    &:hover {
+      background: #fee2e2;
+      filter: none;
+    }
+  }
 }
 
 .tabla__pager {

@@ -1,4 +1,16 @@
-import { AfterViewInit, Component, ElementRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  DestroyRef,
+  ElementRef,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -21,6 +33,7 @@ import { PedidosKanbanComponent } from '../../components/pedidos-kanban/pedidos-
 import { PedidosTablaComponent } from '../../components/pedidos-tabla/pedidos-tabla.component';
 import { EmitirCpeLoteDialogComponent } from '../../components/emitir-cpe-lote-dialog/emitir-cpe-lote-dialog.component';
 import { EmpaqueConsolidadoDialogComponent } from '../../components/empaque-consolidado-dialog/empaque-consolidado-dialog.component';
+import { LiberarStockAbandonoDialogComponent } from '../../components/liberar-stock-abandono-dialog/liberar-stock-abandono-dialog.component';
 import { PedidoAccionPreparadaDialogComponent } from '../../components/pedido-accion-preparada-dialog/pedido-accion-preparada-dialog.component';
 import { PedidoEtiquetaDialogComponent } from '../../components/pedido-etiqueta-dialog/pedido-etiqueta-dialog.component';
 import { RegistrarPagoLoteDialogComponent } from '../../components/registrar-pago-lote-dialog/registrar-pago-lote-dialog.component';
@@ -67,6 +80,7 @@ function leerVistaPreferida(): PedidosVistaMode {
     RegistrarPagoLoteDialogComponent,
     EmitirCpeLoteDialogComponent,
     EmpaqueConsolidadoDialogComponent,
+    LiberarStockAbandonoDialogComponent,
     PedidoAccionPreparadaDialogComponent,
     PedidoEtiquetaDialogComponent,
   ],
@@ -82,6 +96,10 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
   private readonly entregasApi = inject(EntregasApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly tablaPedidos = viewChild(PedidosTablaComponent);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly busquedaInput = viewChild<ElementRef<HTMLInputElement>>('busquedaInput');
 
@@ -99,10 +117,27 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
   readonly consolidadoEmpaque = signal<PedidoDigital[] | null>(null);
   readonly error = signal('');
   readonly aviso = signal('');
+  readonly toastExito = signal('');
+  readonly abandonoPedido = signal<PedidoDigital | null>(null);
+  readonly abandonoGuardando = signal(false);
+  readonly abandonoError = signal('');
+  private readonly tabPendiente = signal<EstadoPedidoDigital | 'TODOS' | null>(null);
 
   readonly sedeCajaId = computed(() => this.sedesApi.sedes()[0]?.id ?? '');
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.limpiarToast());
+    effect(() => {
+      const tabla = this.tablaPedidos();
+      const tab = this.tabPendiente();
+      if (!tabla || !tab) {
+        return;
+      }
+      untracked(() => {
+        tabla.setEstadoTab(tab);
+        this.tabPendiente.set(null);
+      });
+    });
     void this.cargar().then(() => this.aplicarQueryParams());
   }
 
@@ -120,7 +155,8 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
       this.cpeLote() ||
       this.notaCreditoLote() ||
       this.etiquetasLote() ||
-      this.consolidadoEmpaque()
+      this.consolidadoEmpaque() ||
+      this.abandonoPedido()
     ) {
       return;
     }
@@ -429,6 +465,42 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     this.consolidadoEmpaque.set(null);
   }
 
+  abrirLiberarStock(pedido: PedidoDigital): void {
+    this.abandonoError.set('');
+    this.abandonoPedido.set(pedido);
+  }
+
+  cerrarLiberarStock(): void {
+    if (this.abandonoGuardando()) {
+      return;
+    }
+    this.abandonoPedido.set(null);
+    this.abandonoError.set('');
+  }
+
+  async confirmarLiberarStock(): Promise<void> {
+    const pedido = this.abandonoPedido();
+    if (!pedido || this.abandonoGuardando()) {
+      return;
+    }
+    this.abandonoGuardando.set(true);
+    this.abandonoError.set('');
+    try {
+      await this.pedidosApi.liberarStockPorAbandono(pedido.id);
+      await this.refrescarPedidos().catch(() => undefined);
+      this.abandonoPedido.set(null);
+      this.seleccionadoId.set(null);
+      this.moverACancelado();
+      this.mostrarToast('Pedido cancelado por abandono y stock liberado correctamente.');
+    } catch (err) {
+      this.abandonoError.set(
+        err instanceof Error ? err.message : 'No se pudo liberar el stock del pedido.',
+      );
+    } finally {
+      this.abandonoGuardando.set(false);
+    }
+  }
+
   async anular(pedido: PedidoDigital): Promise<void> {
     this.error.set('');
     this.aviso.set('');
@@ -506,6 +578,34 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     }
     this.error.set(this.cajaApi.mensajeCerrada(sedeId));
     return false;
+  }
+
+  private moverACancelado(): void {
+    if (this.vista() !== 'tabla') {
+      this.setVista('tabla');
+    }
+    const tabla = this.tablaPedidos();
+    if (tabla) {
+      tabla.setEstadoTab('Cancelado');
+      return;
+    }
+    this.tabPendiente.set('Cancelado');
+  }
+
+  private mostrarToast(mensaje: string): void {
+    this.limpiarToast();
+    this.toastExito.set(mensaje);
+    this.toastTimer = setTimeout(() => {
+      this.toastExito.set('');
+      this.toastTimer = null;
+    }, 5000);
+  }
+
+  private limpiarToast(): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
   }
 
   private async refrescarPedidos(): Promise<void> {

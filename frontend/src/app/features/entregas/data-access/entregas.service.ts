@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { SedesApiService } from '../../../core/data-access/sedes-api.service';
+import { readApiError } from '../../../core/http/api-error';
 import { apiUrl } from '../../../core/http/api-url';
 import { codigoPedido } from '../../../core/ui/codigo-amigable';
 import { PedidosDigitalesApiService } from '../../pedidos-digitales/data-access/pedidos-digitales.service';
@@ -233,6 +234,27 @@ export class EntregasApiService {
     };
     this.persistir(siguiente);
     return clonar(siguiente);
+  }
+
+  /**
+   * Devolución por no recojo en punto (plazo 30 días). Cancela el pedido y marca logística FALLIDA.
+   */
+  async devolverNoRecogido(pedidoId: string, observacion?: string): Promise<Entrega> {
+    const pedido = this.requierePedido(pedidoId);
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<EntregaApi>(apiUrl('entregas/devolver-no-recogido'), {
+          pedidoDigitalId: pedido.id,
+          observacion: observacion ?? null,
+        }),
+      );
+      const entrega = mapEntregaApi(dto);
+      this.persistir(entrega);
+      await this.pedidosApi.refrescar().catch(() => undefined);
+      return clonar(entrega);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   private toFila(pedido: PedidoDigital): EntregaFila {

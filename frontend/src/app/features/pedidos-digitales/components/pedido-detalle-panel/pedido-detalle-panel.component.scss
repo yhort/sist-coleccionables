@@ -239,6 +239,29 @@
     font-size: 0.72rem;
     font-weight: 500;
   }
+
+  .acciones-col {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+  }
+}
+
+.item-devolver-btn {
+  min-height: 28px;
+  padding: 0 0.55rem;
+  color: #991b1b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+  }
 }
 
 .totales {
@@ -285,13 +308,19 @@
 }
 
 .empty,
-.error {
+.error,
+.aviso {
   margin: 0;
   font-size: 0.85rem;
 }
 
 .error {
   color: var(--color-danger);
+  font-weight: 600;
+}
+
+.aviso {
+  color: #166534;
   font-weight: 600;
 }
 

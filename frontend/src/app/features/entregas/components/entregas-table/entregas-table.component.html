@@ -67,6 +67,11 @@
               @if (puedeConfirmar(fila)) {
                 <button type="button" class="link-btn" (click)="confirmar.emit(fila)">Confirmar entrega</button>
               }
+              @if (puedeDevolver(fila)) {
+                <button type="button" class="link-btn" (click)="devolver.emit(fila)">
+                  Devolver (no recogido)
+                </button>
+              }
               <button type="button" class="link-btn" (click)="etiqueta.emit(fila)">Etiqueta</button>
             </td>
           </tr>

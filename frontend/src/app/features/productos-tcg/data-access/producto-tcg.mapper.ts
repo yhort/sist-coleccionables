@@ -23,6 +23,7 @@ export interface ProductoCartaApi {
   idioma: IdiomaTcg;
   condicion: CondicionTcg;
   esFoil: boolean;
+  variante?: string | null;
   artista?: string | null;
 }
 
@@ -162,6 +163,9 @@ export function mapProductoFromApi(dto: ProductoTcgApi, stockLocal = 0): Product
     rareza: dto.carta?.rareza ?? '',
     condicion: dto.carta?.condicion ?? '',
     esFoil: dto.carta?.esFoil ?? false,
+    variante:
+      dto.carta?.variante?.trim() ||
+      (dto.carta?.esFoil ? 'Holo' : 'Básica'),
     idioma: dto.carta?.idioma ?? '',
     artista: dto.carta?.artista ?? '',
     tipoSellado: dto.sellado?.tipoSellado ?? '',
@@ -261,6 +265,7 @@ export function mapProductoToUpsert(
       idioma: (producto.atributosTcg.idioma || 'ES') as IdiomaTcg,
       condicion: (producto.atributosTcg.condicion || 'NM') as CondicionTcg,
       esFoil: producto.atributosTcg.esFoil,
+      variante: producto.atributosTcg.variante?.trim() || (producto.atributosTcg.esFoil ? 'Holo' : 'Básica'),
       artista: producto.atributosTcg.artista || null,
     };
   }

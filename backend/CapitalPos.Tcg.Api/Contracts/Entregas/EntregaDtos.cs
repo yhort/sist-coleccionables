@@ -88,6 +88,18 @@ public sealed class FallarEntregaRequest
     public string? Observacion { get; set; }
 }
 
+/// <summary>
+/// Devolución por no recojo en punto de entrega (plazo mínimo 30 días desde despacho/programación).
+/// </summary>
+public sealed class DevolverNoRecogidoRequest
+{
+    [Required]
+    public Guid PedidoDigitalId { get; set; }
+
+    [MaxLength(500)]
+    public string? Observacion { get; set; }
+}
+
 public sealed class EntregaResponse
 {
     public required Guid Id { get; init; }

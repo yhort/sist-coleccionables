@@ -9,6 +9,7 @@ import {
   ETIQUETAS_METODO_ENVIO,
   EntregaFila,
   destinoDe,
+  puedeDevolverNoRecogido,
 } from '../../models/entrega.model';
 
 const PAGE_SIZE = 40;
@@ -24,6 +25,7 @@ export class EntregasTableComponent {
   readonly empaquetar = output<EntregaFila>();
   readonly despachar = output<EntregaFila>();
   readonly confirmar = output<EntregaFila>();
+  readonly devolver = output<EntregaFila>();
   readonly etiqueta = output<EntregaFila>();
 
   readonly etiquetasMetodo = ETIQUETAS_METODO_ENVIO;
@@ -81,6 +83,10 @@ export class EntregasTableComponent {
       fila.pedido.estado === 'PendienteEntrega' ||
       (fila.pedido.estado === 'Empaquetado' && fila.entrega.metodoEnvio === 'RECOJO_TIENDA')
     );
+  }
+
+  puedeDevolver(fila: EntregaFila): boolean {
+    return puedeDevolverNoRecogido(fila);
   }
 
   paginaAnterior(): void {

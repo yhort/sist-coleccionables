@@ -90,4 +90,14 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
         var fallida = await entregas.FallarAsync(id, request?.Observacion, cancellationToken);
         return Ok(fallida);
     }
+
+    [HttpPost("devolver-no-recogido")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<EntregaResponse>> DevolverNoRecogido(
+        [FromBody] DevolverNoRecogidoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await entregas.DevolverNoRecogidoAsync(request, cancellationToken);
+        return Ok(resultado);
+    }
 }

@@ -167,6 +167,16 @@ public sealed class EmitirComprobanteConsolidadoRequest
     public List<Guid> PedidoDigitalIds { get; set; } = [];
 }
 
+/// <summary>
+/// Devolución parcial de una línea del pedido: libera la reserva del ítem,
+/// lo retira del pedido y recalcula totales. Si era el último ítem, cancela el pedido.
+/// </summary>
+public sealed class DevolverDetallePedidoRequest
+{
+    [MaxLength(500)]
+    public string? Observacion { get; set; }
+}
+
 public sealed class ConvertirVentaRequest
 {
     [MaxLength(500)]

@@ -428,6 +428,70 @@ export class PedidosDigitalesApiService {
     }
   }
 
+  /**
+   * POST /api/entregas/devolver-no-recogido. Cancela el pedido, marca la logística
+   * como FALLIDA y libera el stock. El listado se actualiza en el signal local.
+   */
+  async liberarStockPorAbandono(id: string): Promise<PedidoDigital> {
+    const actual = this.requiere(id);
+    try {
+      await firstValueFrom(
+        this.http.post(apiUrl('entregas/devolver-no-recogido'), {
+          pedidoDigitalId: id,
+          observacion: 'No recogido por el cliente en el punto de entrega.',
+        }),
+      );
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+
+    const ahora = new Date().toISOString();
+    const cancelado: PedidoDigital = {
+      ...actual,
+      estado: 'Cancelado',
+      indicadorReserva: 'Liberado',
+      historialEstados: [
+        ...actual.historialEstados,
+        {
+          id: globalThis.crypto?.randomUUID?.() ?? `hist-abandono-${Date.now()}`,
+          estadoAnterior: actual.estado,
+          estadoNuevo: 'Cancelado',
+          usuarioNombre: null,
+          fecha: ahora,
+          observacion: 'Cancelado por abandono del cliente. Logística FALLIDA y stock liberado.',
+        },
+      ],
+    };
+    this.reemplazar(cancelado);
+    await this.stockApi.refrescarSede(actual.sedeId).catch(() => undefined);
+    return clonarPedido(cancelado);
+  }
+
+  /**
+   * POST /api/pedidos-digitales/{id}/detalles/{detalleId}/devolver
+   * Retira el ítem, libera su reserva y recalcula totales (o cancela si era el último).
+   */
+  async devolverDetalle(pedidoId: string, detalleId: string, observacion?: string): Promise<PedidoDigital> {
+    try {
+      const actualizado = await firstValueFrom(
+        this.http.post<PedidoApi>(
+          apiUrl(`pedidos-digitales/${pedidoId}/detalles/${detalleId}/devolver`),
+          { observacion: observacion?.trim() || null },
+        ),
+      );
+      const pedido = mapPedido(actualizado);
+      this.reemplazar(pedido);
+      await this.stockApi.refrescarSede(pedido.sedeId).catch(() => undefined);
+      if (pedido.estado === 'Cancelado' && pedido.subastaTcgId) {
+        const { SubastasTcgApiService } = await import('../../subastas-tcg/data-access/subastas-tcg.service');
+        await this.injector.get(SubastasTcgApiService).refrescar().catch(() => undefined);
+      }
+      return clonarPedido(pedido);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
+  }
+
   async cancelar(id: string, observacion?: string): Promise<PedidoDigital> {
     try {
       const cancelado = await firstValueFrom(

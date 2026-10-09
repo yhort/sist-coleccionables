@@ -241,8 +241,21 @@ public sealed class CatalogoTcgService(ApplicationDbContext db, ITenantProvider 
             db.TcgCartas.RemoveRange(cartas);
         }
 
+        var serieId = set.SerieId;
         db.TcgSets.Remove(set);
         await db.SaveChangesAsync(cancellationToken);
+
+        // Si la serie queda sin sets, desactivarla para que no siga en el desplegable.
+        var setsRestantes = await db.TcgSets.CountAsync(s => s.SerieId == serieId, cancellationToken);
+        if (setsRestantes == 0)
+        {
+            var serie = await db.TcgSeries.FirstOrDefaultAsync(s => s.Id == serieId, cancellationToken);
+            if (serie is not null && serie.Activa)
+            {
+                serie.Activa = false;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
     }
 
     public async Task<IReadOnlyList<TcgCartaResponse>> ListarCartasAsync(

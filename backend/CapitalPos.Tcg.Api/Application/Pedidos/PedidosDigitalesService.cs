@@ -377,6 +377,99 @@ public sealed class PedidosDigitalesService(
         return actualizados;
     }
 
+    /// <summary>
+    /// Retira un ítem del pedido en Pendiente de entrega, libera su reserva al stock libre
+    /// y recalcula totales. Si era el último ítem, cancela el pedido completo.
+    /// </summary>
+    public async Task<PedidoDigitalResponse> DevolverDetalleAsync(
+        Guid id,
+        Guid detalleId,
+        string? observacion,
+        CancellationToken cancellationToken)
+    {
+        var pedido = await CargarAsync(id, cancellationToken);
+        if (pedido.Estado != EstadoPedidoDigital.PendienteEntrega)
+        {
+            throw new BusinessRuleException(
+                "Solo se puede devolver un ítem cuando el pedido está en Pendiente de entrega.");
+        }
+
+        if (PedidoKanban.BloqueaOperacionesTrasNc(pedido.Estado))
+        {
+            throw new BusinessRuleException("El pedido está cerrado por nota de crédito.");
+        }
+
+        if (pedido.VentaId is not null)
+        {
+            throw new BusinessRuleException(
+                "El pedido ya tiene venta o comprobante fiscal. Usa una nota de crédito parcial si corresponde.");
+        }
+
+        var detalle = pedido.Detalles.FirstOrDefault(d => d.Id == detalleId)
+            ?? throw new BusinessRuleException("No se encontró el ítem en el pedido.", StatusCodes.Status404NotFound);
+
+        var motivo = observacion?.Trim();
+        if (string.IsNullOrEmpty(motivo))
+        {
+            motivo = $"Devolución parcial por abandono · {detalle.Descripcion}.";
+        }
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        await kardex.AplicarMuchosAsync(
+            [
+                new KardexComando(
+                    pedido.SedeId,
+                    detalle.ProductoId,
+                    TipoMovimientoInventario.LIBERACION_RESERVA,
+                    detalle.Cantidad,
+                    $"{motivo} · {detalle.Descripcion}",
+                    "PEDIDO_DIGITAL",
+                    pedido.Id)
+            ],
+            cancellationToken);
+
+        db.PedidoDigitalDetalles.Remove(detalle);
+        pedido.Detalles.Remove(detalle);
+
+        var esUltimo = pedido.Detalles.Count == 0;
+        if (esUltimo)
+        {
+            pedido.Subtotal = 0;
+            pedido.Igv = 0;
+            pedido.Total = 0;
+            AplicarHistorial(
+                pedido,
+                EstadoPedidoDigital.Cancelado,
+                $"{motivo} Último ítem devuelto; pedido cancelado y stock liberado.");
+            await subastas.LiberarAdjudicacionPorPedidoCanceladoAsync(
+                pedido.Id,
+                pedido.SubastaTcgId,
+                cancellationToken);
+        }
+        else
+        {
+            var total = IgvCalculo.Round2(pedido.Detalles.Sum(l => l.Total));
+            var (subtotal, igv, totalR) = IgvCalculo.DesdeTotal(total);
+            pedido.Subtotal = subtotal;
+            pedido.Igv = igv;
+            pedido.Total = totalR;
+
+            var evento = NuevoHistorial(
+                pedido.Id,
+                pedido.Estado,
+                pedido.Estado,
+                DateTimeOffset.UtcNow,
+                $"{motivo} Ítem retirado; total actualizado a S/ {totalR:0.00}.");
+            pedido.Historial.Add(evento);
+            db.PedidoDigitalHistorialEstados.Add(evento);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+        return (await ObtenerAsync(id, cancellationToken))!;
+    }
+
     public async Task<PedidoDigitalResponse> CancelarAsync(
         Guid id,
         string? observacion,

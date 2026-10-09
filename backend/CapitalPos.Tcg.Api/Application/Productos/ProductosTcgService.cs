@@ -186,16 +186,19 @@ public sealed class ProductosTcgService(
             .FirstOrDefaultAsync(c => c.Id == request.CartaCatalogoId, cancellationToken)
             ?? throw new BusinessRuleException("No existe la ficha de catálogo.", StatusCodes.Status404NotFound);
 
+        var variante = SkuVarianteTcg.NormalizarVariante(request.Variante, request.EsFoil);
+        var esFoil = SkuVarianteTcg.EsFoilDesdeVariante(variante);
+
         var duplicada = await db.ProductosCarta.AnyAsync(
             c => c.CartaCatalogoId == ficha.Id
-                && c.EsFoil == request.EsFoil
+                && c.Variante == variante
                 && c.Condicion == request.Condicion
                 && c.Idioma == request.Idioma,
             cancellationToken);
         if (duplicada)
         {
             throw new BusinessRuleException(
-                "Ya existe un SKU para esa ficha con el mismo acabado, condición e idioma.",
+                "Ya existe un SKU para esa ficha con la misma variante, condición e idioma.",
                 StatusCodes.Status409Conflict);
         }
 
@@ -204,7 +207,7 @@ public sealed class ProductosTcgService(
                 ficha.Set.Codigo,
                 ficha.Numero,
                 ficha.Rareza,
-                request.EsFoil,
+                variante,
                 request.Condicion,
                 request.Idioma)
             : request.CodigoSku.Trim();
@@ -233,7 +236,7 @@ public sealed class ProductosTcgService(
             Id = Guid.NewGuid(),
             EmpresaId = tenant.EmpresaId,
             TipoProducto = TipoProducto.CARTA,
-            Nombre = SkuVarianteTcg.NombreComercial(ficha, request.EsFoil, request.Condicion),
+            Nombre = SkuVarianteTcg.NombreComercial(ficha, variante, request.Condicion),
             CodigoSku = sku,
             CodigoBarras = string.IsNullOrWhiteSpace(request.CodigoBarras) ? null : request.CodigoBarras.Trim(),
             PrecioVenta = request.PrecioVenta,
@@ -249,7 +252,8 @@ public sealed class ProductosTcgService(
             Rareza = ficha.Rareza,
             Idioma = request.Idioma,
             Condicion = request.Condicion,
-            EsFoil = request.EsFoil,
+            EsFoil = esFoil,
+            Variante = variante,
             Artista = ficha.Artista
         };
 
@@ -455,11 +459,12 @@ public sealed class ProductosTcgService(
         if (request.TipoProducto == TipoProducto.CARTA && request.Carta is not null)
         {
             var c = request.Carta;
+            var variante = SkuVarianteTcg.NormalizarVariante(c.Variante, c.EsFoil);
             return SkuVarianteTcg.Generar(
                 c.SetCodigo,
                 c.NumeroCarta,
                 c.Rareza,
-                c.EsFoil,
+                variante,
                 c.Condicion,
                 c.Idioma);
         }
@@ -532,7 +537,9 @@ public sealed class ProductosTcgService(
         carta.Rareza = request.Rareza;
         carta.Idioma = request.Idioma;
         carta.Condicion = request.Condicion;
-        carta.EsFoil = request.EsFoil;
+        var variante = SkuVarianteTcg.NormalizarVariante(request.Variante, request.EsFoil);
+        carta.Variante = variante;
+        carta.EsFoil = SkuVarianteTcg.EsFoilDesdeVariante(variante);
         carta.Artista = string.IsNullOrWhiteSpace(request.Artista) ? null : request.Artista.Trim();
     }
 
@@ -883,6 +890,9 @@ public sealed class ProductosTcgService(
                     Idioma = carta.Idioma,
                     Condicion = carta.Condicion,
                     EsFoil = carta.EsFoil,
+                    Variante = string.IsNullOrWhiteSpace(carta.Variante)
+                        ? (carta.EsFoil ? "Holo" : "Básica")
+                        : carta.Variante,
                     Artista = carta.Artista
                 }
                 : null,

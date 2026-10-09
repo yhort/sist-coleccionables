@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, inject, input, output } from '@angular/core';
+import { Component, HostListener, computed, inject, input, output, signal } from '@angular/core';
 
 import { codigoItem, pareceUuid } from '../../../../core/ui/codigo-amigable';
 import {
@@ -34,6 +34,9 @@ export class EmpaqueConsolidadoDialogComponent {
 
   readonly pedidos = input.required<PedidoDigital[]>();
   readonly closed = output<void>();
+
+  /** Columna SKU oculta por defecto; el operador la activa solo si la necesita. */
+  readonly mostrarSku = signal(false);
 
   readonly etiquetaCantidad = etiquetaCantidadPedidos;
 

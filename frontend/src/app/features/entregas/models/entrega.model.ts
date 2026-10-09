@@ -66,6 +66,37 @@ export interface EntregaFila {
   sedeNombre: string;
 }
 
+/** Plazo mínimo (días) para devolución por no recojo en punto de entrega. */
+export const PLAZO_DEVOLUCION_NO_RECOJO_DIAS = 30;
+
+export function esMetodoPuntoEntrega(metodo: MetodoEnvio): boolean {
+  return metodo === 'RECOJO_TIENDA' || metodo === 'SHALOM' || metodo === 'OLVA_COURIER';
+}
+
+/** True si el pedido puede devolverse por no recojo (UI; el backend revalida el plazo). */
+export function puedeDevolverNoRecogido(fila: EntregaFila, ahora = Date.now()): boolean {
+  const estado = fila.pedido.estado;
+  if (estado !== 'PendienteEntrega' && estado !== 'Empaquetado') {
+    return false;
+  }
+  if (fila.entrega.estado === 'ENTREGADA' || fila.entrega.estado === 'FALLIDA') {
+    return false;
+  }
+  if (!esMetodoPuntoEntrega(fila.entrega.metodoEnvio)) {
+    return false;
+  }
+  const anclaIso =
+    fila.entrega.fechaDespacho ??
+    fila.entrega.fechaProgramada ??
+    fila.pedido.fechaPedido;
+  const ancla = Date.parse(anclaIso);
+  if (!Number.isFinite(ancla)) {
+    return false;
+  }
+  const vencimiento = ancla + PLAZO_DEVOLUCION_NO_RECOJO_DIAS * 24 * 60 * 60 * 1000;
+  return ahora >= vencimiento;
+}
+
 export const METODOS_ENVIO: readonly MetodoEnvio[] = [
   'RECOJO_TIENDA',
   'OLVA_COURIER',

@@ -1,0 +1,118 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(17 24 39 / 45%);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-md);
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem 0.35rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    p {
+      margin: 0.35rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+    }
+
+    code {
+      font-size: 0.78rem;
+    }
+  }
+
+  &__close {
+    width: 36px;
+    height: 36px;
+    color: var(--color-text-secondary);
+    font-size: 1.4rem;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+
+    &:hover:not(:disabled) {
+      background: var(--color-background);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+  }
+
+  &__body {
+    padding: 0.75rem 1.5rem 0.25rem;
+    color: var(--color-text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  &__error {
+    margin-top: 0.75rem;
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    padding: 1rem 1.5rem 1.25rem;
+  }
+}
+
+.ghost,
+.danger {
+  min-height: 40px;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.ghost {
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+  }
+}
+
+.danger {
+  color: #fff;
+  background: #b91c1c;
+  border: 0;
+
+  &:hover:not(:disabled) {
+    background: #991b1b;
+  }
+}

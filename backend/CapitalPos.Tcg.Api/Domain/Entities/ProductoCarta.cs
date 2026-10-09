@@ -13,6 +13,8 @@ public class ProductoCarta : Producto
     public IdiomaTcg Idioma { get; set; }
     public CondicionTcg Condicion { get; set; }
     public bool EsFoil { get; set; }
+    /// <summary>Variante comercial (Básica, Holo, Reverse, EX, Jumbo, Promo u otro texto libre).</summary>
+    public string Variante { get; set; } = "Básica";
     public string? Artista { get; set; }
 
     public TcgCarta? CartaCatalogo { get; set; }

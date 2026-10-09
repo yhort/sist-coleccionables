@@ -112,6 +112,22 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
         return Ok(cancelado);
     }
 
+    [HttpPost("{id:guid}/detalles/{detalleId:guid}/devolver")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<PedidoDigitalResponse>> DevolverDetalle(
+        Guid id,
+        Guid detalleId,
+        [FromBody] DevolverDetallePedidoRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var actualizado = await pedidos.DevolverDetalleAsync(
+            id,
+            detalleId,
+            request?.Observacion,
+            cancellationToken);
+        return Ok(actualizado);
+    }
+
     [HttpPost("{id:guid}/convertir-venta")]
     [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ConversionVentaResponse>> ConvertirVenta(

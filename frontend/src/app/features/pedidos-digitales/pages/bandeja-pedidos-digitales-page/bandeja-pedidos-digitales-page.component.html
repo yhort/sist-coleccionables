@@ -187,6 +187,7 @@
       (imprimirEtiquetas)="abrirEtiquetas($event)"
       (verConsolidadoEmpaque)="abrirConsolidadoEmpaque($event)"
       (anular)="anular($event)"
+      (liberarStockAbandono)="abrirLiberarStock($event)"
       (marcarNotificados)="onMarcarNotificados($event)"
       (toggleNotificacion)="onToggleNotificacion($event)"
       (aviso)="onAviso($event)"
@@ -196,7 +197,13 @@
 </section>
 
 @if (seleccionadoId(); as id) {
-  <app-pedido-detalle-panel [pedidoId]="id" (closed)="cerrarDetalle()" />
+  <app-pedido-detalle-panel
+    [pedidoId]="id"
+    [ignorarEscape]="abandonoPedido() !== null"
+    (closed)="cerrarDetalle()"
+    (liberarStockAbandono)="abrirLiberarStock($event)"
+    (avisoExterno)="onAviso($event)"
+  />
 }
 
 @if (formAbierta()) {
@@ -240,4 +247,20 @@
 
 @if (consolidadoEmpaque(); as pedidos) {
   <app-empaque-consolidado-dialog [pedidos]="pedidos" (closed)="cerrarConsolidadoEmpaque()" />
+}
+
+@if (abandonoPedido(); as pedido) {
+  <app-liberar-stock-abandono-dialog
+    [pedido]="pedido"
+    [guardando]="abandonoGuardando()"
+    [error]="abandonoError()"
+    (confirmed)="confirmarLiberarStock()"
+    (cancelled)="cerrarLiberarStock()"
+  />
+}
+
+@if (toastExito()) {
+  <div class="pedidos-toast" role="status" aria-live="polite">
+    {{ toastExito() }}
+  </div>
 }

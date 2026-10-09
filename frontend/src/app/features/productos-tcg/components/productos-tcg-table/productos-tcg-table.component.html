@@ -8,7 +8,9 @@
           <thead>
             <tr>
               <th>Producto</th>
-              <th>SKU</th>
+              @if (mostrarSku()) {
+                <th>SKU</th>
+              }
               <th>Tipo</th>
               <th>Juego</th>
               <th>Precio venta</th>
@@ -41,7 +43,9 @@
                         <small>
                           {{ producto.atributosTcg.setCodigo }}
                           · {{ producto.atributosTcg.numeroCarta }}
-                          @if (producto.atributosTcg.esFoil) {
+                          @if (producto.atributosTcg.variante) {
+                            · {{ producto.atributosTcg.variante }}
+                          } @else if (producto.atributosTcg.esFoil) {
                             · Foil
                           }
                         </small>
@@ -49,9 +53,11 @@
                     </div>
                   </div>
                 </td>
-                <td>
-                  <code>{{ producto.codigoSku }}</code>
-                </td>
+                @if (mostrarSku()) {
+                  <td>
+                    <code>{{ producto.codigoSku }}</code>
+                  </td>
+                }
                 <td>{{ etiquetasTipo[producto.tipoProducto] }}</td>
                 <td>
                   {{ producto.juego ? etiquetaJuego(producto.juego) : '—' }}
@@ -172,7 +178,9 @@
               }
               · {{ producto.activo ? 'Activo' : 'Inactivo' }}
             </p>
-            <code>{{ producto.codigoSku }}</code>
+            @if (mostrarSku()) {
+              <code>{{ producto.codigoSku }}</code>
+            }
             <div class="price">
               <strong>{{ producto.precioVenta | soles }}</strong>
               @if (mostrarPrecioWoo(producto)) {

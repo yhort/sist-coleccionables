@@ -5,6 +5,14 @@
     <div>
       <h2 id="etiqueta-title">{{ titulo() }}</h2>
       <p class="slip__hint">{{ resumenHint() }} · impresión térmica / A4</p>
+      <label class="slip__fecha">
+        Fecha de entrega
+        <input
+          type="date"
+          [value]="fechaEntregaInput()"
+          (change)="onFechaChange($any($event.target).value)"
+        />
+      </label>
     </div>
     <div class="slip__actions">
       <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
@@ -72,7 +80,7 @@
               </svg>
             </span>
             <dt>FECHA</dt>
-            <dd>{{ etiqueta.fecha | date: 'dd/MM/yyyy' }}</dd>
+            <dd>{{ fechaTicket() | date: 'dd/MM/yyyy' }}</dd>
           </div>
 
           <div class="ticket__row ticket__row--cliente">
@@ -100,6 +108,21 @@
             <dt>CELULAR</dt>
             <dd>{{ etiqueta.celular }}</dd>
           </div>
+
+          @if (etiqueta.contactoReferencia) {
+            <div class="ticket__row">
+              <span class="ticket__row-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20">
+                  <path
+                    fill="currentColor"
+                    d="M7 8a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm6 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zM2 16c0-2.2 2.2-4 5-4s5 1.8 5 4v1H2v-1zm10 1v-1c0-1.3.6-2.4 1.6-3.2A6.6 6.6 0 0 1 18 16v1h-6z"
+                  />
+                </svg>
+              </span>
+              <dt>REF.</dt>
+              <dd>{{ etiqueta.contactoReferencia }}</dd>
+            </div>
+          }
 
           <div class="ticket__row">
             <span class="ticket__row-icon" aria-hidden="true">

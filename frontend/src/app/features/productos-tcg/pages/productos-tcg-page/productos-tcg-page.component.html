@@ -50,6 +50,14 @@
               Grid
             </button>
           </div>
+          <label class="productos__sku-toggle">
+            <input
+              type="checkbox"
+              [checked]="mostrarSku()"
+              (change)="setMostrarSku($any($event.target).checked)"
+            />
+            Mostrar SKU
+          </label>
           <button type="button" class="productos__add" (click)="abrirAlta()">Nuevo producto</button>
         </div>
       }
@@ -69,6 +77,7 @@
     <app-productos-tcg-table
       [productos]="productosFiltrados()"
       [vista]="vista()"
+      [mostrarSku]="mostrarSku()"
       [page]="pagina()"
       [pageSize]="pageSize()"
       [total]="total()"

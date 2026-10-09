@@ -8,9 +8,13 @@ import {
   ETIQUETAS_CONDICION,
   ETIQUETAS_IDIOMA,
   IdiomaTcg,
+  VARIANTES_SKU_PRESET,
+  esFoilDesdeVariante,
 } from '../../../productos-tcg/models/producto-tcg.model';
 import { ProductosTcgApiService } from '../../../productos-tcg/data-access/productos-tcg.service';
 import { TcgCarta } from '../../models/catalogo-tcg.model';
+
+const VARIANTE_OTRO = '__OTRO__';
 
 @Component({
   selector: 'app-variante-sku-dialog',
@@ -33,9 +37,12 @@ export class VarianteSkuDialogComponent {
   readonly sedes = this.sedesApi.sedes;
   readonly idiomas = Object.entries(ETIQUETAS_IDIOMA) as [IdiomaTcg, string][];
   readonly condiciones = Object.entries(ETIQUETAS_CONDICION) as [CondicionTcg, string][];
+  readonly variantesPreset = VARIANTES_SKU_PRESET;
+  readonly varianteOtro = VARIANTE_OTRO;
 
   readonly form = this.fb.nonNullable.group({
-    esFoil: [false],
+    variantePreset: ['Básica'],
+    varianteLibre: [''],
     condicion: this.fb.nonNullable.control<CondicionTcg>('NM'),
     idioma: this.fb.nonNullable.control<IdiomaTcg>('EN'),
     precioVenta: [0, [Validators.required, Validators.min(0)]],
@@ -45,15 +52,33 @@ export class VarianteSkuDialogComponent {
     stockInicial: [0, [Validators.required, Validators.min(0)]],
   });
 
+  get usaVarianteLibre(): boolean {
+    return this.form.controls.variantePreset.value === VARIANTE_OTRO;
+  }
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.cancelled.emit();
+  }
+
+  private resolverVariante(): string | null {
+    const raw = this.form.getRawValue();
+    if (raw.variantePreset === VARIANTE_OTRO) {
+      const libre = raw.varianteLibre.trim();
+      return libre.length > 0 ? libre.slice(0, 64) : null;
+    }
+    return raw.variantePreset.trim() || 'Básica';
   }
 
   async guardar(): Promise<void> {
     this.form.markAllAsTouched();
     this.error.set('');
     if (this.form.invalid) {
+      return;
+    }
+    const variante = this.resolverVariante();
+    if (!variante) {
+      this.error.set('Indica la variante (elige una opción o escribe un texto libre).');
       return;
     }
     const raw = this.form.getRawValue();
@@ -65,7 +90,8 @@ export class VarianteSkuDialogComponent {
     try {
       await this.productosApi.crearVariante({
         cartaCatalogoId: this.ficha().id,
-        esFoil: raw.esFoil,
+        variante,
+        esFoil: esFoilDesdeVariante(variante),
         condicion: raw.condicion,
         idioma: raw.idioma,
         precioVenta: Number(raw.precioVenta) || 0,

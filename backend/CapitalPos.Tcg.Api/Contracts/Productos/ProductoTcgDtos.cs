@@ -66,6 +66,9 @@ public sealed class ProductoCartaRequest
     public CondicionTcg Condicion { get; set; }
     public bool EsFoil { get; set; }
 
+    [MaxLength(64)]
+    public string? Variante { get; set; }
+
     [MaxLength(120)]
     public string? Artista { get; set; }
 }
@@ -157,6 +160,7 @@ public sealed class ProductoCartaResponse
     public required IdiomaTcg Idioma { get; init; }
     public required CondicionTcg Condicion { get; init; }
     public required bool EsFoil { get; init; }
+    public required string Variante { get; init; }
     public string? Artista { get; init; }
 }
 
@@ -172,6 +176,10 @@ public sealed class CrearVarianteProductoCartaRequest
     public Guid CartaCatalogoId { get; set; }
 
     public bool EsFoil { get; set; }
+
+    /// <summary>Básica, Holo, Reverse, EX, Jumbo, Promo u otro texto libre.</summary>
+    [MaxLength(64)]
+    public string? Variante { get; set; }
 
     public CondicionTcg Condicion { get; set; }
 

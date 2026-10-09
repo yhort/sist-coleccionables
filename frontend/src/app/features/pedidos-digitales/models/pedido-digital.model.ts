@@ -439,6 +439,19 @@ export function puedeAnularPedido(pedido: Pick<PedidoDigital, 'estado'>): boolea
   return pedido.estado === 'PendientePago';
 }
 
+/**
+ * Baja por abandono (no recogido). Visible en Pendiente de entrega,
+ * que es el estado del pedido cuando la logística ya está Despachada.
+ */
+export function puedeLiberarStockPorAbandono(pedido: Pick<PedidoDigital, 'estado'>): boolean {
+  return pedido.estado === 'PendienteEntrega';
+}
+
+/** Devolución parcial de un ítem al inventario (solo Pendiente de entrega). */
+export function puedeDevolverItemPedido(pedido: Pick<PedidoDigital, 'estado' | 'ventaId'>): boolean {
+  return pedido.estado === 'PendienteEntrega' && !pedido.ventaId;
+}
+
 export function puedeImprimirEtiqueta(
   pedido: Pick<PedidoDigital, 'estado' | 'notaCredito'>,
 ): boolean {

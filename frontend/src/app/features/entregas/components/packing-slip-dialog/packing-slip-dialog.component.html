@@ -7,6 +7,14 @@
       <p class="slip__hint">
         Plantilla {{ esSubasta() ? 'TICKET SUBASTA' : 'TICKET PEDIDO WEB' }} · impresión térmica 58/80 mm
       </p>
+      <label class="slip__fecha">
+        Fecha de entrega
+        <input
+          type="date"
+          [value]="fechaEntregaInput()"
+          (change)="onFechaChange($any($event.target).value)"
+        />
+      </label>
     </div>
     <div>
       <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
@@ -81,6 +89,16 @@
         <dt>CELULAR</dt>
         <dd>{{ celular() }}</dd>
       </div>
+
+      @if (contactoReferencia()) {
+        <div class="ticket__row">
+          <span class="ticket__row-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20"><path fill="currentColor" d="M7 8a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm6 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zM2 16c0-2.2 2.2-4 5-4s5 1.8 5 4v1H2v-1zm10 1v-1c0-1.3.6-2.4 1.6-3.2A6.6 6.6 0 0 1 18 16v1h-6z"/></svg>
+          </span>
+          <dt>REF.</dt>
+          <dd>{{ contactoReferencia() }}</dd>
+        </div>
+      }
 
       <div class="ticket__row">
         <span class="ticket__row-icon" aria-hidden="true">

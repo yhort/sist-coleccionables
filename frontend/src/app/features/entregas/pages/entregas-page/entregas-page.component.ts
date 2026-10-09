@@ -137,6 +137,26 @@ export class EntregasPageComponent {
     }
   }
 
+  async devolverNoRecogido(fila: EntregaFila): Promise<void> {
+    this.error.set('');
+    const mensaje =
+      `¿Registrar devolución por no recojo de ${fila.pedido.codigo}? ` +
+      `Se cancela el pedido, se libera la reserva de stock y la logística pasa a Fallida ` +
+      `(plazo mínimo 30 días desde despacho/programación).`;
+    if (!globalThis.confirm(mensaje)) {
+      return;
+    }
+    try {
+      await this.entregasApi.devolverNoRecogido(
+        fila.pedido.id,
+        'No recogido por el cliente en el punto de entrega.',
+      );
+      await this.refrescarEntregas();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'No se pudo registrar la devolución.');
+    }
+  }
+
   onCajaChanged(): void {
     void this.cajaApi.refrescarEstados(this.sedes().map((sede) => sede.id));
   }

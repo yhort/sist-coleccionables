@@ -325,7 +325,8 @@ public static class DevelopmentDataSeeder
             Rareza = RarezaTcg.ULTRA,
             Idioma = IdiomaTcg.ES,
             Condicion = CondicionTcg.NM,
-            EsFoil = true
+            EsFoil = true,
+            Variante = "Holo"
         });
         db.StocksProductos.Add(new StockProducto
         {

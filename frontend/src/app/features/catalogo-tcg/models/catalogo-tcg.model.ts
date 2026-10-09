@@ -101,6 +101,9 @@ export interface ImportarSetTcgResponse {
 
 export interface CrearVarianteProductoCartaRequest {
   cartaCatalogoId: string;
+  /** Básica, Holo, Reverse, EX, Jumbo, Promo u otro texto libre. */
+  variante: string;
+  /** Derivado de la variante; se mantiene por compatibilidad. */
   esFoil: boolean;
   condicion: CondicionTcg;
   idioma: IdiomaTcg;

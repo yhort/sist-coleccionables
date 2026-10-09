@@ -1,5 +1,13 @@
 import { DatePipe } from '@angular/common';
-import { AfterViewInit, Component, HostListener, computed, input, output } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  HostListener,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import { origenDeCanal } from '../../../pedidos-digitales/models/pedido-digital.model';
 import { EntregaFila } from '../../models/entrega.model';
@@ -18,6 +26,9 @@ export class PackingSlipDialogComponent implements AfterViewInit {
   readonly closed = output<void>();
 
   readonly logoUrl = 'assets/img/logo-trunqi.png';
+
+  /** Fecha de entrega editable; por defecto hoy (yyyy-MM-dd). */
+  readonly fechaEntregaInput = signal(hoyLocalIso());
 
   readonly tipoTicket = computed<TicketDespachoTipo>(() => {
     const pedido = this.fila().pedido;
@@ -44,29 +55,21 @@ export class PackingSlipDialogComponent implements AfterViewInit {
   readonly numeroTicket = computed(() => {
     const pedido = this.fila().pedido;
     if (this.esSubasta()) {
-      return pedido.codigoSubasta || pedido.codigo;
+      return (
+        pedido.tituloSubasta?.trim() ||
+        pedido.codigoSubasta?.trim() ||
+        pedido.codigo
+      );
     }
     return pedido.codigo;
   });
 
   readonly fechaTicket = computed(() => {
-    const pedido = this.fila().pedido;
-    const historial = [...(pedido.historialEstados ?? [])].sort((a, b) =>
-      a.fecha.localeCompare(b.fecha),
-    );
-    const despacho = [...historial]
-      .reverse()
-      .find((evento) => evento.estadoNuevo === 'PendienteEntrega');
-    if (despacho) {
-      return despacho.fecha;
+    const valor = this.fechaEntregaInput().trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      return `${valor}T12:00:00`;
     }
-    const empaque = [...historial]
-      .reverse()
-      .find((evento) => evento.estadoNuevo === 'Empaquetado');
-    if (empaque) {
-      return empaque.fecha;
-    }
-    return pedido.fechaPedido;
+    return valor || new Date().toISOString();
   });
 
   readonly clienteNombre = computed(
@@ -78,6 +81,13 @@ export class PackingSlipDialogComponent implements AfterViewInit {
       this.fila().entrega.destinatarioTelefono ||
       this.fila().pedido.clienteTelefono ||
       '—',
+  );
+
+  readonly contactoReferencia = computed(
+    () =>
+      this.fila().entrega.contactoReferencia?.trim() ||
+      this.fila().pedido.entrega?.contactoReferencia?.trim() ||
+      '',
   );
 
   readonly tienda = computed(() => this.fila().sedeNombre || 'Tienda');
@@ -93,7 +103,19 @@ export class PackingSlipDialogComponent implements AfterViewInit {
     this.closed.emit();
   }
 
+  onFechaChange(valor: string): void {
+    this.fechaEntregaInput.set(valor);
+  }
+
   imprimir(): void {
     globalThis.print();
   }
+}
+
+function hoyLocalIso(): string {
+  const ahora = new Date();
+  const y = ahora.getFullYear();
+  const m = String(ahora.getMonth() + 1).padStart(2, '0');
+  const d = String(ahora.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }

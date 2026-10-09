@@ -237,6 +237,76 @@ public sealed class EntregasService(
         return (await ObtenerAsync(id, cancellationToken))!;
     }
 
+    /// <summary>
+    /// Cancela el pedido y marca la logística como FALLIDA cuando el cliente no recogió
+    /// en el punto de entrega tras al menos 30 días desde el despacho/programación.
+    /// </summary>
+    public async Task<EntregaResponse> DevolverNoRecogidoAsync(
+        DevolverNoRecogidoRequest request,
+        CancellationToken cancellationToken)
+    {
+        const int plazoDias = 30;
+        var pedido = await pedidos.CargarAsync(request.PedidoDigitalId, cancellationToken);
+
+        if (pedido.Estado is EstadoPedidoDigital.Entregado
+            or EstadoPedidoDigital.Cancelado
+            or EstadoPedidoDigital.Anulado
+            or EstadoPedidoDigital.Devuelto)
+        {
+            throw new BusinessRuleException(
+                "El pedido ya está cerrado y no admite devolución por no recojo.");
+        }
+
+        if (pedido.Estado is not (EstadoPedidoDigital.PendienteEntrega or EstadoPedidoDigital.Empaquetado))
+        {
+            throw new BusinessRuleException(
+                "Solo se puede devolver un pedido Empaquetado o Pendiente de entrega no recogido.");
+        }
+
+        var entrega = await AsegurarAsync(pedido, cancellationToken);
+        entrega.FechaProgramada ??= DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (!EsMetodoPuntoEntrega(entrega.MetodoEnvio))
+        {
+            throw new BusinessRuleException(
+                "La devolución por no recojo aplica a recojo en tienda o agencia (Shalom / Olva).");
+        }
+
+        if (entrega.Estado == EstadoLogistica.ENTREGADA)
+        {
+            throw new BusinessRuleException("No se puede devolver una entrega ya confirmada.");
+        }
+
+        var ancla = entrega.FechaDespacho ?? entrega.FechaProgramada ?? pedido.FechaPedido;
+        var vencimiento = ancla.AddDays(plazoDias);
+        if (DateTimeOffset.UtcNow < vencimiento)
+        {
+            var diasRestantes = Math.Max(1, (int)Math.Ceiling((vencimiento - DateTimeOffset.UtcNow).TotalDays));
+            throw new BusinessRuleException(
+                $"Aún no cumple el plazo de {plazoDias} días para devolución por no recojo. Faltan aproximadamente {diasRestantes} día(s).");
+        }
+
+        var motivo = TextoOpcional(request.Observacion, 500)
+            ?? $"Devolución por no recojo en punto de entrega (plazo {plazoDias} días).";
+
+        await pedidos.CancelarAsync(pedido.Id, motivo, cancellationToken);
+
+        entrega = await db.Entregas
+            .Include(e => e.SedeOrigen)
+            .Include(e => e.Pedido)
+            .FirstOrDefaultAsync(e => e.Id == entrega.Id, cancellationToken)
+            ?? throw new BusinessRuleException("No se encontró la entrega.", StatusCodes.Status404NotFound);
+
+        entrega.Estado = EstadoLogistica.FALLIDA;
+        entrega.Observacion = motivo;
+        await db.SaveChangesAsync(cancellationToken);
+        return (await ObtenerAsync(entrega.Id, cancellationToken))!;
+    }
+
+    private static bool EsMetodoPuntoEntrega(MetodoEnvio metodo) =>
+        metodo is MetodoEnvio.RECOJO_TIENDA or MetodoEnvio.SHALOM or MetodoEnvio.OLVA_COURIER;
+
     private async Task<Entrega> AsegurarAsync(PedidoDigital pedido, CancellationToken cancellationToken)
     {
         if (pedido.Entrega is not null)

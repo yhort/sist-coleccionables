@@ -164,12 +164,32 @@ export class CatalogoTcgPanelComponent {
     this.eliminando.set(true);
     this.error.set('');
     try {
+      const serieActualId = this.serieId();
       await this.catalogoApi.eliminarSet(set.id);
       this.setId.set('');
       this.mostrarToast(`Set eliminado: ${set.codigo}`);
-      const sets = await this.catalogoApi.listarSets(this.serieId());
-      if (sets[0]) {
-        await this.onSetChange(sets[0].id);
+
+      // Refrescar series (el backend desactiva la serie si quedó sin sets).
+      const series = await this.catalogoApi.listarSeries();
+      const serieSigue = series.some((item) => item.id === serieActualId);
+
+      if (serieSigue) {
+        const sets = await this.catalogoApi.listarSets(serieActualId);
+        if (sets[0]) {
+          await this.onSetChange(sets[0].id);
+        } else {
+          this.serieId.set('');
+          const siguiente = series[0];
+          if (siguiente) {
+            await this.onSerieChange(siguiente.id);
+          }
+        }
+      } else {
+        this.serieId.set('');
+        const siguiente = series[0];
+        if (siguiente) {
+          await this.onSerieChange(siguiente.id);
+        }
       }
     } catch (err) {
       this.error.set(readApiError(err));

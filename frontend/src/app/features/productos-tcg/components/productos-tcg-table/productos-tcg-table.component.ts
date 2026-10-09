@@ -35,6 +35,7 @@ export type VistaCatalogo = 'tabla' | 'grid';
 export class ProductosTcgTableComponent {
   readonly productos = input.required<ProductoTcg[]>();
   readonly vista = input<VistaCatalogo>('tabla');
+  readonly mostrarSku = input(true);
   readonly page = input(1);
   readonly pageSize = input(15);
   readonly total = input(0);

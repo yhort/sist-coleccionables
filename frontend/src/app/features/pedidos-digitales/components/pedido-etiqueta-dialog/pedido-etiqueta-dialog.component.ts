@@ -1,5 +1,13 @@
 import { DatePipe } from '@angular/common';
-import { AfterViewInit, Component, HostListener, computed, input, output } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  HostListener,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 
 import {
   origenDeCanal,
@@ -16,9 +24,9 @@ export interface EtiquetaImpresion {
   tituloTipo: string;
   etiquetaNumero: string;
   numero: string;
-  fecha: string;
   clienteNombre: string;
   celular: string;
+  contactoReferencia: string;
   tienda: string;
 }
 
@@ -36,7 +44,18 @@ export class PedidoEtiquetaDialogComponent implements AfterViewInit {
   readonly logoUrl = 'assets/img/logo-trunqi.png';
   readonly etiquetaCantidad = etiquetaCantidadPedidos;
 
+  /** Fecha de entrega editable compartida por todas las hojas. */
+  readonly fechaEntregaInput = signal(hoyLocalIso());
+
   readonly etiquetas = computed(() => agruparEtiquetas(this.pedidos()));
+
+  readonly fechaTicket = computed(() => {
+    const valor = this.fechaEntregaInput().trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      return `${valor}T12:00:00`;
+    }
+    return valor || new Date().toISOString();
+  });
 
   readonly titulo = computed(() => {
     const hojas = this.etiquetas().length;
@@ -73,6 +92,10 @@ export class PedidoEtiquetaDialogComponent implements AfterViewInit {
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.closed.emit();
+  }
+
+  onFechaChange(valor: string): void {
+    this.fechaEntregaInput.set(valor);
   }
 
   imprimir(): void {
@@ -125,8 +148,15 @@ function construirEtiqueta(pedidos: PedidoDigital[], consolidada: boolean): Etiq
   const esSubasta = tipo === 'SUBASTA';
 
   const numeros = pedidos.map((pedido) =>
-    esSubasta ? pedido.codigoSubasta?.trim() || pedido.codigo : pedido.codigo,
+    esSubasta
+      ? pedido.tituloSubasta?.trim() || pedido.codigoSubasta?.trim() || pedido.codigo
+      : pedido.codigo,
   );
+
+  const contacto =
+    base.entrega.contactoReferencia?.trim() ||
+    pedidos.map((p) => p.entrega.contactoReferencia?.trim()).find(Boolean) ||
+    '';
 
   return {
     id: pedidos.map((pedido) => pedido.id).join('|'),
@@ -141,32 +171,20 @@ function construirEtiqueta(pedidos: PedidoDigital[], consolidada: boolean): Etiq
         ? 'N° PEDIDOS'
         : 'N° PEDIDO',
     numero: [...new Set(numeros)].join(' / '),
-    fecha: fechaDespachoDe(base),
     clienteNombre: base.clienteNombre?.trim() || 'Cliente',
     celular:
       base.entrega.destinatarioTelefono?.trim() ||
       base.clienteTelefono?.trim() ||
       '—',
+    contactoReferencia: contacto,
     tienda: base.sedeNombre?.trim() || 'Tienda',
   };
 }
 
-/** Preferir fecha de despacho (→ PendienteEntrega); si no, empaque; si no, pedido. */
-function fechaDespachoDe(pedido: PedidoDigital): string {
-  const historial = [...(pedido.historialEstados ?? [])].sort((a, b) =>
-    a.fecha.localeCompare(b.fecha),
-  );
-  const despacho = [...historial]
-    .reverse()
-    .find((evento) => evento.estadoNuevo === 'PendienteEntrega');
-  if (despacho) {
-    return despacho.fecha;
-  }
-  const empaque = [...historial]
-    .reverse()
-    .find((evento) => evento.estadoNuevo === 'Empaquetado');
-  if (empaque) {
-    return empaque.fecha;
-  }
-  return pedido.fechaPedido;
+function hoyLocalIso(): string {
+  const ahora = new Date();
+  const y = ahora.getFullYear();
+  const m = String(ahora.getMonth() + 1).padStart(2, '0');
+  const d = String(ahora.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }

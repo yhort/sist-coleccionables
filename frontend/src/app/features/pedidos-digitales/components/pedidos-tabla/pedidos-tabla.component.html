@@ -324,6 +324,15 @@
                     Entregar
                   </button>
                 }
+                @if (puedeLiberarStock(item.pedido)) {
+                  <button
+                    type="button"
+                    class="accion-btn accion-btn--abandono"
+                    (click)="liberarStockAbandono.emit(item.pedido)"
+                  >
+                    Liberar stock por abandono (No recogido)
+                  </button>
+                }
               </td>
             </tr>
           }

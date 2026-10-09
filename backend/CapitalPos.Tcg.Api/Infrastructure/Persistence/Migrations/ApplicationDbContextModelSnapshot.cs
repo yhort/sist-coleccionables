@@ -2842,6 +2842,12 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("set_nombre");
 
+                    b.Property<string>("Variante")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("variante");
+
                     b.HasIndex("CartaCatalogoId")
                         .HasDatabaseName("ix_producto_cartas_carta_catalogo_id");
 

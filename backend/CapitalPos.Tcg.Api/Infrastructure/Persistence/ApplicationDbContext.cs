@@ -230,6 +230,7 @@ public sealed class ApplicationDbContext : DbContext
         EnumAsString(carta.Property(e => e.Rareza), 32);
         EnumAsString(carta.Property(e => e.Idioma), 8);
         EnumAsString(carta.Property(e => e.Condicion), 8);
+        carta.Property(e => e.Variante).HasMaxLength(64).IsRequired();
         carta.Property(e => e.Artista).HasMaxLength(120);
 
         var sellado = modelBuilder.Entity<ProductoSellado>();

@@ -4,8 +4,26 @@ function montoWhatsapp(valor: number): string {
   return `S/ ${round2(valor).toFixed(2)}`;
 }
 
+function nombreSubastaLive(pedidos: readonly PedidoDigital[]): string {
+  const titulos = [
+    ...new Set(
+      pedidos
+        .map((pedido) => pedido.tituloSubasta?.trim() || pedido.codigoSubasta?.trim() || '')
+        .filter((valor) => valor.length > 0),
+    ),
+  ];
+  if (titulos.length === 0) {
+    return 'nuestro Live';
+  }
+  if (titulos.length === 1) {
+    return titulos[0];
+  }
+  return titulos.join(' / ');
+}
+
 export function construirResumenWhatsAppLive(pedidos: readonly PedidoDigital[]): string {
   const nombre = pedidos[0]?.clienteNombre.trim() || 'cliente';
+  const live = nombreSubastaLive(pedidos);
   const lineasCartas: string[] = [];
   for (const pedido of pedidos) {
     for (const detalle of pedido.detalles) {
@@ -17,11 +35,11 @@ export function construirResumenWhatsAppLive(pedidos: readonly PedidoDigital[]):
 
   const total = round2(pedidos.reduce((sum, pedido) => sum + pedido.total, 0));
   return [
-    `¡Hola ${nombre}! Gracias por participar en nuestro Live.`,
+    `¡Hola ${nombre}! Gracias por participar en *${live}*.`,
     'Aquí tienes el detalle de tus cartas adjudicadas:',
     ...lineasCartas,
     `*Total a pagar:* ${montoWhatsapp(total)}`,
-    '*Medios de pago:* Yape / Plin / Transferencia',
+    '*Medio de pago:* Yape / Plin 919014191 de Katherina Mitma Romero.',
     'Por favor envíanos la captura de tu pago por aquí para procesar tu pedido. ¡Muchas gracias!',
   ].join('\n');
 }

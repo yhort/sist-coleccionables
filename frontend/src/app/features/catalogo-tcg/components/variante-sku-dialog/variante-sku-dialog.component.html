@@ -23,12 +23,24 @@
   <form [formGroup]="form" (ngSubmit)="guardar()">
     <div class="dialog__grid">
       <label>
-        Acabado
-        <select formControlName="esFoil">
-          <option [ngValue]="false">Standard</option>
-          <option [ngValue]="true">Foil</option>
+        Variante
+        <select formControlName="variantePreset">
+          @for (opcion of variantesPreset; track opcion) {
+            <option [value]="opcion">{{ opcion }}</option>
+          }
+          <option [value]="varianteOtro">Otro (texto libre)</option>
         </select>
       </label>
+      @if (usaVarianteLibre) {
+        <label>
+          Variante (texto libre)
+          <input
+            formControlName="varianteLibre"
+            maxlength="64"
+            placeholder="Ej. Full Art, Rainbow…"
+          />
+        </label>
+      }
       <label>
         Estado
         <select formControlName="condicion">

@@ -51,6 +51,22 @@
     gap: 0.65rem;
   }
 
+  &__sku-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      width: 1rem;
+      height: 1rem;
+      cursor: pointer;
+    }
+  }
+
   &__add {
     min-height: 40px;
     padding: 0 1.1rem;

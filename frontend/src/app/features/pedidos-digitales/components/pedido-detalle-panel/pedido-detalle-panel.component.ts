@@ -22,6 +22,8 @@ import {
   ETIQUETAS_ESTADO_PEDIDO,
   ETIQUETAS_ORIGEN_PEDIDO,
   EstadoPedidoDigital,
+  PedidoDigital,
+  PedidoDigitalDetalle,
   cpeEstadoEmitido,
   etiquetaAccionEstado,
   etiquetaNumeroCpe,
@@ -30,9 +32,12 @@ import {
   pedidoBloqueadoPorNc,
   pedidoPuedeNotaCredito,
   pedidoTieneCpeEmitido,
+  puedeDevolverItemPedido,
+  puedeLiberarStockPorAbandono,
   transicionesPermitidas,
 } from '../../models/pedido-digital.model';
 import { etiquetaCanalContacto } from '../../../../shared/models/contacto-entrega.model';
+import { DevolverItemPedidoDialogComponent } from '../devolver-item-pedido-dialog/devolver-item-pedido-dialog.component';
 import { PedidoAccionPreparadaDialogComponent } from '../pedido-accion-preparada-dialog/pedido-accion-preparada-dialog.component';
 import { RegistrarPagoLoteDialogComponent } from '../registrar-pago-lote-dialog/registrar-pago-lote-dialog.component';
 import { SolesPipe } from '../../../../shared/pipes/soles.pipe';
@@ -41,7 +46,14 @@ export type PedidoDetalleAccion = 'pago-consulta' | 'cpe' | 'nota-credito';
 
 @Component({
   selector: 'app-pedido-detalle-panel',
-  imports: [SolesPipe, DatePipe, NgClass, PedidoAccionPreparadaDialogComponent, RegistrarPagoLoteDialogComponent],
+  imports: [
+    SolesPipe,
+    DatePipe,
+    NgClass,
+    DevolverItemPedidoDialogComponent,
+    PedidoAccionPreparadaDialogComponent,
+    RegistrarPagoLoteDialogComponent,
+  ],
   templateUrl: './pedido-detalle-panel.component.html',
   styleUrl: './pedido-detalle-panel.component.scss',
 })
@@ -52,11 +64,19 @@ export class PedidoDetallePanelComponent {
   private readonly pagosApi = inject(PagosApiService);
 
   readonly pedidoId = input.required<string>();
+  /** Evita cerrar el panel cuando el diálogo de abandono está encima. */
+  readonly ignorarEscape = input(false);
   readonly closed = output<void>();
+  readonly liberarStockAbandono = output<PedidoDigital>();
+  readonly avisoExterno = output<string>();
 
   readonly error = signal('');
+  readonly aviso = signal('');
   readonly accion = signal<PedidoDetalleAccion | null>(null);
   readonly cobrando = signal(false);
+  readonly devolverDetalle = signal<PedidoDigitalDetalle | null>(null);
+  readonly devolverGuardando = signal(false);
+  readonly devolverError = signal('');
   readonly comprobante = signal<EmisionSimulada | null>(null);
   readonly pagosVinculados = signal<Pago[]>([]);
   readonly cargandoPagos = signal(false);
@@ -200,6 +220,8 @@ export class PedidoDetallePanelComponent {
   origenDe = origenDeCanal;
   reservaDe = indicadorReservaDe;
   transicionesDe = transicionesPermitidas;
+  puedeLiberarStock = puedeLiberarStockPorAbandono;
+  puedeDevolverItem = puedeDevolverItemPedido;
   etiquetaAccion = etiquetaAccionEstado;
   etiquetaNumeroCpe = etiquetaNumeroCpe;
 
@@ -224,6 +246,13 @@ export class PedidoDetallePanelComponent {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.ignorarEscape()) {
+      return;
+    }
+    if (this.devolverDetalle()) {
+      this.cerrarDevolverItem();
+      return;
+    }
     if (this.cobrando()) {
       this.cobrando.set(false);
       return;
@@ -233,6 +262,55 @@ export class PedidoDetallePanelComponent {
       return;
     }
     this.closed.emit();
+  }
+
+  abrirDevolverItem(detalle: PedidoDigitalDetalle): void {
+    this.error.set('');
+    this.aviso.set('');
+    this.devolverError.set('');
+    this.devolverDetalle.set(detalle);
+  }
+
+  cerrarDevolverItem(): void {
+    if (this.devolverGuardando()) {
+      return;
+    }
+    this.devolverDetalle.set(null);
+    this.devolverError.set('');
+  }
+
+  async confirmarDevolverItem(): Promise<void> {
+    const pedido = this.pedido();
+    const detalle = this.devolverDetalle();
+    if (!pedido || !detalle || this.devolverGuardando()) {
+      return;
+    }
+    this.devolverGuardando.set(true);
+    this.devolverError.set('');
+    try {
+      const actualizado = await this.pedidosApi.devolverDetalle(
+        pedido.id,
+        detalle.id,
+        `Devolución parcial por abandono · ${detalle.descripcion}.`,
+      );
+      this.devolverDetalle.set(null);
+      if (actualizado.estado === 'Cancelado') {
+        const mensaje =
+          'Ítem devuelto. Era el último del pedido: quedó Cancelado y el stock se liberó.';
+        this.aviso.set(mensaje);
+        this.avisoExterno.emit(mensaje);
+      } else {
+        this.aviso.set(
+          `Ítem «${detalle.descripcion}» devuelto al inventario. Total actualizado a ${actualizado.total.toFixed(2)}.`,
+        );
+      }
+    } catch (err) {
+      this.devolverError.set(
+        err instanceof Error ? err.message : 'No se pudo devolver el ítem.',
+      );
+    } finally {
+      this.devolverGuardando.set(false);
+    }
   }
 
   async transicionar(estado: EstadoPedidoDigital): Promise<void> {

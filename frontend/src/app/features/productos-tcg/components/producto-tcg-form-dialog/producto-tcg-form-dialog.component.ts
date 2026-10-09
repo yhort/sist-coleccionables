@@ -40,6 +40,7 @@ import {
   TipoSellado,
   crearAtributosTcgVacios,
   crearMetadatosWooVacios,
+  esFoilDesdeVariante,
   etiquetaJuego,
   normalizarJuego,
 } from '../../models/producto-tcg.model';
@@ -130,6 +131,7 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       rareza: this.fb.nonNullable.control<RarezaTcg | ''>(''),
       condicion: this.fb.nonNullable.control<CondicionTcg | ''>(''),
       esFoil: [false],
+      variante: ['Básica'],
       idioma: this.fb.nonNullable.control<IdiomaTcg | ''>(''),
       artista: [''],
       tipoSellado: this.fb.nonNullable.control<TipoSellado | ''>(''),
@@ -375,6 +377,7 @@ export class ProductoTcgFormDialogComponent implements OnInit {
         'Condición',
         tcg.condicion ? ETIQUETAS_CONDICION[tcg.condicion as CondicionTcg] : '',
       );
+      this.agregarAtributoWoo('Variante', tcg.variante || (tcg.esFoil ? 'Holo' : 'Básica'));
       this.agregarAtributoWoo('Foil', tcg.esFoil ? 'Sí' : 'No');
       this.agregarAtributoWoo('Idioma', tcg.idioma ? ETIQUETAS_IDIOMA[tcg.idioma as IdiomaTcg] : '');
     } else if (tipo === 'SELLADO') {
@@ -440,6 +443,11 @@ export class ProductoTcgFormDialogComponent implements OnInit {
     }
 
     const atributosTcg = { ...crearAtributosTcgVacios(), ...raw.atributosTcg };
+    if (atributosTcg.variante?.trim()) {
+      atributosTcg.esFoil = esFoilDesdeVariante(atributosTcg.variante);
+    } else {
+      atributosTcg.variante = atributosTcg.esFoil ? 'Holo' : 'Básica';
+    }
     const existentes = this.producto();
     const wooSku = String(woo.sku || sku).trim();
 

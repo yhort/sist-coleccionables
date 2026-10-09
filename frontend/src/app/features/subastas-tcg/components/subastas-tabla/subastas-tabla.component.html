@@ -35,16 +35,6 @@
             </th>
             <th>Canal / Sede</th>
             <th>
-              <button type="button" class="sort" (click)="ordenar('precioBase')">
-                Precio base{{ sortMark('precioBase') }}
-              </button>
-            </th>
-            <th>
-              <button type="button" class="sort" (click)="ordenar('oferta')">
-                Última oferta{{ sortMark('oferta') }}
-              </button>
-            </th>
-            <th>
               <button type="button" class="sort" (click)="ordenar('estado')">
                 Estado{{ sortMark('estado') }}
               </button>
@@ -74,23 +64,6 @@
                   </span>
                   <span class="sede">{{ item.sedeNombre }}</span>
                 </div>
-              </td>
-              <td class="monto">{{ item.subasta.precioBase | soles }}</td>
-              <td>
-                @if (ofertaMostrada(item.subasta); as oferta) {
-                  <strong class="monto">
-                    {{ oferta.monto | soles }}
-                    <span class="pujas-count">· {{ etiquetaPujas(oferta.totalPujas) }}</span>
-                  </strong>
-                  <small>{{ oferta.postor }}</small>
-                } @else {
-                  <span class="sin-oferta">
-                    Sin ofertas
-                    @if (item.subasta.pujas.length > 0) {
-                      · {{ etiquetaPujas(item.subasta.pujas.length) }}
-                    }
-                  </span>
-                }
               </td>
               <td>
                 <div class="estado-cell">

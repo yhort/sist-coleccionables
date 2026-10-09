@@ -23,13 +23,24 @@
   </header>
 
   <div class="dialog__body">
+    <label class="dialog__check">
+      <input
+        type="checkbox"
+        [checked]="mostrarSku()"
+        (change)="mostrarSku.set($any($event.target).checked)"
+      />
+      Mostrar columna SKU
+    </label>
+
     @if (lineas().length === 0) {
       <p class="dialog__empty">No hay ítems en los pedidos seleccionados.</p>
     } @else {
       <table>
         <thead>
           <tr>
-            <th>SKU</th>
+            @if (mostrarSku()) {
+              <th>SKU</th>
+            }
             <th>Carta / producto</th>
             <th>Rareza</th>
             <th>Cant.</th>
@@ -39,7 +50,9 @@
         <tbody>
           @for (linea of lineas(); track linea.clave) {
             <tr>
-              <td><code>{{ linea.sku }}</code></td>
+              @if (mostrarSku()) {
+                <td><code>{{ linea.sku }}</code></td>
+              }
               <td>{{ linea.nombre }}</td>
               <td>{{ linea.rareza }}</td>
               <td>{{ linea.cantidad }}</td>
@@ -49,7 +62,7 @@
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="3">Totales</td>
+            <td [attr.colspan]="mostrarSku() ? 3 : 2">Totales</td>
             <td>{{ totalUnidades() }}</td>
             <td>{{ totalMonto() | soles }}</td>
           </tr>

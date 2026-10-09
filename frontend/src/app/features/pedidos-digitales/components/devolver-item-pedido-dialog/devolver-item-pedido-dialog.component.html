@@ -1,0 +1,47 @@
+<div class="dialog-backdrop" (click)="cancelar()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="devolver-item-pedido-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="devolver-item-pedido-title">Devolver ítem</h2>
+      <p>
+        Pedido <code>{{ pedido().codigo }}</code> · {{ detalle().descripcion }}
+        · {{ detalle().cantidad }} × {{ detalle().precioUnitario | soles }}
+      </p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" [disabled]="guardando()" (click)="cancelar()">
+      ×
+    </button>
+  </header>
+
+  <div class="dialog__body">
+    <p>
+      ¿Deseas devolver este ítem al inventario libre? El producto será retirado del pedido y su stock
+      se incrementará.
+    </p>
+    @if (pedido().detalles.length <= 1) {
+      <p class="dialog__warn">
+        Es el último ítem del pedido: al confirmar, el pedido completo quedará
+        <strong>Cancelado</strong>.
+      </p>
+    }
+    @if (error()) {
+      <p class="dialog__error">{{ error() }}</p>
+    }
+  </div>
+
+  <footer class="dialog__footer">
+    <button type="button" class="ghost" [disabled]="guardando()" (click)="cancelar()">
+      Cancelar
+    </button>
+    <button type="button" class="danger" [disabled]="guardando()" (click)="confirmar()">
+      {{ guardando() ? 'Devolviendo…' : 'Confirmar devolución' }}
+    </button>
+  </footer>
+</section>

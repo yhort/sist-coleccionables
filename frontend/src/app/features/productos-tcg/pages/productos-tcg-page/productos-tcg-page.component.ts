@@ -20,6 +20,20 @@ import {
 
 type TabProductos = 'skus' | 'catalogo';
 
+const MOSTRAR_SKU_STORAGE_KEY = 'productos-tcg.mostrarSku';
+
+function leerMostrarSkuPreferido(): boolean {
+  try {
+    const valor = localStorage.getItem(MOSTRAR_SKU_STORAGE_KEY);
+    if (valor === null) {
+      return true;
+    }
+    return valor === '1' || valor === 'true';
+  } catch {
+    return true;
+  }
+}
+
 @Component({
   selector: 'app-productos-tcg-page',
   imports: [
@@ -46,6 +60,7 @@ export class ProductosTcgPageComponent {
   readonly total = signal(0);
   readonly items = signal<ProductoTcg[]>([]);
   readonly vista = signal<VistaCatalogo>('tabla');
+  readonly mostrarSku = signal(leerMostrarSkuPreferido());
   readonly tab = signal<TabProductos>('skus');
   readonly formularioAbierto = signal(false);
   readonly productoEditando = signal<ProductoTcg | null>(null);
@@ -154,6 +169,15 @@ export class ProductosTcgPageComponent {
   cambiarTamano(pageSize: number): void {
     if (esTamanoPaginaTabla(pageSize)) {
       this.pageSize.set(pageSize);
+    }
+  }
+
+  setMostrarSku(valor: boolean): void {
+    this.mostrarSku.set(valor);
+    try {
+      localStorage.setItem(MOSTRAR_SKU_STORAGE_KEY, valor ? '1' : '0');
+    } catch {
+      /* ignore quota / private mode */
     }
   }
 

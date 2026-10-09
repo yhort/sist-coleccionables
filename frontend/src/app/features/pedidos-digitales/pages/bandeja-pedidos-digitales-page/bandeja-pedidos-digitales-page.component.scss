@@ -244,6 +244,22 @@
   flex-shrink: 0;
 }
 
+.pedidos-toast {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 95;
+  max-width: min(420px, calc(100vw - 2rem));
+  padding: 0.85rem 1.1rem;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  background: var(--color-success);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 24px rgb(22 163 74 / 28%);
+}
+
 app-pedidos-kanban,
 app-pedidos-tabla {
   flex: 1 1 auto;

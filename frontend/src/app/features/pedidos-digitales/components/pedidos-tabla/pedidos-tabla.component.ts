@@ -18,6 +18,7 @@ import {
   puedeEmpaquetar,
   puedeEntregarRapido,
   puedeImprimirEtiqueta,
+  puedeLiberarStockPorAbandono,
   puedeSeleccionarEnLote,
   cpeEstadoEmitido,
   round2,
@@ -100,6 +101,7 @@ export class PedidosTablaComponent {
   readonly imprimirEtiquetas = output<PedidoDigital[]>();
   readonly verConsolidadoEmpaque = output<PedidoDigital[]>();
   readonly anular = output<PedidoDigital>();
+  readonly liberarStockAbandono = output<PedidoDigital>();
   readonly marcarNotificados = output<PedidoDigital[]>();
   readonly toggleNotificacion = output<PedidoDigital>();
   readonly aviso = output<string>();
@@ -123,6 +125,7 @@ export class PedidosTablaComponent {
   readonly puedeDespachar = puedeDespachar;
   readonly puedeEntregarRapido = puedeEntregarRapido;
   readonly puedeAnular = puedeAnularPedido;
+  readonly puedeLiberarStock = puedeLiberarStockPorAbandono;
   readonly puedeEtiqueta = puedeImprimirEtiqueta;
   readonly etiquetaCantidad = etiquetaCantidadPedidos;
 

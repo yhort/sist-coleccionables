@@ -40,6 +40,21 @@ export type EstadoSincronizacionWoo =
   | 'NO_MAPEADO'
   | 'ERROR';
 
+export const VARIANTES_SKU_PRESET = [
+  'Básica',
+  'Holo',
+  'Reverse',
+  'EX',
+  'Jumbo',
+  'Promo',
+] as const;
+
+export type VarianteSkuPreset = (typeof VARIANTES_SKU_PRESET)[number];
+
+export function esFoilDesdeVariante(variante: string): boolean {
+  return variante.trim().toLowerCase() !== 'básica' && variante.trim().toLowerCase() !== 'basica';
+}
+
 export interface AtributosTcg {
   setCodigo: string;
   setNombre: string;
@@ -47,6 +62,8 @@ export interface AtributosTcg {
   rareza: RarezaTcg | '';
   condicion: CondicionTcg | '';
   esFoil: boolean;
+  /** Variante comercial asociada al SKU (Básica, Holo, etc. o texto libre). */
+  variante: string;
   idioma: IdiomaTcg | '';
   artista: string;
   tipoSellado: TipoSellado | '';
@@ -161,6 +178,7 @@ export function crearAtributosTcgVacios(): AtributosTcg {
     rareza: '',
     condicion: '',
     esFoil: false,
+    variante: 'Básica',
     idioma: '',
     artista: '',
     tipoSellado: '',
