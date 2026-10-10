@@ -42,6 +42,15 @@ export class ClientesApiService {
     }
   }
 
+  /** Puntos de entrega ya persistidos en clientes (catálogo dinámico). */
+  async listarPuntosEntrega(): Promise<string[]> {
+    try {
+      return await firstValueFrom(this.http.get<string[]>(apiUrl('clientes/puntos-entrega')));
+    } catch {
+      return [];
+    }
+  }
+
   async guardar(request: UpsertClienteRequest, id?: string | null): Promise<Cliente> {
     try {
       const cliente = id

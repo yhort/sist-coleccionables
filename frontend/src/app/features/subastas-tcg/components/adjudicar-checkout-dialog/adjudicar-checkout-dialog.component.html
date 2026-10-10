@@ -161,7 +161,7 @@
           placeholder="Papurris, Dapkris, TCG House…"
         />
         <datalist id="puntos-entrega-checkout">
-          @for (punto of puntosSugeridos; track punto) {
+          @for (punto of puntosSugeridos(); track punto) {
             <option [value]="punto"></option>
           }
         </datalist>

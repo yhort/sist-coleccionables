@@ -16,7 +16,9 @@ import {
   CANALES_CONTACTO,
   CanalContactoCliente,
   ETIQUETAS_CANAL_CONTACTO,
-  PUNTOS_ENTREGA_SUGERIDOS,
+  combinarPuntosEntrega,
+  leerPuntosEntregaLocales,
+  registrarPuntoEntregaLocal,
 } from '../../../../shared/models/contacto-entrega.model';
 import { SubastasTcgApiService } from '../../data-access/subastas-tcg.service';
 import {
@@ -67,7 +69,7 @@ export class AdjudicarCheckoutDialogComponent {
   readonly etiquetasOrigen = ETIQUETAS_ORIGEN_PAGO_CHECKOUT;
   readonly canalesContacto = CANALES_CONTACTO;
   readonly etiquetasCanalContacto = ETIQUETAS_CANAL_CONTACTO;
-  readonly puntosSugeridos = PUNTOS_ENTREGA_SUGERIDOS;
+  readonly puntosSugeridos = signal(combinarPuntosEntrega(leerPuntosEntregaLocales()));
   readonly nombreVisibleLinea = nombreVisibleLinea;
 
   readonly form = this.fb.nonNullable.group({
@@ -260,6 +262,10 @@ export class AdjudicarCheckoutDialogComponent {
         contactoReferencia: raw.contactoReferencia.trim() || null,
         guardarPuntoEnCliente: Boolean(raw.guardarPuntoEnCliente && this.tieneCliente()),
       });
+      if (punto) {
+        registrarPuntoEntregaLocal(punto);
+        this.puntosSugeridos.update((actual) => combinarPuntosEntrega(actual, [punto]));
+      }
       this.confirmed.emit();
     } catch (err) {
       this.error.set(readApiError(err));

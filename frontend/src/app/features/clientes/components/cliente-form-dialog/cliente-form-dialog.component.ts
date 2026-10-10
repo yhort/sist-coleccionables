@@ -10,6 +10,7 @@ import {
   TIPOS_DOCUMENTO,
   TipoDocumentoIdentidad,
   documentoDuplicadoEnLista,
+  nombreDuplicadoSinDocumentoEnLista,
   sanitizarTelefono,
   validarDocumento,
   validarTelefono,
@@ -18,7 +19,10 @@ import {
   CANALES_CONTACTO,
   CanalContactoCliente,
   ETIQUETAS_CANAL_CONTACTO,
-  PUNTOS_ENTREGA_SUGERIDOS,
+  combinarPuntosEntrega,
+  leerPuntosEntregaLocales,
+  normalizarPuntoEntrega,
+  registrarPuntoEntregaLocal,
 } from '../../../../shared/models/contacto-entrega.model';
 
 function telefonoValidator(control: AbstractControl): ValidationErrors | null {
@@ -46,7 +50,7 @@ export class ClienteFormDialogComponent implements OnInit {
   readonly etiquetas = ETIQUETAS_DOCUMENTO;
   readonly canales = CANALES_CONTACTO;
   readonly etiquetasCanal = ETIQUETAS_CANAL_CONTACTO;
-  readonly puntosSugeridos = PUNTOS_ENTREGA_SUGERIDOS;
+  readonly puntosSugeridos = signal<string[]>(combinarPuntosEntrega(leerPuntosEntregaLocales()));
   readonly telefonoMax = TELEFONO_MAX_DIGITOS;
 
   readonly form = this.fb.nonNullable.group({
@@ -77,8 +81,14 @@ export class ClienteFormDialogComponent implements OnInit {
         numeroDocumento: sinDocumento ? '' : (actual.numeroDocumento ?? ''),
         esPublicoGeneral: actual.esPublicoGeneral,
       });
-      this.sincronizarCampoNumero();
+      if (actual.esPublicoGeneral) {
+        this.form.controls.tipoDocumento.disable({ emitEvent: false });
+        this.form.controls.numeroDocumento.disable({ emitEvent: false });
+      } else {
+        this.sincronizarCampoNumero();
+      }
     }
+    void this.cargarPuntosEntrega(actual?.puntoEntregaPreferido);
   }
 
   @HostListener('document:keydown.escape')
@@ -126,6 +136,15 @@ export class ClienteFormDialogComponent implements OnInit {
     }
   }
 
+  onPuntoEntregaBlur(): void {
+    const punto = normalizarPuntoEntrega(this.form.controls.puntoEntregaPreferido.value);
+    if (!punto) {
+      return;
+    }
+    this.form.controls.puntoEntregaPreferido.setValue(punto, { emitEvent: false });
+    this.incorporarPunto(punto);
+  }
+
   async guardar(): Promise<void> {
     this.form.markAllAsTouched();
     this.error.set('');
@@ -137,31 +156,47 @@ export class ClienteFormDialogComponent implements OnInit {
       return;
     }
 
+    const sinDocumento =
+      raw.esPublicoGeneral ||
+      raw.tipoDocumento === 'SIN_DOCUMENTO' ||
+      !raw.numeroDocumento?.trim();
+
     if (!raw.esPublicoGeneral) {
-      const duplicado = documentoDuplicadoEnLista(
-        this.api.clientes(),
-        raw.numeroDocumento,
-        this.cliente()?.id,
-      );
-      if (duplicado) {
-        this.error.set(
-          `El cliente ya se encuentra registrado (${duplicado.nombre} · ${duplicado.tipoDocumento} ${duplicado.numeroDocumento}).`,
+      if (!sinDocumento) {
+        const duplicadoDoc = documentoDuplicadoEnLista(
+          this.api.clientes(),
+          raw.numeroDocumento,
+          this.cliente()?.id,
         );
-        return;
+        if (duplicadoDoc) {
+          this.error.set(
+            `El cliente ya se encuentra registrado (${duplicadoDoc.nombre} · ${duplicadoDoc.tipoDocumento} ${duplicadoDoc.numeroDocumento}).`,
+          );
+          return;
+        }
+      } else {
+        const duplicadoNombre = nombreDuplicadoSinDocumentoEnLista(
+          this.api.clientes(),
+          raw.nombre,
+          this.cliente()?.id,
+        );
+        if (duplicadoNombre) {
+          this.error.set(
+            `Ya existe un cliente activo sin documento con el nombre «${duplicadoNombre.nombre}». Edítalo desde el listado para actualizar el punto de entrega u otros datos.`,
+          );
+          return;
+        }
       }
     }
 
     this.guardando.set(true);
     try {
-      const sinDocumento =
-        raw.esPublicoGeneral ||
-        raw.tipoDocumento === 'SIN_DOCUMENTO' ||
-        !raw.numeroDocumento?.trim();
+      const punto = normalizarPuntoEntrega(raw.puntoEntregaPreferido) || null;
       const cliente = await this.api.guardar(
         {
-          nombre: raw.nombre,
+          nombre: raw.nombre.trim().replace(/\s+/g, ' '),
           telefono: raw.telefono || null,
-          puntoEntregaPreferido: raw.puntoEntregaPreferido || null,
+          puntoEntregaPreferido: punto,
           canalContacto: raw.canalContacto || null,
           contactoReferencia: raw.contactoReferencia || null,
           tipoDocumento: sinDocumento ? 'SIN_DOCUMENTO' : raw.tipoDocumento,
@@ -170,11 +205,35 @@ export class ClienteFormDialogComponent implements OnInit {
         },
         this.cliente()?.id,
       );
+      if (punto) {
+        this.incorporarPunto(punto);
+      }
       this.saved.emit(cliente);
     } catch (err) {
       this.error.set(readApiError(err));
     } finally {
       this.guardando.set(false);
     }
+  }
+
+  private async cargarPuntosEntrega(puntoActual?: string | null): Promise<void> {
+    const desdeApi = await this.api.listarPuntosEntrega();
+    const desdeClientes = this.api
+      .clientes()
+      .map((item) => item.puntoEntregaPreferido)
+      .filter((item): item is string => !!item?.trim());
+    this.puntosSugeridos.set(
+      combinarPuntosEntrega(
+        leerPuntosEntregaLocales(),
+        desdeApi,
+        desdeClientes,
+        puntoActual ? [puntoActual] : [],
+      ),
+    );
+  }
+
+  private incorporarPunto(punto: string): void {
+    registrarPuntoEntregaLocal(punto);
+    this.puntosSugeridos.update((actual) => combinarPuntosEntrega(actual, [punto]));
   }
 }

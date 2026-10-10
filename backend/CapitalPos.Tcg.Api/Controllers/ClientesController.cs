@@ -22,6 +22,15 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
         return Ok(items);
     }
 
+    /// <summary>Puntos de entrega preferidos ya usados (catálogo dinámico del maestro).</summary>
+    [HttpGet("puntos-entrega")]
+    public async Task<ActionResult<IReadOnlyList<string>>> ListarPuntosEntrega(
+        CancellationToken cancellationToken)
+    {
+        var puntos = await clientes.ListarPuntosEntregaPreferidosAsync(cancellationToken);
+        return Ok(puntos);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ClienteResponse>> Obtener(Guid id, CancellationToken cancellationToken)
     {

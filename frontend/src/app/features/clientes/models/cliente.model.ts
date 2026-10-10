@@ -169,3 +169,29 @@ export function documentoDuplicadoEnLista(
     ) ?? null
   );
 }
+
+function normalizarNombreClave(nombre: string | null | undefined): string {
+  return (nombre ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** Unicidad operativa: clientes activos SIN_DOCUMENTO no pueden repetir el mismo nombre. */
+export function nombreDuplicadoSinDocumentoEnLista(
+  clientes: readonly Cliente[],
+  nombre: string | null | undefined,
+  excluirId?: string | null,
+): Cliente | null {
+  const clave = normalizarNombreClave(nombre);
+  if (clave.length < 2) {
+    return null;
+  }
+  return (
+    clientes.find((cliente) => {
+      if (!cliente.activo || cliente.id === excluirId || cliente.esPublicoGeneral) {
+        return false;
+      }
+      const sinDoc =
+        cliente.tipoDocumento === 'SIN_DOCUMENTO' || !(cliente.numeroDocumento ?? '').trim();
+      return sinDoc && normalizarNombreClave(cliente.nombre) === clave;
+    }) ?? null
+  );
+}

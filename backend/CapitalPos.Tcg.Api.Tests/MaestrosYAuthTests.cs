@@ -94,6 +94,84 @@ public sealed class MaestrosYAuthTests
     }
 
     [Fact]
+    public async Task Cliente_sin_documento_unicidad_por_nombre_y_actualiza_punto()
+    {
+        using var client = _factory.CreateClient();
+        await LoginAsync(client);
+
+        var nombre = $"Carlos Miguel Armas {Guid.NewGuid():N}"[..28];
+        var alta = await client.PostAsJsonAsync(
+            "/api/clientes",
+            new
+            {
+                nombre,
+                tipoDocumento = "SIN_DOCUMENTO",
+                numeroDocumento = (string?)null,
+                puntoEntregaPreferido = "Papurris",
+                esPublicoGeneral = false
+            },
+            Json);
+        Assert.True(alta.IsSuccessStatusCode, await alta.Content.ReadAsStringAsync());
+        var creado = await alta.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var id = creado.GetProperty("id").GetGuid();
+        Assert.Equal("Papurris", creado.GetProperty("puntoEntregaPreferido").GetString());
+
+        var duplicado = await client.PostAsJsonAsync(
+            "/api/clientes",
+            new
+            {
+                nombre,
+                tipoDocumento = "SIN_DOCUMENTO",
+                numeroDocumento = (string?)null,
+                puntoEntregaPreferido = "Dapkris",
+                esPublicoGeneral = false
+            },
+            Json);
+        Assert.Equal(HttpStatusCode.BadRequest, duplicado.StatusCode);
+
+        var edicion = await client.PutAsJsonAsync(
+            $"/api/clientes/{id}",
+            new
+            {
+                nombre,
+                tipoDocumento = "SIN_DOCUMENTO",
+                numeroDocumento = (string?)null,
+                puntoEntregaPreferido = "TCG House Norte",
+                esPublicoGeneral = false
+            },
+            Json);
+        Assert.True(edicion.IsSuccessStatusCode, await edicion.Content.ReadAsStringAsync());
+        var actualizado = await edicion.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("TCG House Norte", actualizado.GetProperty("puntoEntregaPreferido").GetString());
+
+        var puntos = await client.GetFromJsonAsync<JsonElement>("/api/clientes/puntos-entrega", Json);
+        Assert.Equal(JsonValueKind.Array, puntos.ValueKind);
+        Assert.Contains(
+            puntos.EnumerateArray().Select(p => p.GetString()),
+            p => p == "TCG House Norte");
+
+        var desactivar = await client.PostAsync($"/api/clientes/{id}/desactivar", null);
+        Assert.True(desactivar.IsSuccessStatusCode, await desactivar.Content.ReadAsStringAsync());
+
+        var recrear = await client.PostAsJsonAsync(
+            "/api/clientes",
+            new
+            {
+                nombre,
+                tipoDocumento = "SIN_DOCUMENTO",
+                numeroDocumento = (string?)null,
+                puntoEntregaPreferido = "Olva Miraflores",
+                esPublicoGeneral = false
+            },
+            Json);
+        Assert.True(recrear.IsSuccessStatusCode, await recrear.Content.ReadAsStringAsync());
+        var reactivado = await recrear.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal(id, reactivado.GetProperty("id").GetGuid());
+        Assert.True(reactivado.GetProperty("activo").GetBoolean());
+        Assert.Equal("Olva Miraflores", reactivado.GetProperty("puntoEntregaPreferido").GetString());
+    }
+
+    [Fact]
     public async Task Proveedor_compra_ingresa_stock_al_kardex()
     {
         using var client = _factory.CreateClient();

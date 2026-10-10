@@ -4,7 +4,12 @@
   <header class="dialog__header">
     <div>
       <h2>{{ cliente() ? 'Editar cliente' : 'Nuevo cliente' }}</h2>
-      <p>DNI de 8 dígitos, RUC de 11 o Cliente varios / Público general para boletas.</p>
+      <p>
+        DNI de 8 dígitos, RUC de 11 o Cliente varios / Público general para boletas.
+        @if (cliente()) {
+          Puedes actualizar el punto de entrega y el resto de datos sin crear un registro nuevo.
+        }
+      </p>
     </div>
     <button type="button" class="dialog__close" aria-label="Cerrar" (click)="cancelled.emit()">×</button>
   </header>
@@ -68,13 +73,16 @@
           formControlName="puntoEntregaPreferido"
           maxlength="80"
           list="puntos-entrega-cliente"
-          placeholder="Papurris, Dapkris, TCG House…"
+          placeholder="Elige o escribe uno nuevo…"
+          autocomplete="off"
+          (blur)="onPuntoEntregaBlur()"
         />
         <datalist id="puntos-entrega-cliente">
-          @for (punto of puntosSugeridos; track punto) {
+          @for (punto of puntosSugeridos(); track punto) {
             <option [value]="punto"></option>
           }
         </datalist>
+        <small class="field-hint">Si no está en la lista, escríbelo: quedará disponible para próximos clientes.</small>
       </label>
       <label class="wide">
         Contacto de referencia

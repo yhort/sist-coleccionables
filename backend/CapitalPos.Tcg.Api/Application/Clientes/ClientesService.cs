@@ -40,6 +40,21 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         return items.Select(Map).ToList();
     }
 
+    /// <summary>
+    /// Catálogo dinámico de puntos de entrega preferidos usados en clientes (más sugerencias del FE).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListarPuntosEntregaPreferidosAsync(
+        CancellationToken cancellationToken)
+    {
+        return await db.Clientes.AsNoTracking()
+            .Where(c => c.PuntoEntregaPreferido != null && c.PuntoEntregaPreferido != "")
+            .Select(c => c.PuntoEntregaPreferido!)
+            .Distinct()
+            .OrderBy(p => p)
+            .Take(200)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<ClienteResponse?> ObtenerAsync(Guid id, CancellationToken cancellationToken)
     {
         var cliente = await db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
@@ -70,10 +85,41 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         if (inactivo is { Activo: false })
         {
             await AsegurarDocumentoLibreAsync(numero, inactivo.Id, cancellationToken);
+            if (EsClienteSinDocumento(tipo, numero))
+            {
+                await AsegurarNombreLibreSinDocumentoAsync(nombre, inactivo.Id, cancellationToken);
+            }
+
             AplicarDatos(inactivo, nombre, telefono, punto, request.CanalContacto, contactoRef, tipo, numero);
             inactivo.Activo = true;
             await db.SaveChangesAsync(cancellationToken);
             return Map(inactivo);
+        }
+
+        // Sin documento: reutilizar inactivo homónimo (evita duplicar al “recrear” tras desactivar).
+        if (EsClienteSinDocumento(tipo, numero))
+        {
+            var inactivoPorNombre = await BuscarPorNombreSinDocumentoAsync(
+                nombre,
+                soloActivos: false,
+                cancellationToken);
+            if (inactivoPorNombre is { Activo: false })
+            {
+                AplicarDatos(
+                    inactivoPorNombre,
+                    nombre,
+                    telefono,
+                    punto,
+                    request.CanalContacto,
+                    contactoRef,
+                    tipo,
+                    numero);
+                inactivoPorNombre.Activo = true;
+                await db.SaveChangesAsync(cancellationToken);
+                return Map(inactivoPorNombre);
+            }
+
+            await AsegurarNombreLibreSinDocumentoAsync(nombre, excluirId: null, cancellationToken);
         }
 
         await AsegurarDocumentoLibreAsync(numero, excluirId: null, cancellationToken);
@@ -82,7 +128,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         {
             Id = Guid.NewGuid(),
             EmpresaId = tenant.EmpresaId,
-            Nombre = nombre,
+            Nombre = NormalizarNombrePresentacion(nombre),
             Telefono = telefono,
             PuntoEntregaPreferido = punto,
             CanalContacto = request.CanalContacto,
@@ -114,6 +160,11 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             request.NumeroDocumento,
             request.EsPublicoGeneral);
         await AsegurarDocumentoLibreAsync(numero, id, cancellationToken);
+        if (EsClienteSinDocumento(tipo, numero)
+            && !DocumentoIdentidad.EsPublicoGeneral(nombre, tipo, numero))
+        {
+            await AsegurarNombreLibreSinDocumentoAsync(nombre, id, cancellationToken);
+        }
 
         AplicarDatos(
             cliente,
@@ -169,6 +220,14 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
             && !DocumentoIdentidad.EsNumeroLegadoSinDocumento(cliente.NumeroDocumento))
         {
             await AsegurarDocumentoLibreAsync(cliente.NumeroDocumento, id, cancellationToken);
+        }
+        else if (EsClienteSinDocumento(cliente.TipoDocumento, cliente.NumeroDocumento)
+                 && !DocumentoIdentidad.EsPublicoGeneral(
+                     cliente.Nombre,
+                     cliente.TipoDocumento,
+                     cliente.NumeroDocumento))
+        {
+            await AsegurarNombreLibreSinDocumentoAsync(cliente.Nombre, id, cancellationToken);
         }
 
         cliente.Activo = true;
@@ -264,12 +323,34 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
                 return existente;
             }
         }
+        else if (EsClienteSinDocumento(tipo, numero))
+        {
+            // Sin documento: reutiliza por nombre y actualiza punto/teléfono/canal (evita duplicados).
+            var porNombre = await BuscarPorNombreSinDocumentoAsync(
+                nombre,
+                soloActivos: false,
+                cancellationToken);
+            if (porNombre is not null)
+            {
+                AplicarDatos(
+                    porNombre,
+                    nombre,
+                    telefono ?? porNombre.Telefono,
+                    punto ?? porNombre.PuntoEntregaPreferido,
+                    request.CanalContacto ?? porNombre.CanalContacto,
+                    contactoRef ?? porNombre.ContactoReferencia,
+                    tipo,
+                    numero);
+                porNombre.Activo = true;
+                return porNombre;
+            }
+        }
 
         var cliente = new Cliente
         {
             Id = Guid.NewGuid(),
             EmpresaId = tenant.EmpresaId,
-            Nombre = nombre,
+            Nombre = NormalizarNombrePresentacion(nombre),
             Telefono = telefono,
             PuntoEntregaPreferido = punto,
             CanalContacto = request.CanalContacto,
@@ -302,6 +383,33 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
+    private async Task<Cliente?> BuscarPorNombreSinDocumentoAsync(
+        string nombre,
+        bool soloActivos,
+        CancellationToken cancellationToken)
+    {
+        var clave = NormalizarNombreClave(nombre);
+        if (clave.Length < 2)
+        {
+            return null;
+        }
+
+        var query = db.Clientes.Where(c =>
+            c.TipoDocumento == TipoDocumentoIdentidad.SIN_DOCUMENTO
+            && (c.NumeroDocumento == null || c.NumeroDocumento == "")
+            && c.Nombre.ToLower() == clave);
+        if (soloActivos)
+        {
+            query = query.Where(c => c.Activo);
+        }
+
+        // Preferir activo si hay varios legados; si no, el más reciente.
+        return await query
+            .OrderByDescending(c => c.Activo)
+            .ThenByDescending(c => c.FechaCreacion)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private async Task AsegurarDocumentoLibreAsync(
         string? numero,
         Guid? excluirId,
@@ -326,6 +434,44 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         }
     }
 
+    private async Task AsegurarNombreLibreSinDocumentoAsync(
+        string nombre,
+        Guid? excluirId,
+        CancellationToken cancellationToken)
+    {
+        var clave = NormalizarNombreClave(nombre);
+        if (clave.Length < 2)
+        {
+            return;
+        }
+
+        var query = db.Clientes.Where(c =>
+            c.Activo
+            && c.TipoDocumento == TipoDocumentoIdentidad.SIN_DOCUMENTO
+            && (c.NumeroDocumento == null || c.NumeroDocumento == "")
+            && c.Nombre.ToLower() == clave);
+        if (excluirId.HasValue)
+        {
+            query = query.Where(c => c.Id != excluirId.Value);
+        }
+
+        var choque = await query.AnyAsync(cancellationToken);
+        if (choque)
+        {
+            throw new BusinessRuleException(
+                "Ya existe un cliente activo sin documento con ese nombre. "
+                + "Edítalo desde el listado para actualizar el punto de entrega u otros datos.");
+        }
+    }
+
+    private static bool EsClienteSinDocumento(TipoDocumentoIdentidad tipo, string? numero) =>
+        tipo == TipoDocumentoIdentidad.SIN_DOCUMENTO
+        || string.IsNullOrWhiteSpace(numero)
+        || DocumentoIdentidad.EsNumeroLegadoSinDocumento(numero);
+
+    private static string NormalizarNombreClave(string nombre) =>
+        NormalizarNombrePresentacion(nombre).ToLowerInvariant();
+
     private static void AplicarDatos(
         Cliente cliente,
         string nombre,
@@ -336,7 +482,7 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
         TipoDocumentoIdentidad tipo,
         string? numero)
     {
-        cliente.Nombre = nombre;
+        cliente.Nombre = NormalizarNombrePresentacion(nombre);
         cliente.Telefono = telefono;
         cliente.PuntoEntregaPreferido = punto;
         cliente.CanalContacto = canal;
@@ -349,6 +495,12 @@ public sealed class ClientesService(ApplicationDbContext db, ITenantProvider ten
     {
         var texto = valor?.Trim() ?? string.Empty;
         return texto.Length == 0 ? null : texto[..Math.Min(texto.Length, max)];
+    }
+
+    private static string NormalizarNombrePresentacion(string nombre)
+    {
+        var partes = nombre.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', partes);
     }
 
     internal static ClienteResponse Map(Cliente cliente) => new()

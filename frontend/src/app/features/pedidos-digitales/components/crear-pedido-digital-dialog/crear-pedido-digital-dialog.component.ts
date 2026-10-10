@@ -37,7 +37,9 @@ import {
   CANALES_CONTACTO,
   CanalContactoCliente,
   ETIQUETAS_CANAL_CONTACTO,
-  PUNTOS_ENTREGA_SUGERIDOS,
+  combinarPuntosEntrega,
+  leerPuntosEntregaLocales,
+  registrarPuntoEntregaLocal,
 } from '../../../../shared/models/contacto-entrega.model';
 import {
   ETIQUETAS_ORIGEN_PAGO,
@@ -94,7 +96,7 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
   readonly etiquetaDocumento = etiquetaDocumento;
   readonly canalesContacto = CANALES_CONTACTO;
   readonly etiquetasCanalContacto = ETIQUETAS_CANAL_CONTACTO;
-  readonly puntosSugeridos = PUNTOS_ENTREGA_SUGERIDOS;
+  readonly puntosSugeridos = signal(combinarPuntosEntrega(leerPuntosEntregaLocales()));
   readonly origenesPagoPos = ORIGENES_PAGO_POS;
   readonly etiquetasOrigenPago = ETIQUETAS_ORIGEN_PAGO;
   readonly telefonoMax = TELEFONO_MAX_DIGITOS;
@@ -462,6 +464,11 @@ export class CrearPedidoDigitalDialogComponent implements AfterViewInit {
             }
           : null,
       });
+      const puntoNuevo = raw.puntoEntrega?.trim();
+      if (puntoNuevo) {
+        registrarPuntoEntregaLocal(puntoNuevo);
+        this.puntosSugeridos.update((actual) => combinarPuntosEntrega(actual, [puntoNuevo]));
+      }
       this.saved.emit({
         pedido,
         imprimirTicket: Boolean(raw.cobroInmediato && raw.imprimirTicket),
