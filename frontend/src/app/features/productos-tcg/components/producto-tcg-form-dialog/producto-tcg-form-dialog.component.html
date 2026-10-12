@@ -95,11 +95,25 @@
       }
       <label>
         Costo
-        <input type="number" min="0" step="0.01" formControlName="costo" />
+        <input
+          type="number"
+          class="input-monto"
+          min="0"
+          step="1"
+          formControlName="costo"
+          (wheel)="$event.preventDefault()"
+        />
       </label>
       <label>
         Precio de venta (S/)
-        <input type="number" min="0" step="0.01" formControlName="precioVenta" />
+        <input
+          type="number"
+          class="input-monto"
+          min="0"
+          step="1"
+          formControlName="precioVenta"
+          (wheel)="$event.preventDefault()"
+        />
       </label>
       <label class="checkbox">
         <input type="checkbox" formControlName="activo" />
@@ -349,11 +363,25 @@
         </label>
         <label>
           Precio regular Woo
-          <input type="number" min="0" step="0.01" formControlName="precioNormal" />
+          <input
+            type="number"
+            class="input-monto"
+            min="0"
+            step="1"
+            formControlName="precioNormal"
+            (wheel)="$event.preventDefault()"
+          />
         </label>
         <label>
           Precio rebajado Woo
-          <input type="number" min="0" step="0.01" formControlName="precioRebajado" />
+          <input
+            type="number"
+            class="input-monto"
+            min="0"
+            step="1"
+            formControlName="precioRebajado"
+            (wheel)="$event.preventDefault()"
+          />
           @if (form.controls['woo'].get('precioRebajado')?.hasError('mayorQueNormal')) {
             <small class="field-error">Debe ser menor al precio regular Woo.</small>
           }

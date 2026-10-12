@@ -59,11 +59,25 @@
       </label>
       <label>
         Precio de venta (S/)
-        <input type="number" min="0" step="0.01" formControlName="precioVenta" />
+        <input
+          type="number"
+          class="input-monto"
+          min="0"
+          step="1"
+          formControlName="precioVenta"
+          (wheel)="$event.preventDefault()"
+        />
       </label>
       <label>
         Costo (S/)
-        <input type="number" min="0" step="0.01" formControlName="costo" />
+        <input
+          type="number"
+          class="input-monto"
+          min="0"
+          step="1"
+          formControlName="costo"
+          (wheel)="$event.preventDefault()"
+        />
       </label>
       <label>
         SKU (opcional)
