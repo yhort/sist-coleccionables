@@ -3,6 +3,8 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { readApiError } from '../../../../core/http/api-error';
 import { CajaTurnoBannerComponent } from '../../../caja/components/caja-turno-banner/caja-turno-banner.component';
 import { CajaApiService } from '../../../caja/data-access/caja.service';
+import { LiberarStockAbandonoDialogComponent } from '../../../pedidos-digitales/components/liberar-stock-abandono-dialog/liberar-stock-abandono-dialog.component';
+import { MotivoDevolucionTienda } from '../../../pedidos-digitales/models/pedido-digital.model';
 import { EntregasFiltersComponent } from '../../components/entregas-filters/entregas-filters.component';
 import { EntregasKpisComponent } from '../../components/entregas-kpis/entregas-kpis.component';
 import { EntregasTableComponent } from '../../components/entregas-table/entregas-table.component';
@@ -24,6 +26,7 @@ import {
     EntregasTableComponent,
     PackingSlipDialogComponent,
     ProgramarEntregaDialogComponent,
+    LiberarStockAbandonoDialogComponent,
     CajaTurnoBannerComponent,
   ],
   templateUrl: './entregas-page.component.html',
@@ -39,6 +42,8 @@ export class EntregasPageComponent {
   readonly dialogModo = signal<'empaque' | 'despacho' | null>(null);
   readonly filaActiva = signal<EntregaFila | null>(null);
   readonly etiquetaAbierta = signal(false);
+  readonly devolucionFila = signal<EntregaFila | null>(null);
+  readonly devolucionGuardando = signal(false);
   readonly sedeCajaId = computed(() => this.sedes()[0]?.id ?? '');
 
   readonly filas = computed(() => {
@@ -83,6 +88,7 @@ export class EntregasPageComponent {
   abrirEmpaque(fila: EntregaFila): void {
     this.error.set('');
     this.etiquetaAbierta.set(false);
+    this.devolucionFila.set(null);
     this.filaActiva.set(fila);
     this.dialogModo.set('empaque');
   }
@@ -90,14 +96,49 @@ export class EntregasPageComponent {
   abrirDespacho(fila: EntregaFila): void {
     this.error.set('');
     this.etiquetaAbierta.set(false);
+    this.devolucionFila.set(null);
     this.filaActiva.set(fila);
     this.dialogModo.set('despacho');
   }
 
   abrirEtiqueta(fila: EntregaFila): void {
     this.error.set('');
+    this.devolucionFila.set(null);
     this.filaActiva.set(fila);
     this.etiquetaAbierta.set(true);
+  }
+
+  abrirDevolucion(fila: EntregaFila): void {
+    this.error.set('');
+    this.dialogModo.set(null);
+    this.etiquetaAbierta.set(false);
+    this.filaActiva.set(null);
+    this.devolucionFila.set(fila);
+  }
+
+  cerrarDevolucion(): void {
+    if (this.devolucionGuardando()) {
+      return;
+    }
+    this.devolucionFila.set(null);
+  }
+
+  async confirmarDevolucion(motivo: MotivoDevolucionTienda): Promise<void> {
+    const fila = this.devolucionFila();
+    if (!fila || this.devolucionGuardando()) {
+      return;
+    }
+    this.devolucionGuardando.set(true);
+    this.error.set('');
+    try {
+      await this.entregasApi.devolverNoRecogido(fila.pedido.id, motivo);
+      this.devolucionFila.set(null);
+      await this.refrescarEntregas();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'No se pudo registrar la devolución.');
+    } finally {
+      this.devolucionGuardando.set(false);
+    }
   }
 
   cerrarDialog(): void {
@@ -124,8 +165,8 @@ export class EntregasPageComponent {
     }
     const recojo = fila.entrega.metodoEnvio === 'RECOJO_TIENDA';
     const mensaje = recojo
-      ? '¿Confirmar el recojo en tienda? Se crea la venta y el kardex VENTA.'
-      : '¿Confirmar la entrega? El pedido pasa a Entregado y se confirma la reserva en inventario.';
+      ? '¿Entregar al cliente (recojo en tienda)? Se crea la venta y el kardex VENTA.'
+      : '¿Entregar al cliente? El pedido pasa a Entregado y se confirma la reserva en inventario.';
     if (!globalThis.confirm(mensaje)) {
       return;
     }
@@ -134,26 +175,6 @@ export class EntregasPageComponent {
       await this.cajaApi.refrescarEstado(fila.pedido.sedeId).catch(() => undefined);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo confirmar la entrega.');
-    }
-  }
-
-  async devolverNoRecogido(fila: EntregaFila): Promise<void> {
-    this.error.set('');
-    const mensaje =
-      `¿Registrar devolución por no recojo de ${fila.pedido.codigo}? ` +
-      `Se cancela el pedido, se libera la reserva de stock y la logística pasa a Fallida ` +
-      `(plazo mínimo 30 días desde despacho/programación).`;
-    if (!globalThis.confirm(mensaje)) {
-      return;
-    }
-    try {
-      await this.entregasApi.devolverNoRecogido(
-        fila.pedido.id,
-        'No recogido por el cliente en el punto de entrega.',
-      );
-      await this.refrescarEntregas();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo registrar la devolución.');
     }
   }
 

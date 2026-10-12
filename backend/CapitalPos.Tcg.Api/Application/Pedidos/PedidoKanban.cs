@@ -5,7 +5,7 @@ namespace CapitalPos.Tcg.Api.Application.Pedidos;
 public static class PedidoKanban
 {
     /// <summary>
-    /// Flujo operativo. EnPreparacion = Empaquetado; ListoEntrega = PendienteEntrega.
+    /// Flujo operativo lineal (courier). EnPuntoRecojo es rama de recojo desde Empaquetado.
     /// </summary>
     public static readonly EstadoPedidoDigital[] Flujo =
     [
@@ -36,10 +36,15 @@ public static class PedidoKanban
             return actual != EstadoPedidoDigital.Entregado;
         }
 
+        if (destino == EstadoPedidoDigital.EnPuntoRecojo)
+        {
+            return actual == EstadoPedidoDigital.Empaquetado;
+        }
+
         if (destino == EstadoPedidoDigital.Entregado)
         {
-            // Recojo en mostrador: desde Pagado o Empaquetado (sin pasar por PendienteEntrega).
-            return actual == EstadoPedidoDigital.PendienteEntrega
+            // Entregar al cliente: punto de recojo, pendiente de entrega, o recojo rápido en mostrador.
+            return actual is EstadoPedidoDigital.PendienteEntrega or EstadoPedidoDigital.EnPuntoRecojo
                 || (esRecojoTienda
                     && actual is EstadoPedidoDigital.Pagado or EstadoPedidoDigital.Empaquetado);
         }
@@ -71,12 +76,24 @@ public static class PedidoKanban
     {
         EstadoPedidoDigital.Pagado => "Pago registrado. El pedido pasa a empaque.",
         EstadoPedidoDigital.Empaquetado => "Pedido empaquetado.",
+        EstadoPedidoDigital.EnPuntoRecojo => "Paquete dejado en punto de recojo, esperando al cliente.",
         EstadoPedidoDigital.PendienteEntrega => "Listo para despacho o recojo.",
         EstadoPedidoDigital.Entregado => "Entrega confirmada. Se convierte a venta y se confirma la reserva.",
         EstadoPedidoDigital.Cancelado => "Pedido cancelado. Se libera la reserva de stock.",
         EstadoPedidoDigital.Anulado => "Pedido anulado por nota de crédito.",
         EstadoPedidoDigital.Devuelto => "Pedido devuelto por nota de crédito.",
         _ => $"Estado actualizado a {estado}."
+    };
+
+    public static string EtiquetaMotivoDevolucionTienda(MotivoDevolucionTienda motivo) => motivo switch
+    {
+        MotivoDevolucionTienda.PlazoRetiroVencido =>
+            "Plazo de retiro vencido (Abandono automático)",
+        MotivoDevolucionTienda.ClienteConfirmoNoRetirara =>
+            "Cliente confirmó que no retirará (Abandono explícito)",
+        MotivoDevolucionTienda.CancelacionDevolucionSolicitada =>
+            "Cancelación / Devolución solicitada",
+        _ => motivo.ToString()
     };
 
     public static MetodoEnvio MetodoDesdeSnapshot(bool esRecojoTienda, string? courier)

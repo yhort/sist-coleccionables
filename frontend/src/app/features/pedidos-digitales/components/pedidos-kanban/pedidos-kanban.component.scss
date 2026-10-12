@@ -66,6 +66,16 @@
     background: var(--color-primary-soft);
   }
 
+  &[data-estado='EnPuntoRecojo'] header span {
+    color: #0e7490;
+    background: #cffafe;
+  }
+
+  &[data-estado='PendienteEntrega'] header span {
+    color: #9a3412;
+    background: #ffedd5;
+  }
+
   &[data-estado='Entregado'] header span {
     color: #166534;
     background: #dcfce7;

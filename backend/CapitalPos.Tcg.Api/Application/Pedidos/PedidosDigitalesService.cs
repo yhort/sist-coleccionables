@@ -335,14 +335,15 @@ public sealed class PedidosDigitalesService(
         }
 
         var destino = request.Estado;
-        var origenEsperado = destino switch
+        if (destino is not (
+            EstadoPedidoDigital.Empaquetado
+            or EstadoPedidoDigital.EnPuntoRecojo
+            or EstadoPedidoDigital.PendienteEntrega
+            or EstadoPedidoDigital.Entregado))
         {
-            EstadoPedidoDigital.Empaquetado => EstadoPedidoDigital.Pagado,
-            EstadoPedidoDigital.PendienteEntrega => EstadoPedidoDigital.Empaquetado,
-            EstadoPedidoDigital.Entregado => EstadoPedidoDigital.PendienteEntrega,
-            _ => throw new BusinessRuleException(
-                "El lote solo cubre Empaquetado, Pendiente de entrega o Entregado.")
-        };
+            throw new BusinessRuleException(
+                "El lote solo cubre Empaquetado, En punto de recojo, Pendiente de entrega o Entregado.");
+        }
 
         var pedidos = await db.PedidosDigitales
             .Where(p => ids.Contains(p.Id))
@@ -352,10 +353,26 @@ public sealed class PedidosDigitalesService(
             throw new BusinessRuleException("Uno o más pedidos no existen o no pertenecen a la empresa.");
         }
 
-        if (pedidos.Any(p => p.Estado != origenEsperado))
+        var origenes = pedidos.Select(p => p.Estado).Distinct().ToList();
+        if (origenes.Count != 1)
+        {
+            throw new BusinessRuleException("Todos los pedidos del lote deben compartir el mismo estado.");
+        }
+
+        var origen = origenes[0];
+        var origenValido = destino switch
+        {
+            EstadoPedidoDigital.Empaquetado => origen == EstadoPedidoDigital.Pagado,
+            EstadoPedidoDigital.EnPuntoRecojo => origen == EstadoPedidoDigital.Empaquetado,
+            EstadoPedidoDigital.PendienteEntrega => origen == EstadoPedidoDigital.Empaquetado,
+            EstadoPedidoDigital.Entregado =>
+                origen is EstadoPedidoDigital.PendienteEntrega or EstadoPedidoDigital.EnPuntoRecojo,
+            _ => false
+        };
+        if (!origenValido)
         {
             throw new BusinessRuleException(
-                $"Todos los pedidos deben estar en {origenEsperado} para pasar a {destino}.");
+                $"No se puede pasar en lote de {origen} a {destino}.");
         }
 
         var nota = request.Observacion?.Trim();
@@ -670,8 +687,8 @@ public sealed class PedidosDigitalesService(
         {
             throw new BusinessRuleException(
                 pedido.EsRecojoTienda
-                    ? "El recojo en tienda se confirma desde Pagado, Empaquetado o Pendiente de entrega."
-                    : "La entrega se confirma desde Pendiente de entrega.");
+                    ? "El recojo en tienda se confirma desde Pagado, Empaquetado, En punto de recojo o Pendiente de entrega."
+                    : "La entrega se confirma desde Pendiente de entrega o En punto de recojo.");
         }
 
         var tipo = ResolverTipoComprobante(request.TipoComprobante);

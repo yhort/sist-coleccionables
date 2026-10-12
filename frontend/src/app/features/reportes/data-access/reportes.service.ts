@@ -42,6 +42,7 @@ import {
 const ESTADOS_COBRADOS: readonly EstadoPedidoDigital[] = [
   'Pagado',
   'Empaquetado',
+  'EnPuntoRecojo',
   'PendienteEntrega',
   'Entregado',
 ];

@@ -7,7 +7,10 @@ import { readApiError } from '../../../core/http/api-error';
 import { apiUrl } from '../../../core/http/api-url';
 import { codigoPedido } from '../../../core/ui/codigo-amigable';
 import { PedidosDigitalesApiService } from '../../pedidos-digitales/data-access/pedidos-digitales.service';
-import { PedidoDigital } from '../../pedidos-digitales/models/pedido-digital.model';
+import {
+  MotivoDevolucionTienda,
+  PedidoDigital,
+} from '../../pedidos-digitales/models/pedido-digital.model';
 import {
   DespacharEntregaRequest,
   EmpaquetarEntregaRequest,
@@ -125,7 +128,10 @@ export class EntregasApiService {
     return {
       porEmpaquetar: filas.filter((fila) => fila.pedido.estado === 'Pagado').length,
       porDespachar: filas.filter((fila) => fila.pedido.estado === 'Empaquetado').length,
-      enTransito: filas.filter((fila) => fila.pedido.estado === 'PendienteEntrega').length,
+      enTransito: filas.filter(
+        (fila) =>
+          fila.pedido.estado === 'PendienteEntrega' || fila.pedido.estado === 'EnPuntoRecojo',
+      ).length,
     };
   }
 
@@ -175,8 +181,14 @@ export class EntregasApiService {
 
   despachar(pedidoId: string, request: DespacharEntregaRequest): Entrega {
     const pedido = this.requierePedido(pedidoId);
-    if (pedido.estado !== 'Empaquetado' && pedido.estado !== 'PendienteEntrega') {
-      throw new Error('Despacha desde Empaquetado o actualiza el tracking en Pendiente de entrega.');
+    if (
+      pedido.estado !== 'Empaquetado' &&
+      pedido.estado !== 'EnPuntoRecojo' &&
+      pedido.estado !== 'PendienteEntrega'
+    ) {
+      throw new Error(
+        'Despacha desde Empaquetado, deja en punto de recojo o actualiza el tracking en Pendiente de entrega.',
+      );
     }
 
     const costo = Number(request.costoEnvio);
@@ -189,13 +201,14 @@ export class EntregasApiService {
       throw new Error('Indica el N° de tracking o la clave de recojo de la agencia.');
     }
 
+    const esRecojo = request.metodoEnvio === 'RECOJO_TIENDA';
     const entrega = this.asegurar(pedido);
     if (pedido.estado === 'Empaquetado') {
       void this.pedidosApi.cambiarEstado(
         pedido.id,
-        'PendienteEntrega',
-        request.metodoEnvio === 'RECOJO_TIENDA'
-          ? 'Listo para recojo en tienda.'
+        esRecojo ? 'EnPuntoRecojo' : 'PendienteEntrega',
+        esRecojo
+          ? 'Paquete dejado en punto de recojo, esperando al cliente.'
           : `Despachado · ${request.metodoEnvio}${tracking ? ` · ${tracking}` : ''}`,
       );
     }
@@ -205,10 +218,10 @@ export class EntregasApiService {
       ...entrega,
       ...this.destinoDesdePedido(pedido),
       metodoEnvio: request.metodoEnvio,
-      numeroTracking: tracking ?? (request.metodoEnvio === 'RECOJO_TIENDA' ? `RECOJO-${codigoPedido(pedido)}` : null),
+      numeroTracking: tracking ?? (esRecojo ? `RECOJO-${codigoPedido(pedido)}` : null),
       agencia: textoOpcional(request.agencia, 80),
       costoEnvio: costo,
-      estado: request.metodoEnvio === 'RECOJO_TIENDA' ? 'PROGRAMADA' : 'DESPACHADA',
+      estado: esRecojo ? 'PROGRAMADA' : 'DESPACHADA',
       fechaDespacho: ahora,
       observacion: textoOpcional(request.observacion, 500) ?? entrega.observacion,
     };
@@ -237,14 +250,19 @@ export class EntregasApiService {
   }
 
   /**
-   * Devolución por no recojo en punto (plazo 30 días). Cancela el pedido y marca logística FALLIDA.
+   * Devolución de tienda (sin plazo mínimo). Cancela el pedido y marca logística FALLIDA.
    */
-  async devolverNoRecogido(pedidoId: string, observacion?: string): Promise<Entrega> {
+  async devolverNoRecogido(
+    pedidoId: string,
+    motivo: MotivoDevolucionTienda,
+    observacion?: string,
+  ): Promise<Entrega> {
     const pedido = this.requierePedido(pedidoId);
     try {
       const dto = await firstValueFrom(
         this.http.post<EntregaApi>(apiUrl('entregas/devolver-no-recogido'), {
           pedidoDigitalId: pedido.id,
+          motivo,
           observacion: observacion ?? null,
         }),
       );
@@ -397,6 +415,8 @@ function estadoLogisticaDesdePedido(estado: PedidoDigital['estado']): EstadoLogi
   switch (estado) {
     case 'PendienteEntrega':
       return 'DESPACHADA';
+    case 'EnPuntoRecojo':
+      return 'PROGRAMADA';
     case 'Entregado':
       return 'ENTREGADA';
     default:

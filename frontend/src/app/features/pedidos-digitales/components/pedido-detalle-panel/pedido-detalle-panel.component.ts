@@ -151,6 +151,7 @@ export class PedidoDetallePanelComponent {
   private readonly estadosYaPagados: readonly EstadoPedidoDigital[] = [
     'Pagado',
     'Empaquetado',
+    'EnPuntoRecojo',
     'PendienteEntrega',
     'Entregado',
   ];

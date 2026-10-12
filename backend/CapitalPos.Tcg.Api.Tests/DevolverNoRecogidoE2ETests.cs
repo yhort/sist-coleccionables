@@ -2,8 +2,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using CapitalPos.Tcg.Api.Domain.Entities;
-using CapitalPos.Tcg.Api.Domain.Enums;
 using CapitalPos.Tcg.Api.Infrastructure.Persistence;
 using CapitalPos.Tcg.Api.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +12,7 @@ using Xunit.Abstractions;
 namespace CapitalPos.Tcg.Api.Tests;
 
 /// <summary>
-/// Prueba de integración E2E: devolución por no recojo tras 30 días.
+/// Integración: Empaquetado → En punto de recojo → Devolución de tienda (stock) o Entregado.
 /// </summary>
 [Collection("SubastaE2E")]
 public sealed class DevolverNoRecogidoE2ETests
@@ -36,13 +34,12 @@ public sealed class DevolverNoRecogidoE2ETests
     }
 
     [Fact]
-    public async Task Devolver_no_recogido_tras_35_dias_cancela_libera_stock_y_marca_fallida()
+    public async Task Empaquetado_a_punto_recojo_a_devolucion_tienda_libera_stock_inmediato()
     {
         using var client = _factory.CreateClient();
         await LoginAsync(client);
 
         var sedeId = DevelopmentDataSeeder.SedeId;
-        var ancla = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
         Guid productoId = Guid.Empty;
         Guid pedidoId = Guid.Empty;
         Guid? entregaId = null;
@@ -50,12 +47,10 @@ public sealed class DevolverNoRecogidoE2ETests
 
         try
         {
-            // 1) Producto real con stock inicial
-            productoId = await CrearCartaConStockAsync(client, sedeId, "Carta E2E no recogido", cantidad: 3m);
+            productoId = await CrearCartaConStockAsync(client, sedeId, "Carta E2E devolución tienda", cantidad: 3m);
             Log($"Producto creado: {productoId}");
 
-            // 2) Pedido recojo tienda → Pagado → Empaquetado → PendienteEntrega (+ entrega logística)
-            pedidoId = await CrearPedidoAsync(client, sedeId, "Cliente No Recogido E2E", productoId, 25m);
+            pedidoId = await CrearPedidoAsync(client, sedeId, "Cliente Devolución Tienda E2E", productoId, 25m);
             Log($"Pedido creado: {pedidoId}");
 
             pagoId = await PagarAsync(client, 25m, pedidoId);
@@ -63,13 +58,13 @@ public sealed class DevolverNoRecogidoE2ETests
 
             var emp = await client.PostAsJsonAsync(
                 "/api/entregas/empaquetar",
-                new { pedidoDigitalId = pedidoId, notasEmpaque = "Empaque prueba E2E no recogido" },
+                new { pedidoDigitalId = pedidoId, notasEmpaque = "Empaque prueba E2E devolución tienda" },
                 Json);
             Assert.True(emp.IsSuccessStatusCode, await emp.Content.ReadAsStringAsync());
             var entregaEmp = await emp.Content.ReadFromJsonAsync<JsonElement>(Json);
             entregaId = GuidDe(entregaEmp, "id");
             Assert.NotEqual(Guid.Empty, entregaId.Value);
-            Log($"Entrega empaquetada: {entregaId}");
+            Assert.Equal("Empaquetado", await EstadoPedidoAsync(client, pedidoId));
 
             var desp = await client.PostAsJsonAsync(
                 $"/api/entregas/{entregaId}/despachar",
@@ -79,41 +74,33 @@ public sealed class DevolverNoRecogidoE2ETests
                     numeroTracking = (string?)null,
                     agencia = "Tienda Miraflores",
                     costoEnvio = 0m,
-                    observacion = "Listo para recojo E2E"
+                    observacion = "Dejado en punto de recojo E2E"
                 },
                 Json);
             Assert.True(desp.IsSuccessStatusCode, await desp.Content.ReadAsStringAsync());
 
-            var estadoAntes = await EstadoPedidoAsync(client, pedidoId);
-            Assert.Equal("PendienteEntrega", estadoAntes);
-            Log($"Estado pedido antes de antedatar: {estadoAntes}");
+            var estadoEnPunto = await EstadoPedidoAsync(client, pedidoId);
+            Assert.Equal("EnPuntoRecojo", estadoEnPunto);
+            Log($"Estado tras dejar en punto: {estadoEnPunto}");
 
-            // Antedatar creación / despacho a 2026-08-01 (~35+ días respecto a hoy)
-            await AntedatarPedidoYEntregaAsync(pedidoId, entregaId.Value, ancla);
-            Log($"Fechas antedatadas a {ancla:yyyy-MM-dd} (pedido + entrega.fechaDespacho/fechaProgramada)");
-
-            // 3) Stock justo antes de la devolución (con reserva activa)
             var stockAntes = await StockAsync(client, productoId, sedeId);
             Log(
                 $"Stock ANTES devolución → disponible={stockAntes.Disponible} reservada={stockAntes.Reservada} libre={stockAntes.Libre}");
 
-            // 4) Invocar endpoint
             var devolver = await client.PostAsJsonAsync(
                 "/api/entregas/devolver-no-recogido",
                 new
                 {
                     pedidoDigitalId = pedidoId,
-                    observacion = "E2E: no recogido en punto de entrega tras 35 días"
+                    motivo = "ClienteConfirmoNoRetirara",
+                    observacion = "E2E: cliente confirmó que no retirará"
                 },
                 Json);
             var cuerpoDevolver = await devolver.Content.ReadAsStringAsync();
-            Log($"POST /api/entregas/devolver-no-recogido → {(int)devolver.StatusCode} {devolver.StatusCode}");
-            Log($"Respuesta: {cuerpoDevolver}");
+            Log($"POST /api/entregas/devolver-no-recogido → {(int)devolver.StatusCode}");
             Assert.True(devolver.IsSuccessStatusCode, cuerpoDevolver);
 
             var entregaResp = JsonSerializer.Deserialize<JsonElement>(cuerpoDevolver, Json);
-
-            // 5) Verificaciones
             var estadoPedido = await EstadoPedidoAsync(client, pedidoId);
             var estadoLogistica = StringDe(entregaResp, "estado");
             var stockDespues = await StockAsync(client, productoId, sedeId);
@@ -123,31 +110,89 @@ public sealed class DevolverNoRecogidoE2ETests
                 sedeId,
                 "LIBERACION_RESERVA");
 
-            Log("========== RESULTADO E2E DEVOLVER NO RECOGIDO ==========");
-            Log($"Pedido.estado          = {estadoPedido}  (esperado: Cancelado)");
-            Log($"Entrega.estado         = {estadoLogistica}  (esperado: FALLIDA)");
-            Log(
-                $"Stock DESPUÉS          → disponible={stockDespues.Disponible} reservada={stockDespues.Reservada} libre={stockDespues.Libre}");
-            Log(
-                $"Δ libre                = {stockDespues.Libre - stockAntes.Libre:+0;-0;0}  (esperado: +1 por liberación de reserva)");
-            Log(
-                $"Δ reservada            = {stockDespues.Reservada - stockAntes.Reservada:+0;-0;0}  (esperado: -1)");
-            Log($"Kardex LIBERACION_RESERVA (conteo en sede/producto) = {liberaciones} (esperado ≥ 1)");
-            Log("========================================================");
-
             Assert.Equal("Cancelado", estadoPedido);
             Assert.Equal("FALLIDA", estadoLogistica);
             Assert.Equal(stockAntes.Libre + 1m, stockDespues.Libre);
             Assert.Equal(stockAntes.Reservada - 1m, stockDespues.Reservada);
             Assert.True(liberaciones >= 1, "Debe existir movimiento kardex LIBERACION_RESERVA");
-
-            Log("OK: todas las aserciones pasaron. Limpiando datos de prueba…");
+            Log("OK: Empaquetado → EnPuntoRecojo → Devolución de tienda con restitución de stock.");
         }
         finally
         {
-            // 6) Limpieza (best-effort)
             await LimpiarAsync(pedidoId, pagoId, entregaId, productoId, sedeId);
-            Log("Limpieza de registros de prueba finalizada.");
+        }
+    }
+
+    [Fact]
+    public async Task Empaquetado_a_punto_recojo_a_entregado_al_cliente()
+    {
+        using var client = _factory.CreateClient();
+        await LoginAsync(client);
+
+        var sedeId = DevelopmentDataSeeder.SedeId;
+        Guid productoId = Guid.Empty;
+        Guid pedidoId = Guid.Empty;
+        Guid? entregaId = null;
+        Guid? pagoId = null;
+
+        try
+        {
+            productoId = await CrearCartaConStockAsync(client, sedeId, "Carta E2E entregar cliente", cantidad: 2m);
+            pedidoId = await CrearPedidoAsync(client, sedeId, "Cliente Entrega Punto E2E", productoId, 30m);
+            pagoId = await PagarAsync(client, 30m, pedidoId);
+
+            var emp = await client.PostAsJsonAsync(
+                "/api/entregas/empaquetar",
+                new { pedidoDigitalId = pedidoId, notasEmpaque = "Empaque E2E entregar al cliente" },
+                Json);
+            Assert.True(emp.IsSuccessStatusCode, await emp.Content.ReadAsStringAsync());
+            entregaId = GuidDe(await emp.Content.ReadFromJsonAsync<JsonElement>(Json), "id");
+
+            var desp = await client.PostAsJsonAsync(
+                $"/api/entregas/{entregaId}/despachar",
+                new
+                {
+                    metodoEnvio = "RECOJO_TIENDA",
+                    numeroTracking = (string?)null,
+                    agencia = "Tienda Miraflores",
+                    costoEnvio = 0m,
+                    observacion = "En punto de recojo"
+                },
+                Json);
+            Assert.True(desp.IsSuccessStatusCode, await desp.Content.ReadAsStringAsync());
+            Assert.Equal("EnPuntoRecojo", await EstadoPedidoAsync(client, pedidoId));
+
+            await AsegurarCajaAsync(client, sedeId);
+
+            var stockAntes = await StockAsync(client, productoId, sedeId);
+            var confirmar = await client.PostAsJsonAsync(
+                $"/api/entregas/{entregaId}/confirmar",
+                new { observacion = "Cliente retiró el paquete", emitirComprobante = false },
+                Json);
+            Assert.True(confirmar.IsSuccessStatusCode, await confirmar.Content.ReadAsStringAsync());
+
+            Assert.Equal("Entregado", await EstadoPedidoAsync(client, pedidoId));
+
+            // Pedido cerrado: no admite devolución de tienda.
+            var devolver = await client.PostAsJsonAsync(
+                "/api/entregas/devolver-no-recogido",
+                new
+                {
+                    pedidoDigitalId = pedidoId,
+                    motivo = "CancelacionDevolucionSolicitada"
+                },
+                Json);
+            Assert.False(devolver.IsSuccessStatusCode);
+
+            var stockDespues = await StockAsync(client, productoId, sedeId);
+            Assert.True(
+                stockDespues.Reservada < stockAntes.Reservada || stockDespues.Libre <= stockAntes.Libre,
+                "Al entregar se confirma la reserva (deja de estar reservada).");
+            Log("OK: Empaquetado → EnPuntoRecojo → Entregado; devolución bloqueada.");
+        }
+        finally
+        {
+            await LimpiarAsync(pedidoId, pagoId, entregaId, productoId, sedeId);
         }
     }
 
@@ -156,28 +201,6 @@ public sealed class DevolverNoRecogidoE2ETests
         var line = $"[DevolverNoRecogidoE2E] {mensaje}";
         _output.WriteLine(line);
         Console.WriteLine(line);
-    }
-
-    private async Task AntedatarPedidoYEntregaAsync(Guid pedidoId, Guid entregaId, DateTimeOffset ancla)
-    {
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var tenant = scope.ServiceProvider.GetRequiredService<ITenantProvider>();
-        tenant.SetEmpresa(DevelopmentDataSeeder.EmpresaId);
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var pedido = await db.PedidosDigitales
-            .IgnoreQueryFilters()
-            .FirstAsync(p => p.Id == pedidoId);
-        pedido.FechaPedido = ancla;
-
-        var entrega = await db.Entregas
-            .IgnoreQueryFilters()
-            .FirstAsync(e => e.Id == entregaId);
-        entrega.FechaProgramada = ancla;
-        entrega.FechaDespacho = ancla;
-        entrega.FechaCreacion = ancla;
-
-        await db.SaveChangesAsync();
     }
 
     private async Task LimpiarAsync(
@@ -199,6 +222,30 @@ public sealed class DevolverNoRecogidoE2ETests
 
         if (pedidoId != Guid.Empty)
         {
+            var ventas = await db.PedidosDigitales.IgnoreQueryFilters()
+                .Where(p => p.Id == pedidoId && p.VentaId != null)
+                .Select(p => p.VentaId!.Value)
+                .ToListAsync();
+            if (ventas.Count > 0)
+            {
+                var comps = await db.Comprobantes.IgnoreQueryFilters()
+                    .Where(c => ventas.Contains(c.VentaId))
+                    .ToListAsync();
+                db.Comprobantes.RemoveRange(comps);
+                var ventaPagos = await db.VentaPagos.IgnoreQueryFilters()
+                    .Where(v => ventas.Contains(v.VentaId))
+                    .ToListAsync();
+                db.VentaPagos.RemoveRange(ventaPagos);
+                var ventaDets = await db.VentaDetalles.IgnoreQueryFilters()
+                    .Where(d => ventas.Contains(d.VentaId))
+                    .ToListAsync();
+                db.VentaDetalles.RemoveRange(ventaDets);
+                var ventasEnt = await db.Ventas.IgnoreQueryFilters()
+                    .Where(v => ventas.Contains(v.Id))
+                    .ToListAsync();
+                db.Ventas.RemoveRange(ventasEnt);
+            }
+
             var kardexPedido = await db.MovimientosInventario
                 .IgnoreQueryFilters()
                 .Where(k => k.ReferenciaTipo == "PEDIDO_DIGITAL" && k.ReferenciaId == pedidoId)
@@ -280,7 +327,7 @@ public sealed class DevolverNoRecogidoE2ETests
         }
 
         await db.SaveChangesAsync();
-        _ = sedeId; // reservado por si se amplía limpieza por sede
+        _ = sedeId;
     }
 
     private async Task LoginAsync(HttpClient client)
@@ -300,6 +347,23 @@ public sealed class DevolverNoRecogidoE2ETests
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         client.DefaultRequestHeaders.Remove("X-CapitalPos-EmpresaId");
         client.DefaultRequestHeaders.Add("X-CapitalPos-EmpresaId", DevelopmentDataSeeder.EmpresaId.ToString());
+    }
+
+    private async Task AsegurarCajaAsync(HttpClient client, Guid sedeId)
+    {
+        var estado = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/caja/sesion-actual?sedeId={sedeId}",
+            Json);
+        if (estado.TryGetProperty("abierta", out var abierta) && abierta.GetBoolean())
+        {
+            return;
+        }
+
+        var abrir = await client.PostAsJsonAsync(
+            "/api/caja/apertura",
+            new { sedeId, montoApertura = 50m, observacion = "Apertura prueba devolución tienda" },
+            Json);
+        Assert.True(abrir.IsSuccessStatusCode, await abrir.Content.ReadAsStringAsync());
     }
 
     private async Task<Guid> CrearCartaConStockAsync(

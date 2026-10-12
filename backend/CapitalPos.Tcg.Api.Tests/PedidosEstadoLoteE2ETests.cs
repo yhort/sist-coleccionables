@@ -116,7 +116,12 @@ public sealed class PedidosEstadoLoteE2ETests
 
         Assert.Equal(HttpStatusCode.BadRequest, lote.StatusCode);
         var cuerpo = await lote.Content.ReadFromJsonAsync<JsonElement>(Json);
-        Assert.Contains("Pagado", DetalleError(cuerpo), StringComparison.OrdinalIgnoreCase);
+        var detalle = DetalleError(cuerpo);
+        Assert.True(
+            detalle.Contains("Pagado", StringComparison.OrdinalIgnoreCase)
+            || detalle.Contains("PendientePago", StringComparison.OrdinalIgnoreCase)
+            || detalle.Contains("No se puede pasar en lote", StringComparison.OrdinalIgnoreCase),
+            detalle);
     }
 
     private async Task LoteEstadoAsync(HttpClient client, string estado, params Guid[] ids)

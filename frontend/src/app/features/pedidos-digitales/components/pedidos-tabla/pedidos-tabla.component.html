@@ -96,7 +96,10 @@
               }
             }
             @case ('despachar') {
-              <button type="button" class="primary" (click)="ejecutarLoteLogistico('PendienteEntrega')">
+              <button type="button" class="primary" (click)="ejecutarLoteLogistico('EnPuntoRecojo')">
+                Enviar / Dejar en punto de recojo ({{ etiquetaCantidad(lote.count) }})
+              </button>
+              <button type="button" class="ghost" (click)="ejecutarLoteLogistico('PendienteEntrega')">
                 Despachar / Enviar a Entrega ({{ etiquetaCantidad(lote.count) }})
               </button>
               <button type="button" class="ghost" (click)="imprimirEtiquetasLote()">
@@ -110,7 +113,7 @@
             }
             @case ('entregar') {
               <button type="button" class="primary" (click)="ejecutarLoteLogistico('Entregado')">
-                Marcar como Entregados ({{ etiquetaCantidad(lote.count) }})
+                Entregar al cliente ({{ etiquetaCantidad(lote.count) }})
               </button>
             }
             @case ('cpe') {
@@ -315,13 +318,22 @@
                     Despachar
                   </button>
                 }
+                @if (puedeEnviarPuntoRecojo(item.pedido)) {
+                  <button
+                    type="button"
+                    class="accion-btn"
+                    (click)="transicionar.emit({ pedido: item.pedido, estado: 'EnPuntoRecojo' })"
+                  >
+                    Enviar / Dejar en punto de recojo
+                  </button>
+                }
                 @if (puedeEntregarRapido(item.pedido)) {
                   <button
                     type="button"
                     class="entregar-btn"
                     (click)="transicionar.emit({ pedido: item.pedido, estado: 'Entregado' })"
                   >
-                    Entregar
+                    Entregar al cliente
                   </button>
                 }
                 @if (puedeLiberarStock(item.pedido)) {
@@ -330,7 +342,7 @@
                     class="accion-btn accion-btn--abandono"
                     (click)="liberarStockAbandono.emit(item.pedido)"
                   >
-                    Liberar stock por abandono (No recogido)
+                    Devolución de tienda
                   </button>
                 }
               </td>

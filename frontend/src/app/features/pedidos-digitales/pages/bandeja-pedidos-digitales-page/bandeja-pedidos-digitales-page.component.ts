@@ -46,6 +46,7 @@ import {
   PedidoDigital,
   PedidosDigitalesFiltros,
   EstadoPedidoDigital,
+  MotivoDevolucionTienda,
   crearFiltrosPedidosDiaActual,
   etiquetaCantidadPedidos,
   origenDeCanal,
@@ -235,6 +236,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
         (pedido) =>
           pedido.estado === 'Pagado' ||
           pedido.estado === 'Empaquetado' ||
+          pedido.estado === 'EnPuntoRecojo' ||
           pedido.estado === 'PendienteEntrega',
       ).length,
       entregados: pedidos.filter((pedido) => pedido.estado === 'Entregado').length,
@@ -478,7 +480,7 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     this.abandonoError.set('');
   }
 
-  async confirmarLiberarStock(): Promise<void> {
+  async confirmarLiberarStock(motivo: MotivoDevolucionTienda): Promise<void> {
     const pedido = this.abandonoPedido();
     if (!pedido || this.abandonoGuardando()) {
       return;
@@ -486,15 +488,15 @@ export class BandejaPedidosDigitalesPageComponent implements AfterViewInit {
     this.abandonoGuardando.set(true);
     this.abandonoError.set('');
     try {
-      await this.pedidosApi.liberarStockPorAbandono(pedido.id);
+      await this.pedidosApi.liberarStockPorAbandono(pedido.id, motivo);
       await this.refrescarPedidos().catch(() => undefined);
       this.abandonoPedido.set(null);
       this.seleccionadoId.set(null);
       this.moverACancelado();
-      this.mostrarToast('Pedido cancelado por abandono y stock liberado correctamente.');
+      this.mostrarToast('Devolución de tienda registrada: pedido cancelado y stock liberado.');
     } catch (err) {
       this.abandonoError.set(
-        err instanceof Error ? err.message : 'No se pudo liberar el stock del pedido.',
+        err instanceof Error ? err.message : 'No se pudo registrar la devolución de tienda.',
       );
     } finally {
       this.abandonoGuardando.set(false);

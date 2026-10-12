@@ -3,8 +3,9 @@
     <div>
       <h2>Pedidos Digitales</h2>
       <p>
-        Flujo operativo: Pendiente de pago → Pagado → Empaquetado → Pendiente de entrega →
-        Entregado. Cobra, resume por WhatsApp y anula subastas desde la tabla, sin salir a Pagos.
+        Flujo operativo: Pendiente de pago → Pagado → Empaquetado → En punto de recojo /
+        Pendiente de entrega → Entregado. Cobra, resume por WhatsApp y anula subastas desde la
+        tabla, sin salir a Pagos.
       </p>
     </div>
     <div class="pedidos__header-actions">
@@ -254,7 +255,7 @@
     [pedido]="pedido"
     [guardando]="abandonoGuardando()"
     [error]="abandonoError()"
-    (confirmed)="confirmarLiberarStock()"
+    (confirmed)="confirmarLiberarStock($event)"
     (cancelled)="cerrarLiberarStock()"
   />
 }

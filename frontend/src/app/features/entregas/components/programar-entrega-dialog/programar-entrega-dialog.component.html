@@ -13,10 +13,15 @@
         <h2 id="empaque-title">Empaquetar pedido</h2>
         <p>Registra las notas de empaque. El pedido pasa a Empaquetado en el Kanban.</p>
       } @else {
-        <h2 id="despacho-title">Despachar / asignar tracking</h2>
+        <h2 id="despacho-title">
+          {{ esRecojo() ? 'Enviar / Dejar en punto de recojo' : 'Despachar / asignar tracking' }}
+        </h2>
         <p>
-          Agencia, costo de envío y N° de seguimiento o clave de recojo. El pedido pasa a
-          Pendiente de entrega.
+          @if (esRecojo()) {
+            Deja el paquete en el local de entrega. El pedido pasa a En punto de recojo.
+          } @else {
+            Agencia, costo de envío y N° de seguimiento. El pedido pasa a Pendiente de entrega.
+          }
         </p>
       }
     </div>
@@ -85,7 +90,13 @@
     <footer class="dialog__footer">
       <button type="button" class="ghost" (click)="cancelled.emit()">Cancelar</button>
       <button type="submit" class="primary">
-        {{ modo() === 'empaque' ? 'Empaquetar pedido' : 'Despachar / asignar tracking' }}
+        @if (modo() === 'empaque') {
+          Empaquetar pedido
+        } @else if (esRecojo()) {
+          Enviar / Dejar en punto de recojo
+        } @else {
+          Despachar / asignar tracking
+        }
       </button>
     </footer>
   </form>

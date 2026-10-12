@@ -13,7 +13,7 @@ import { Component, input } from '@angular/core';
         <strong>{{ porDespachar() }}</strong>
       </article>
       <article>
-        <span>Pendiente de entrega</span>
+        <span>En curso</span>
         <strong>{{ enTransito() }}</strong>
       </article>
     </section>

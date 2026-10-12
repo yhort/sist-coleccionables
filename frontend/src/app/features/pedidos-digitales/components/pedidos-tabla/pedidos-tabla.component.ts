@@ -16,6 +16,7 @@ import {
   puedeAnularPedido,
   puedeDespachar,
   puedeEmpaquetar,
+  puedeEnviarPuntoRecojo,
   puedeEntregarRapido,
   puedeImprimirEtiqueta,
   puedeLiberarStockPorAbandono,
@@ -123,6 +124,7 @@ export class PedidosTablaComponent {
   readonly origenDe = origenDeCanal;
   readonly puedeEmpaquetar = puedeEmpaquetar;
   readonly puedeDespachar = puedeDespachar;
+  readonly puedeEnviarPuntoRecojo = puedeEnviarPuntoRecojo;
   readonly puedeEntregarRapido = puedeEntregarRapido;
   readonly puedeAnular = puedeAnularPedido;
   readonly puedeLiberarStock = puedeLiberarStockPorAbandono;
@@ -300,6 +302,7 @@ export class PedidosTablaComponent {
           mismoCliente: mismoClienteCobro(pedidos),
           clienteNombre: pedidos[0].clienteNombre,
         };
+      case 'EnPuntoRecojo':
       case 'PendienteEntrega':
         return { tipo: 'entregar', pedidos, count: pedidos.length };
       case 'Entregado':

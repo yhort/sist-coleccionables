@@ -22,11 +22,18 @@ export type EstadoPedidoDigital =
   | 'PendientePago'
   | 'Pagado'
   | 'Empaquetado'
+  | 'EnPuntoRecojo'
   | 'PendienteEntrega'
   | 'Entregado'
   | 'Cancelado'
   | 'Anulado'
   | 'Devuelto';
+
+/** Motivos de devolución de tienda (alineados al enum backend MotivoDevolucionTienda). */
+export type MotivoDevolucionTienda =
+  | 'PlazoRetiroVencido'
+  | 'ClienteConfirmoNoRetirara'
+  | 'CancelacionDevolucionSolicitada';
 
 export type IndicadorReservaPedido = 'Reservado' | 'Liberado' | 'Confirmado';
 
@@ -180,6 +187,7 @@ export const COLUMNAS_KANBAN: readonly EstadoPedidoDigital[] = [
   'PendientePago',
   'Pagado',
   'Empaquetado',
+  'EnPuntoRecojo',
   'PendienteEntrega',
   'Entregado',
   'Cancelado',
@@ -187,6 +195,7 @@ export const COLUMNAS_KANBAN: readonly EstadoPedidoDigital[] = [
   'Devuelto',
 ];
 
+/** Flujo lineal courier. EnPuntoRecojo es rama de recojo desde Empaquetado. */
 export const FLUJO_OPERATIVO: readonly EstadoPedidoDigital[] = [
   'PendientePago',
   'Pagado',
@@ -194,6 +203,18 @@ export const FLUJO_OPERATIVO: readonly EstadoPedidoDigital[] = [
   'PendienteEntrega',
   'Entregado',
 ];
+
+export const MOTIVOS_DEVOLUCION_TIENDA: readonly MotivoDevolucionTienda[] = [
+  'PlazoRetiroVencido',
+  'ClienteConfirmoNoRetirara',
+  'CancelacionDevolucionSolicitada',
+];
+
+export const ETIQUETAS_MOTIVO_DEVOLUCION_TIENDA: Record<MotivoDevolucionTienda, string> = {
+  PlazoRetiroVencido: 'Plazo de retiro vencido (Abandono automático)',
+  ClienteConfirmoNoRetirara: 'Cliente confirmó que no retirará (Abandono explícito)',
+  CancelacionDevolucionSolicitada: 'Cancelación / Devolución solicitada',
+};
 
 export const ESTADOS_TERMINALES_PEDIDO: readonly EstadoPedidoDigital[] = [
   'Entregado',
@@ -275,6 +296,7 @@ export const ETIQUETAS_ESTADO_PEDIDO: Record<EstadoPedidoDigital, string> = {
   PendientePago: 'Pendiente de pago',
   Pagado: 'Pagado',
   Empaquetado: 'Empaquetado',
+  EnPuntoRecojo: 'En punto de recojo',
   PendienteEntrega: 'Pendiente de entrega',
   Entregado: 'Entregado',
   Cancelado: 'Cancelado',
@@ -287,8 +309,9 @@ export const ETIQUETAS_ACCION_ESTADO_PEDIDO: Record<EstadoPedidoDigital, string>
   PendientePago: 'Marcar pendiente de pago',
   Pagado: 'Marcar pagado',
   Empaquetado: 'Empaquetar',
+  EnPuntoRecojo: 'Enviar / Dejar en punto de recojo',
   PendienteEntrega: 'Despachar',
-  Entregado: 'Entregar',
+  Entregado: 'Entregar al cliente',
   Cancelado: 'Cancelar',
   Anulado: 'Anulado',
   Devuelto: 'Devuelto',
@@ -378,11 +401,19 @@ export function transicionesPermitidas(
     return [];
   }
 
+  if (estado === 'EnPuntoRecojo') {
+    return ['Entregado', 'Cancelado'];
+  }
+
   const siguientes: EstadoPedidoDigital[] = [];
   const indice = FLUJO_OPERATIVO.indexOf(estado);
   const siguiente = indice >= 0 ? FLUJO_OPERATIVO[indice + 1] : undefined;
   if (siguiente && siguiente !== 'Entregado') {
     siguientes.push(siguiente);
+  }
+
+  if (estado === 'Empaquetado') {
+    siguientes.push('EnPuntoRecojo');
   }
 
   const puedeEntregar =
@@ -397,9 +428,9 @@ export function transicionesPermitidas(
 }
 
 /**
- * Acceso directo "Entregar":
- * - Recojo: desde Pagado / Empaquetado / PendienteEntrega (mostrador).
- * - Envío: solo desde PendienteEntrega (tras Empaquetar → Despachar).
+ * Acceso directo "Entregar al cliente":
+ * - Recojo: desde Pagado / Empaquetado / EnPuntoRecojo / PendienteEntrega (mostrador).
+ * - Envío: desde PendienteEntrega (tras Empaquetar → Despachar).
  */
 export function puedeEntregarRapido(
   pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
@@ -428,6 +459,18 @@ export function puedeDespachar(
   );
 }
 
+export function puedeEnviarPuntoRecojo(
+  pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
+): boolean {
+  if (pedidoBloqueadoPorNc(pedido)) {
+    return false;
+  }
+  return (
+    pedido.estado === 'Empaquetado' &&
+    transicionesPermitidas(pedido).includes('EnPuntoRecojo')
+  );
+}
+
 export function puedeTransicionarA(
   pedido: Pick<PedidoDigital, 'estado' | 'entrega' | 'notaCredito'>,
   destino: EstadoPedidoDigital,
@@ -440,11 +483,15 @@ export function puedeAnularPedido(pedido: Pick<PedidoDigital, 'estado'>): boolea
 }
 
 /**
- * Baja por abandono (no recogido). Visible en Pendiente de entrega,
- * que es el estado del pedido cuando la logística ya está Despachada.
+ * Devolución de tienda: Empaquetado, En punto de recojo o Pendiente de entrega.
+ * No aplica a Entregado ni a estados terminales. Sin plazo mínimo (el backend revalida).
  */
 export function puedeLiberarStockPorAbandono(pedido: Pick<PedidoDigital, 'estado'>): boolean {
-  return pedido.estado === 'PendienteEntrega';
+  return (
+    pedido.estado === 'Empaquetado' ||
+    pedido.estado === 'EnPuntoRecojo' ||
+    pedido.estado === 'PendienteEntrega'
+  );
 }
 
 /** Devolución parcial de un ítem al inventario (solo Pendiente de entrega). */
@@ -461,6 +508,7 @@ export function puedeImprimirEtiqueta(
   return (
     pedido.estado === 'Pagado' ||
     pedido.estado === 'Empaquetado' ||
+    pedido.estado === 'EnPuntoRecojo' ||
     pedido.estado === 'PendienteEntrega'
   );
 }

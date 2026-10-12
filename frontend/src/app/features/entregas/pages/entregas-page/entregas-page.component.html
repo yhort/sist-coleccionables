@@ -3,8 +3,8 @@
     <div>
       <h2>Entregas y envíos</h2>
       <p>
-        Cola de despacho de pedidos Pagado, Empaquetado y Pendiente de entrega. Confirmar genera
-        la venta y el movimiento de kardex VENTA.
+        Cola de despacho: Pagado, Empaquetado, En punto de recojo y Pendiente de entrega.
+        «Entregar al cliente» genera la venta y el kardex VENTA.
       </p>
     </div>
   </header>
@@ -35,7 +35,7 @@
     (empaquetar)="abrirEmpaque($event)"
     (despachar)="abrirDespacho($event)"
     (confirmar)="confirmar($event)"
-    (devolver)="devolverNoRecogido($event)"
+    (devolver)="abrirDevolucion($event)"
     (etiqueta)="abrirEtiqueta($event)"
   />
 </section>
@@ -55,4 +55,14 @@
   @if (filaActiva(); as fila) {
     <app-packing-slip-dialog [fila]="fila" (closed)="cerrarDialog()" />
   }
+}
+
+@if (devolucionFila(); as fila) {
+  <app-liberar-stock-abandono-dialog
+    [pedido]="fila.pedido"
+    [guardando]="devolucionGuardando()"
+    [error]="error()"
+    (confirmed)="confirmarDevolucion($event)"
+    (cancelled)="cerrarDevolucion()"
+  />
 }

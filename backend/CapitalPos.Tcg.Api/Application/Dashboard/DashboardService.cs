@@ -172,6 +172,7 @@ public sealed class DashboardService(ApplicationDbContext db)
         EstadoPedidoDigital.PendientePago => "Pendiente de pago",
         EstadoPedidoDigital.Pagado => "Pagado",
         EstadoPedidoDigital.Empaquetado => "Empaquetado",
+        EstadoPedidoDigital.EnPuntoRecojo => "En punto de recojo",
         EstadoPedidoDigital.PendienteEntrega => "Pendiente de entrega",
         EstadoPedidoDigital.Entregado => "Entregado",
         EstadoPedidoDigital.Cancelado => "Cancelado",

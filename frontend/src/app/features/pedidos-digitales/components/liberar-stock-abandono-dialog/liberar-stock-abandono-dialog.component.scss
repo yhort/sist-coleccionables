@@ -69,6 +69,25 @@
     line-height: 1.45;
   }
 
+  &__motivo {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.9rem;
+    color: var(--color-text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+
+    select {
+      min-height: 40px;
+      padding: 0.45rem 0.65rem;
+      font-weight: 500;
+      color: var(--color-text-primary);
+      background: var(--color-background);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+  }
+
   &__error {
     margin-top: 0.75rem;
     color: var(--color-danger);

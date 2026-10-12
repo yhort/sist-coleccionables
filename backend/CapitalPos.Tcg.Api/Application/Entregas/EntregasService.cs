@@ -98,9 +98,14 @@ public sealed class EntregasService(
         CancellationToken cancellationToken)
     {
         var pedido = await pedidos.CargarAsync(request.PedidoDigitalId, cancellationToken);
-        if (pedido.Estado is not (EstadoPedidoDigital.Empaquetado or EstadoPedidoDigital.PendienteEntrega or EstadoPedidoDigital.Pagado))
+        if (pedido.Estado is not (
+            EstadoPedidoDigital.Empaquetado
+            or EstadoPedidoDigital.EnPuntoRecojo
+            or EstadoPedidoDigital.PendienteEntrega
+            or EstadoPedidoDigital.Pagado))
         {
-            throw new BusinessRuleException("Programa la entrega desde Pagado, Empaquetado o Pendiente de entrega.");
+            throw new BusinessRuleException(
+                "Programa la entrega desde Pagado, Empaquetado, En punto de recojo o Pendiente de entrega.");
         }
 
         if (pedido.Estado == EstadoPedidoDigital.Pagado)
@@ -144,9 +149,13 @@ public sealed class EntregasService(
     {
         var entrega = await CargarAsync(id, cancellationToken);
         var pedido = entrega.Pedido;
-        if (pedido.Estado is not (EstadoPedidoDigital.Empaquetado or EstadoPedidoDigital.PendienteEntrega))
+        if (pedido.Estado is not (
+            EstadoPedidoDigital.Empaquetado
+            or EstadoPedidoDigital.EnPuntoRecojo
+            or EstadoPedidoDigital.PendienteEntrega))
         {
-            throw new BusinessRuleException("Despacha desde Empaquetado o actualiza el tracking en Pendiente de entrega.");
+            throw new BusinessRuleException(
+                "Despacha desde Empaquetado, deja en punto de recojo o actualiza el tracking en Pendiente de entrega.");
         }
 
         if (request.CostoEnvio < 0)
@@ -160,12 +169,16 @@ public sealed class EntregasService(
             throw new BusinessRuleException("Indica el N° de tracking o la clave de recojo de la agencia.");
         }
 
+        var esRecojoTienda = request.MetodoEnvio == MetodoEnvio.RECOJO_TIENDA;
         if (pedido.Estado == EstadoPedidoDigital.Empaquetado)
         {
-            var observacion = request.MetodoEnvio == MetodoEnvio.RECOJO_TIENDA
-                ? "Listo para recojo en tienda."
+            var destinoEstado = esRecojoTienda
+                ? EstadoPedidoDigital.EnPuntoRecojo
+                : EstadoPedidoDigital.PendienteEntrega;
+            var observacion = esRecojoTienda
+                ? "Paquete dejado en punto de recojo, esperando al cliente."
                 : $"Despachado · {request.MetodoEnvio}{(tracking is null ? string.Empty : $" · {tracking}")}";
-            await pedidos.CambiarEstadoAsync(pedido.Id, EstadoPedidoDigital.PendienteEntrega, observacion, cancellationToken);
+            await pedidos.CambiarEstadoAsync(pedido.Id, destinoEstado, observacion, cancellationToken);
             pedido = await pedidos.CargarAsync(pedido.Id, cancellationToken);
             entrega = pedido.Entrega ?? entrega;
         }
@@ -173,13 +186,13 @@ public sealed class EntregasService(
         var ahora = DateTimeOffset.UtcNow;
         entrega.MetodoEnvio = request.MetodoEnvio;
         entrega.NumeroTracking = tracking
-            ?? (request.MetodoEnvio == MetodoEnvio.RECOJO_TIENDA
+            ?? (esRecojoTienda
                 ? $"RECOJO-{pedido.Id.ToString("N")[..8]}".ToUpperInvariant()
                 : null);
 
         entrega.Agencia = TextoOpcional(request.Agencia, 80);
         entrega.CostoEnvio = IgvCalculo.Round2(request.CostoEnvio);
-        entrega.Estado = request.MetodoEnvio == MetodoEnvio.RECOJO_TIENDA
+        entrega.Estado = esRecojoTienda
             ? EstadoLogistica.PROGRAMADA
             : EstadoLogistica.DESPACHADA;
         entrega.FechaDespacho = ahora;
@@ -238,14 +251,21 @@ public sealed class EntregasService(
     }
 
     /// <summary>
-    /// Cancela el pedido y marca la logística como FALLIDA cuando el cliente no recogió
-    /// en el punto de entrega tras al menos 30 días desde el despacho/programación.
+    /// Devolución de tienda: cancela el pedido, libera el stock reservado (kardex) y marca
+    /// la logística como FALLIDA. Disponible de inmediato en Empaquetado, En punto de recojo
+    /// o Pendiente de entrega (sin plazo mínimo). No aplica a pedidos Entregados.
     /// </summary>
     public async Task<EntregaResponse> DevolverNoRecogidoAsync(
         DevolverNoRecogidoRequest request,
         CancellationToken cancellationToken)
     {
-        const int plazoDias = 30;
+        if (request.Motivo is null || !Enum.IsDefined(request.Motivo.Value))
+        {
+            throw new BusinessRuleException("Selecciona un motivo de devolución de tienda válido.");
+        }
+
+        var motivoEnum = request.Motivo.Value;
+
         var pedido = await pedidos.CargarAsync(request.PedidoDigitalId, cancellationToken);
 
         if (pedido.Estado is EstadoPedidoDigital.Entregado
@@ -254,13 +274,16 @@ public sealed class EntregasService(
             or EstadoPedidoDigital.Devuelto)
         {
             throw new BusinessRuleException(
-                "El pedido ya está cerrado y no admite devolución por no recojo.");
+                "El pedido ya está cerrado y no admite devolución de tienda.");
         }
 
-        if (pedido.Estado is not (EstadoPedidoDigital.PendienteEntrega or EstadoPedidoDigital.Empaquetado))
+        if (pedido.Estado is not (
+            EstadoPedidoDigital.PendienteEntrega
+            or EstadoPedidoDigital.Empaquetado
+            or EstadoPedidoDigital.EnPuntoRecojo))
         {
             throw new BusinessRuleException(
-                "Solo se puede devolver un pedido Empaquetado o Pendiente de entrega no recogido.");
+                "La devolución de tienda aplica a pedidos Empaquetados, en punto de recojo o Pendiente de entrega.");
         }
 
         var entrega = await AsegurarAsync(pedido, cancellationToken);
@@ -270,7 +293,7 @@ public sealed class EntregasService(
         if (!EsMetodoPuntoEntrega(entrega.MetodoEnvio))
         {
             throw new BusinessRuleException(
-                "La devolución por no recojo aplica a recojo en tienda o agencia (Shalom / Olva).");
+                "La devolución de tienda aplica a recojo en tienda o agencia (Shalom / Olva).");
         }
 
         if (entrega.Estado == EstadoLogistica.ENTREGADA)
@@ -278,17 +301,15 @@ public sealed class EntregasService(
             throw new BusinessRuleException("No se puede devolver una entrega ya confirmada.");
         }
 
-        var ancla = entrega.FechaDespacho ?? entrega.FechaProgramada ?? pedido.FechaPedido;
-        var vencimiento = ancla.AddDays(plazoDias);
-        if (DateTimeOffset.UtcNow < vencimiento)
+        var etiquetaMotivo = PedidoKanban.EtiquetaMotivoDevolucionTienda(motivoEnum);
+        var extra = TextoOpcional(request.Observacion, 500);
+        var motivo = extra is null
+            ? $"Devolución de tienda · {etiquetaMotivo}."
+            : $"Devolución de tienda · {etiquetaMotivo}. {extra}";
+        if (motivo.Length > 500)
         {
-            var diasRestantes = Math.Max(1, (int)Math.Ceiling((vencimiento - DateTimeOffset.UtcNow).TotalDays));
-            throw new BusinessRuleException(
-                $"Aún no cumple el plazo de {plazoDias} días para devolución por no recojo. Faltan aproximadamente {diasRestantes} día(s).");
+            motivo = motivo[..500];
         }
-
-        var motivo = TextoOpcional(request.Observacion, 500)
-            ?? $"Devolución por no recojo en punto de entrega (plazo {plazoDias} días).";
 
         await pedidos.CancelarAsync(pedido.Id, motivo, cancellationToken);
 

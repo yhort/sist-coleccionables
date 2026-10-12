@@ -410,6 +410,7 @@ public sealed class PagosService(
             }
 
             if (pedido.Estado is EstadoPedidoDigital.Empaquetado
+                or EstadoPedidoDigital.EnPuntoRecojo
                 or EstadoPedidoDigital.PendienteEntrega
                 or EstadoPedidoDigital.Entregado
                 or EstadoPedidoDigital.Anulado

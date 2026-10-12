@@ -5,6 +5,11 @@ public enum EstadoPedidoDigital
     PendientePago,
     Pagado,
     Empaquetado,
+    /// <summary>
+    /// Paquete ya dejado en el local / punto de entrega (p. ej. tienda, Papurris, TCG Center),
+    /// esperando retiro del cliente. Persistido como string; pedidos históricos sin este valor siguen válidos.
+    /// </summary>
+    EnPuntoRecojo,
     PendienteEntrega,
     Entregado,
     Cancelado,

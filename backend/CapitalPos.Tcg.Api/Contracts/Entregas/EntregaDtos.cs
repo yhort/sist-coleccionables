@@ -89,12 +89,17 @@ public sealed class FallarEntregaRequest
 }
 
 /// <summary>
-/// Devolución por no recojo en punto de entrega (plazo mínimo 30 días desde despacho/programación).
+/// Devolución de tienda: desvincula productos del pedido, libera el 100% del stock
+/// (kardex LIBERACION_RESERVA) y marca la logística como FALLIDA. Sin plazo mínimo.
 /// </summary>
 public sealed class DevolverNoRecogidoRequest
 {
     [Required]
     public Guid PedidoDigitalId { get; set; }
+
+    /// <summary>Obligatorio: motivo operativo de la devolución de tienda.</summary>
+    [Required]
+    public MotivoDevolucionTienda? Motivo { get; set; }
 
     [MaxLength(500)]
     public string? Observacion { get; set; }

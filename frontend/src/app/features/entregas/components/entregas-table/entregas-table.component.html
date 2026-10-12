@@ -1,5 +1,7 @@
 @if (filas().length === 0) {
-  <div class="empty">No hay pedidos Pagado / Empaquetado / Pendiente de entrega con esos filtros.</div>
+  <div class="empty">
+    No hay pedidos Pagado / Empaquetado / En punto de recojo / Pendiente de entrega con esos filtros.
+  </div>
 } @else {
   <div class="table-wrap">
     <table class="entregas-table">
@@ -62,14 +64,18 @@
                 <button type="button" class="link-btn" (click)="empaquetar.emit(fila)">Empaquetar</button>
               }
               @if (puedeDespachar(fila)) {
-                <button type="button" class="link-btn" (click)="despachar.emit(fila)">Despachar</button>
+                <button type="button" class="link-btn" (click)="despachar.emit(fila)">
+                  {{ etiquetaDespacho(fila) }}
+                </button>
               }
               @if (puedeConfirmar(fila)) {
-                <button type="button" class="link-btn" (click)="confirmar.emit(fila)">Confirmar entrega</button>
+                <button type="button" class="link-btn" (click)="confirmar.emit(fila)">
+                  Entregar al cliente
+                </button>
               }
               @if (puedeDevolver(fila)) {
                 <button type="button" class="link-btn" (click)="devolver.emit(fila)">
-                  Devolver (no recogido)
+                  Devolución de tienda
                 </button>
               }
               <button type="button" class="link-btn" (click)="etiqueta.emit(fila)">Etiqueta</button>

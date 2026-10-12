@@ -193,6 +193,10 @@
     background: color-mix(in srgb, #e9d5ff 34%, white);
   }
 
+  tbody tr[data-estado='EnPuntoRecojo'] td {
+    background: color-mix(in srgb, #cffafe 36%, white);
+  }
+
   tbody tr[data-estado='PendienteEntrega'] td {
     background: color-mix(in srgb, #ffedd5 40%, white);
   }
@@ -394,6 +398,11 @@
   &[data-estado='Empaquetado'] {
     color: #6b21a8;
     background: #f3e8ff;
+  }
+
+  &[data-estado='EnPuntoRecojo'] {
+    color: #0e7490;
+    background: #cffafe;
   }
 
   &[data-estado='PendienteEntrega'] {

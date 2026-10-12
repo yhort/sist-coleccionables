@@ -14,6 +14,7 @@ import {
   CrearPedidoDigitalRequest,
   EstadoPedidoDigital,
   IndicadorReservaPedido,
+  MotivoDevolucionTienda,
   PedidoDigital,
   PedidoDigitalDetalle,
   PedidoDigitalEntrega,
@@ -429,16 +430,21 @@ export class PedidosDigitalesApiService {
   }
 
   /**
-   * POST /api/entregas/devolver-no-recogido. Cancela el pedido, marca la logística
-   * como FALLIDA y libera el stock. El listado se actualiza en el signal local.
+   * POST /api/entregas/devolver-no-recogido. Devolución de tienda: cancela el pedido,
+   * marca la logística como FALLIDA y libera el stock. Sin plazo mínimo.
    */
-  async liberarStockPorAbandono(id: string): Promise<PedidoDigital> {
+  async liberarStockPorAbandono(
+    id: string,
+    motivo: MotivoDevolucionTienda,
+    observacion?: string,
+  ): Promise<PedidoDigital> {
     const actual = this.requiere(id);
     try {
       await firstValueFrom(
         this.http.post(apiUrl('entregas/devolver-no-recogido'), {
           pedidoDigitalId: id,
-          observacion: 'No recogido por el cliente en el punto de entrega.',
+          motivo,
+          observacion: observacion?.trim() || null,
         }),
       );
     } catch (error) {
@@ -458,7 +464,7 @@ export class PedidosDigitalesApiService {
           estadoNuevo: 'Cancelado',
           usuarioNombre: null,
           fecha: ahora,
-          observacion: 'Cancelado por abandono del cliente. Logística FALLIDA y stock liberado.',
+          observacion: 'Devolución de tienda. Logística FALLIDA y stock liberado.',
         },
       ],
     };
@@ -528,6 +534,7 @@ export class PedidosDigitalesApiService {
         (pedido) =>
           pedido.estado === 'Pagado' ||
           pedido.estado === 'Empaquetado' ||
+          pedido.estado === 'EnPuntoRecojo' ||
           pedido.estado === 'PendienteEntrega',
       )
       .map(clonarPedido)
@@ -638,6 +645,8 @@ function etiquetaTransicion(estado: EstadoPedidoDigital): string {
       return 'Pago registrado. El pedido pasa a empaque.';
     case 'Empaquetado':
       return 'Pedido empaquetado.';
+    case 'EnPuntoRecojo':
+      return 'Paquete dejado en punto de recojo, esperando al cliente.';
     case 'PendienteEntrega':
       return 'Listo para despacho o recojo.';
     case 'Entregado':

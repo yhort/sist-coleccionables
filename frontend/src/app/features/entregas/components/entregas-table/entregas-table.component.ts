@@ -75,12 +75,27 @@ export class EntregasTableComponent {
   }
 
   puedeDespachar(fila: EntregaFila): boolean {
-    return fila.pedido.estado === 'Empaquetado' || fila.pedido.estado === 'PendienteEntrega';
+    return (
+      fila.pedido.estado === 'Empaquetado' ||
+      fila.pedido.estado === 'EnPuntoRecojo' ||
+      fila.pedido.estado === 'PendienteEntrega'
+    );
+  }
+
+  etiquetaDespacho(fila: EntregaFila): string {
+    if (
+      fila.pedido.estado === 'Empaquetado' &&
+      fila.entrega.metodoEnvio === 'RECOJO_TIENDA'
+    ) {
+      return 'Enviar / Dejar en punto de recojo';
+    }
+    return 'Despachar';
   }
 
   puedeConfirmar(fila: EntregaFila): boolean {
     return (
       fila.pedido.estado === 'PendienteEntrega' ||
+      fila.pedido.estado === 'EnPuntoRecojo' ||
       (fila.pedido.estado === 'Empaquetado' && fila.entrega.metodoEnvio === 'RECOJO_TIENDA')
     );
   }
