@@ -12,10 +12,13 @@ Thumbs.db
 .env.*
 !.env.example
 **/appsettings.*.local.json
+**/appsettings.Production.json
+!**/appsettings.Production.example.json
 **/secrets.json
 **/*credentials*
 **/*.pem
 **/*.pfx
+**/*.p12
 
 # Dependencies & build
 frontend/node_modules/
