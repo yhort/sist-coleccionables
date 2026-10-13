@@ -76,6 +76,7 @@ export class SubastaDetallePanelComponent {
   readonly sugerenciasCliente = signal<Cliente[]>([]);
   readonly productoPujaId = signal<string | null>(null);
   readonly detalleSeleccionadoId = signal<string | null>(null);
+  readonly busquedaLote = signal('');
   readonly monto = signal(0);
   readonly ahora = signal(Date.now());
   readonly checkoutAbierto = signal(false);
@@ -102,6 +103,21 @@ export class SubastaDetallePanelComponent {
   });
 
   readonly detalles = computed(() => this.subasta()?.detalles ?? []);
+
+  /** Listado visible en "Cartas del evento" / lote, filtrado por SKU o nombre. */
+  readonly detallesFiltrados = computed(() => {
+    const q = this.busquedaLote().trim().toLowerCase();
+    const lineas = this.detalles();
+    if (!q) {
+      return lineas;
+    }
+    return lineas.filter((linea) => {
+      const nombre = nombreVisibleLinea(linea).toLowerCase();
+      const sku = (linea.codigoSku ?? '').toLowerCase();
+      const catalogo = (linea.productoNombre ?? '').toLowerCase();
+      return nombre.includes(q) || sku.includes(q) || catalogo.includes(q);
+    });
+  });
 
   readonly etiquetaLote = computed(() => {
     const subasta = this.subasta();
@@ -273,6 +289,11 @@ export class SubastaDetallePanelComponent {
   constructor() {
     const tick = globalThis.setInterval(() => this.ahora.set(Date.now()), 1_000);
     this.destroyRef.onDestroy(() => globalThis.clearInterval(tick));
+
+    effect(() => {
+      this.subastaId();
+      this.busquedaLote.set('');
+    });
 
     effect(() => {
       const minimo = this.minimoSiguiente();

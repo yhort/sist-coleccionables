@@ -53,7 +53,22 @@
     </section>
 
     <section class="lote" aria-label="Productos del lote">
-      <h3>{{ esEvento() ? 'Cartas del evento' : 'Lote / Combo' }}</h3>
+      <div class="lote__head">
+        <h3>{{ esEvento() ? 'Cartas del evento' : 'Lote / Combo' }}</h3>
+        @if (detalles().length > 1) {
+          <label class="lote__busqueda">
+            <span class="visually-hidden">Buscar carta por SKU o nombre</span>
+            <input
+              type="search"
+              autocomplete="off"
+              placeholder="Buscar carta por SKU o nombre..."
+              [ngModel]="busquedaLote()"
+              (ngModelChange)="busquedaLote.set($event)"
+              name="busquedaLote"
+            />
+          </label>
+        }
+      </div>
       @if (esMultiItem() && (aceptaPujas() || puedeAdjudicar())) {
         <p class="lote__hint">
           @if (esEvento()) {
@@ -64,32 +79,48 @@
           }
         </p>
       }
-      <ul>
-        @for (linea of detalles(); track linea.id || linea.productoId) {
-          <li
-            [class.lote__item--activo]="detalleSeleccionadoId() === linea.id"
-            [class.lote__item--selectable]="esMultiItem()"
-            [class.lote__item--adjudicado]="linea.estado === 'ADJUDICADO'"
-            [class.lote__item--desierta]="linea.estado === 'DESIERTA'"
-            (click)="seleccionarProductoPuja(linea)"
-          >
-            <div>
-              <strong>{{ nombreLinea(linea) }}</strong>
-              <small>
-                {{ linea.codigoSku }} · {{ etiquetasTipo[linea.tipoProducto] }}
-                @if (esEvento()) {
-                  · {{ etiquetasDetalle[linea.estado] }}
-                }
-              </small>
-              @if (linea.pedidoCodigo) {
-                <small class="lote__pedido">Pedido {{ linea.pedidoCodigo }}</small>
-              }
-            </div>
-            <span>× {{ linea.cantidad }}</span>
-          </li>
+      <div class="lote__scroll">
+        @if (detallesFiltrados().length === 0) {
+          <p class="lote__empty">
+            @if (busquedaLote().trim()) {
+              No hay cartas que coincidan con “{{ busquedaLote().trim() }}”.
+            } @else {
+              No hay productos en este lote.
+            }
+          </p>
+        } @else {
+          <ul>
+            @for (linea of detallesFiltrados(); track linea.id || linea.productoId) {
+              <li
+                [class.lote__item--activo]="detalleSeleccionadoId() === linea.id"
+                [class.lote__item--selectable]="esMultiItem()"
+                [class.lote__item--adjudicado]="linea.estado === 'ADJUDICADO'"
+                [class.lote__item--desierta]="linea.estado === 'DESIERTA'"
+                (click)="seleccionarProductoPuja(linea)"
+              >
+                <div>
+                  <strong>{{ nombreLinea(linea) }}</strong>
+                  <small>
+                    {{ linea.codigoSku }} · {{ etiquetasTipo[linea.tipoProducto] }}
+                    @if (esEvento()) {
+                      · {{ etiquetasDetalle[linea.estado] }}
+                    }
+                  </small>
+                  @if (linea.pedidoCodigo) {
+                    <small class="lote__pedido">Pedido {{ linea.pedidoCodigo }}</small>
+                  }
+                </div>
+                <span>× {{ linea.cantidad }}</span>
+              </li>
+            }
+          </ul>
         }
-      </ul>
+      </div>
       <p class="lote__meta">
+        @if (busquedaLote().trim() && detallesFiltrados().length !== detalles().length) {
+          {{ detallesFiltrados().length }} de {{ detalles().length }} cartas
+          ·
+        }
         {{ unidades() }} ud{{ unidades() === 1 ? '' : 's' }}
         · lotes libres estimados: <strong>{{ stockLibreLote() }}</strong>
       </p>
