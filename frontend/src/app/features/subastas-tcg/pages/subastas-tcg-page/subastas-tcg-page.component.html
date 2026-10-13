@@ -24,7 +24,7 @@
           Kanban
         </button>
       </div>
-      <button type="button" class="subastas__add" (click)="formAbierta.set(true)">Nueva subasta</button>
+      <button type="button" class="subastas__add" (click)="abrirFormularioNueva()">Nueva subasta</button>
     </div>
   </header>
 
@@ -144,5 +144,9 @@
 }
 
 @if (formAbierta()) {
-  <app-subasta-form-dialog (saved)="formAbierta.set(false)" (cancelled)="formAbierta.set(false)" />
+  <app-subasta-form-dialog
+    [subasta]="editandoSubasta()"
+    (saved)="cerrarFormulario()"
+    (cancelled)="cerrarFormulario()"
+  />
 }

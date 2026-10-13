@@ -6,6 +6,7 @@ import {
   ViewChild,
   computed,
   inject,
+  input,
   output,
   signal,
 } from '@angular/core';
@@ -14,7 +15,12 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { SelectorProductoCascadaComponent } from '../../../catalogo-tcg/components/selector-producto-cascada/selector-producto-cascada.component';
 import { ProductoTcg, ETIQUETAS_TIPO } from '../../../productos-tcg/models/producto-tcg.model';
 import { SubastasTcgApiService } from '../../data-access/subastas-tcg.service';
-import { CANALES_SUBASTA, ETIQUETAS_CANAL_SUBASTA } from '../../models/subasta-tcg.model';
+import {
+  CANALES_SUBASTA,
+  ETIQUETAS_CANAL_SUBASTA,
+  SubastaTcg,
+  nombreVisibleLinea,
+} from '../../models/subasta-tcg.model';
 
 interface LineaBorrador {
   /** Clave local única (permite el mismo SKU en varias filas en modo Individuales). */
@@ -49,6 +55,9 @@ export class SubastaFormDialogComponent implements OnInit, OnDestroy {
   @ViewChild(SelectorProductoCascadaComponent)
   private selectorProducto?: SelectorProductoCascadaComponent;
 
+  /** Si se pasa, el diálogo opera en modo edición (solo borradores). */
+  readonly subasta = input<SubastaTcg | null>(null);
+
   readonly saved = output<void>();
   readonly cancelled = output<void>();
 
@@ -67,6 +76,8 @@ export class SubastaFormDialogComponent implements OnInit, OnDestroy {
 
   /** Compat: mismos ítems que `loteItems`. */
   readonly lineas = this.loteItems;
+
+  readonly esEdicion = computed(() => !!this.subasta()?.id);
 
   /** IDs ya en el lote (para omitirlos en la carga masiva por set). */
   readonly idsEnLote = computed(() => this.loteItems().map((l) => l.productoId));
@@ -105,6 +116,12 @@ export class SubastaFormDialogComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    const editando = this.subasta();
+    if (editando) {
+      this.precargarDesdeSubasta(editando);
+      return;
+    }
+
     const sedeId = this.sedes()[0]?.id;
     const inicio = new Date();
     const cierre = new Date(inicio.getTime() + 2 * 60 * 60 * 1000);
@@ -338,25 +355,72 @@ export class SubastaFormDialogComponent implements OnInit, OnDestroy {
       observacion: raw.observacion,
     };
 
+    const payload = {
+      ...base,
+      titulo: raw.titulo,
+      modo: this.modoCreacion(),
+      productoId: lineas[0].productoId,
+      detalles: lineas.map((l) => ({
+        productoId: l.productoId,
+        cantidad: l.cantidad,
+        tituloPersonalizado: l.tituloPersonalizado.trim() || l.nombre,
+      })),
+    };
+
     this.enviando.set(true);
     try {
-      await this.subastasApi.crear({
-        ...base,
-        titulo: raw.titulo,
-        modo: this.modoCreacion(),
-        productoId: lineas[0].productoId,
-        detalles: lineas.map((l) => ({
-          productoId: l.productoId,
-          cantidad: l.cantidad,
-          tituloPersonalizado: l.tituloPersonalizado.trim() || l.nombre,
-        })),
-      });
+      const editando = this.subasta();
+      if (editando) {
+        await this.subastasApi.actualizar(editando.id, payload);
+      } else {
+        await this.subastasApi.crear(payload);
+      }
       this.saved.emit();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo crear la subasta.');
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : this.esEdicion()
+            ? 'No se pudo actualizar la subasta.'
+            : 'No se pudo crear la subasta.',
+      );
     } finally {
       this.enviando.set(false);
     }
+  }
+
+  private precargarDesdeSubasta(subasta: SubastaTcg): void {
+    this.modoCreacion.set(subasta.modo === 'INDIVIDUALES' ? 'INDIVIDUALES' : 'COMBO');
+    this.form.patchValue({
+      titulo: subasta.titulo,
+      sedeId: subasta.sedeId,
+      canal: subasta.canal,
+      precioBase: subasta.precioBase,
+      incrementoMinimo: subasta.incrementoMinimo,
+      precioReserva: subasta.precioReserva,
+      fechaInicio: toDatetimeLocal(new Date(subasta.fechaInicio)),
+      fechaCierre: toDatetimeLocal(new Date(subasta.fechaCierre)),
+      observacion: subasta.observacion ?? '',
+    });
+
+    const sedeId = subasta.sedeId;
+    const items: LoteItem[] = (subasta.detalles ?? []).map((detalle) => {
+      const catalogo = this.subastasApi.productos().find((p) => p.id === detalle.productoId);
+      const nombre = detalle.productoNombre || catalogo?.nombre || nombreVisibleLinea(detalle);
+      const stockLibre = sedeId ? this.subastasApi.stockLibre(sedeId, detalle.productoId) : 0;
+      return {
+        id: detalle.id || this.nuevaClaveLinea(detalle.productoId),
+        productoId: detalle.productoId,
+        nombre,
+        tituloPersonalizado:
+          detalle.tituloPersonalizado?.trim() || nombre,
+        codigoSku: detalle.codigoSku || catalogo?.codigoSku || '',
+        tipoProducto: detalle.tipoProducto || catalogo?.tipoProducto || 'ACCESORIO',
+        cantidad: detalle.cantidad,
+        stockLibre,
+      };
+    });
+    this.loteItems.set(items);
   }
 
   private crearLinea(

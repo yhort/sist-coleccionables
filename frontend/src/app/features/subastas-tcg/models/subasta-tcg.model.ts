@@ -111,6 +111,9 @@ export interface CrearSubastaRequest {
   observacion?: string | null;
 }
 
+/** Mismo payload que crear; solo válido mientras la subasta está en BORRADOR. */
+export type ActualizarSubastaRequest = CrearSubastaRequest;
+
 export interface RegistrarPujaRequest {
   nombrePostor: string;
   clienteId?: string | null;

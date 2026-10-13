@@ -12,6 +12,7 @@ import { PedidosDigitalesApiService } from '../../pedidos-digitales/data-access/
 import { ProductosTcgApiService } from '../../productos-tcg/data-access/productos-tcg.service';
 import { TipoProductoTcg } from '../../productos-tcg/models/producto-tcg.model';
 import {
+  ActualizarSubastaRequest,
   AdjudicarSubastaRequest,
   CanalSubastaTcg,
   CrearSubastaRequest,
@@ -204,24 +205,11 @@ export class SubastasTcgApiService {
   }
 
   crear(request: CrearSubastaRequest): Promise<SubastaTcg> {
-    return this.enviar('POST', apiUrl('subastas-tcg'), {
-      sedeId: request.sedeId,
-      productoId: request.productoId ?? request.detalles[0]?.productoId,
-      detalles: request.detalles.map((d) => ({
-        productoId: d.productoId,
-        cantidad: d.cantidad,
-        tituloPersonalizado: d.tituloPersonalizado?.trim() || null,
-      })),
-      titulo: request.titulo.trim(),
-      canal: request.canal,
-      modo: request.modo ?? 'COMBO',
-      precioBase: request.precioBase,
-      incrementoMinimo: request.incrementoMinimo,
-      precioReserva: request.precioReserva,
-      fechaInicio: request.fechaInicio,
-      fechaCierre: request.fechaCierre,
-      observacion: request.observacion,
-    });
+    return this.enviar('POST', apiUrl('subastas-tcg'), cuerpoSubasta(request));
+  }
+
+  actualizar(id: string, request: ActualizarSubastaRequest): Promise<SubastaTcg> {
+    return this.enviar('PUT', apiUrl(`subastas-tcg/${id}`), cuerpoSubasta(request));
   }
 
   activar(id: string): Promise<SubastaTcg> {
@@ -288,7 +276,7 @@ export class SubastasTcgApiService {
   }
 
   private async enviar(
-    method: 'POST' | 'DELETE',
+    method: 'POST' | 'PUT' | 'DELETE',
     url: string,
     body?: unknown,
   ): Promise<SubastaTcg> {
@@ -296,7 +284,9 @@ export class SubastasTcgApiService {
       const request$ =
         method === 'DELETE'
           ? this.http.delete<SubastaApi>(url)
-          : this.http.post<SubastaApi>(url, body ?? {});
+          : method === 'PUT'
+            ? this.http.put<SubastaApi>(url, body ?? {})
+            : this.http.post<SubastaApi>(url, body ?? {});
       const dto = await firstValueFrom(request$);
       const subasta = mapSubasta(dto);
       this.upsert(subasta);
@@ -314,6 +304,27 @@ export class SubastasTcgApiService {
         : [subasta, ...items];
     });
   }
+}
+
+function cuerpoSubasta(request: CrearSubastaRequest | ActualizarSubastaRequest) {
+  return {
+    sedeId: request.sedeId,
+    productoId: request.productoId ?? request.detalles[0]?.productoId,
+    detalles: request.detalles.map((d) => ({
+      productoId: d.productoId,
+      cantidad: d.cantidad,
+      tituloPersonalizado: d.tituloPersonalizado?.trim() || null,
+    })),
+    titulo: request.titulo.trim(),
+    canal: request.canal,
+    modo: request.modo ?? 'COMBO',
+    precioBase: request.precioBase,
+    incrementoMinimo: request.incrementoMinimo,
+    precioReserva: request.precioReserva,
+    fechaInicio: request.fechaInicio,
+    fechaCierre: request.fechaCierre,
+    observacion: request.observacion,
+  };
 }
 
 function mapDetalles(dto: SubastaApi): SubastaDetalle[] {

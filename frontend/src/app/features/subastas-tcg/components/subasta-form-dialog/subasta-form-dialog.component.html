@@ -9,10 +9,15 @@
 >
   <header class="dialog__header">
     <div>
-      <h2 id="subasta-form-title">Nueva subasta</h2>
+      <h2 id="subasta-form-title">{{ esEdicion() ? 'Editar subasta' : 'Nueva subasta' }}</h2>
       <p>
-        Acumula productos en el lote temporal. Combo = 1 ganador del paquete; Individuales = 1 evento
-        en el tablero con N cartas adjudicables una a una. Se crea en borrador.
+        @if (esEdicion()) {
+          Modifica cabecera y productos del lote mientras esté en borrador. Puedes inyectar SKUs,
+          cambiar cantidades o quitar ítems antes de activar.
+        } @else {
+          Acumula productos en el lote temporal. Combo = 1 ganador del paquete; Individuales = 1
+          evento en el tablero con N cartas adjudicables una a una. Se crea en borrador.
+        }
       </p>
     </div>
     <button
@@ -208,7 +213,11 @@
         Cancelar
       </button>
       <button type="submit" class="primary" [disabled]="enviando()">
-        {{ enviando() ? 'Creando…' : 'Crear borrador' }}
+        @if (enviando()) {
+          {{ esEdicion() ? 'Guardando…' : 'Creando…' }}
+        } @else {
+          {{ esEdicion() ? 'Guardar cambios' : 'Crear borrador' }}
+        }
       </button>
     </footer>
   </form>

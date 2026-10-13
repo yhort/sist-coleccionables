@@ -115,6 +115,100 @@ public sealed class SubastasTcgService(
         return (await ObtenerAsync(subasta.Id, cancellationToken))!;
     }
 
+    public async Task<SubastaTcgResponse> ActualizarAsync(
+        Guid id,
+        ActualizarSubastaTcgRequest request,
+        CancellationToken cancellationToken)
+    {
+        var estadoActual = await db.SubastasTcg
+            .AsNoTracking()
+            .Where(s => s.Id == id)
+            .Select(s => (EstadoSubastaTcg?)s.Estado)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (estadoActual is null)
+        {
+            throw new BusinessRuleException("No se encontró la subasta.", StatusCodes.Status404NotFound);
+        }
+
+        if (estadoActual != EstadoSubastaTcg.BORRADOR)
+        {
+            throw new BusinessRuleException(
+                "Solo se pueden modificar los productos del lote de una subasta en borrador.");
+        }
+
+        var crearRequest = new CrearSubastaTcgRequest
+        {
+            SedeId = request.SedeId,
+            ProductoId = request.ProductoId,
+            Detalles = request.Detalles,
+            Titulo = request.Titulo,
+            Canal = request.Canal,
+            Modo = request.Modo,
+            PrecioBase = request.PrecioBase,
+            IncrementoMinimo = request.IncrementoMinimo,
+            PrecioReserva = request.PrecioReserva,
+            FechaInicio = request.FechaInicio,
+            FechaCierre = request.FechaCierre,
+            Observacion = request.Observacion
+        };
+
+        var lineas = await ValidarCabeceraYLineasAsync(crearRequest, cancellationToken);
+        var principal = lineas[0];
+        var titulo = request.Titulo.Trim();
+        var precioBase = Round2(request.PrecioBase);
+        var incremento = Round2(request.IncrementoMinimo);
+        var precioReserva = request.PrecioReserva is null ? (decimal?)null : Round2(request.PrecioReserva.Value);
+        var fechaInicio = request.FechaInicio.ToUniversalTime();
+        var fechaCierre = request.FechaCierre.ToUniversalTime();
+        var observacion = TextoOpcional(request.Observacion);
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var filasCabecera = await db.SubastasTcg
+            .Where(s => s.Id == id && s.Estado == EstadoSubastaTcg.BORRADOR)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(s => s.SedeId, request.SedeId)
+                    .SetProperty(s => s.ProductoId, principal.Producto.Id)
+                    .SetProperty(s => s.Titulo, titulo)
+                    .SetProperty(s => s.Canal, request.Canal)
+                    .SetProperty(s => s.Modo, request.Modo)
+                    .SetProperty(s => s.PrecioBase, precioBase)
+                    .SetProperty(s => s.IncrementoMinimo, incremento)
+                    .SetProperty(s => s.PrecioReserva, precioReserva)
+                    .SetProperty(s => s.FechaInicio, fechaInicio)
+                    .SetProperty(s => s.FechaCierre, fechaCierre)
+                    .SetProperty(s => s.Observacion, observacion),
+                cancellationToken);
+
+        if (filasCabecera == 0)
+        {
+            throw new BusinessRuleException(
+                "Solo se pueden modificar los productos del lote de una subasta en borrador.");
+        }
+
+        await db.SubastaDetalles
+            .Where(d => d.SubastaTcgId == id)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        db.SubastaDetalles.AddRange(lineas.Select((linea, index) => new SubastaDetalle
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = tenant.EmpresaId,
+            SubastaTcgId = id,
+            ProductoId = linea.Producto.Id,
+            Cantidad = linea.Cantidad,
+            Orden = index + 1,
+            TituloPersonalizado = linea.TituloPersonalizado,
+            Estado = EstadoSubastaDetalle.PENDIENTE
+        }));
+
+        await db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+        return (await ObtenerAsync(id, cancellationToken))!;
+    }
+
     public async Task<SubastaTcgResponse> ActivarAsync(Guid id, CancellationToken cancellationToken)
     {
         var subasta = await CargarAsync(id, cancellationToken);

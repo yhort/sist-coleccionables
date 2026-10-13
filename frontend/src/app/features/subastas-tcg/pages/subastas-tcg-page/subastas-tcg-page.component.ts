@@ -77,6 +77,8 @@ export class SubastasTcgPageComponent {
   readonly seleccionadaId = signal<string | null>(null);
   readonly pujaSubasta = signal<SubastaTcg | null>(null);
   readonly formAbierta = signal(false);
+  /** Subasta en edición; `null` cuando el formulario es "Nueva subasta". */
+  readonly editandoSubasta = signal<SubastaTcg | null>(null);
   readonly error = signal('');
 
   constructor() {
@@ -184,7 +186,24 @@ export class SubastasTcgPageComponent {
 
   editarSubasta(subasta: SubastaTcg): void {
     this.error.set('');
-    this.seleccionadaId.set(subasta.id);
+    if (subasta.estado !== 'BORRADOR') {
+      this.seleccionadaId.set(subasta.id);
+      return;
+    }
+    this.seleccionadaId.set(null);
+    this.editandoSubasta.set(subasta);
+    this.formAbierta.set(true);
+  }
+
+  abrirFormularioNueva(): void {
+    this.error.set('');
+    this.editandoSubasta.set(null);
+    this.formAbierta.set(true);
+  }
+
+  cerrarFormulario(): void {
+    this.formAbierta.set(false);
+    this.editandoSubasta.set(null);
   }
 
   irAPedido(pedido: PedidoVinculoSubasta): void {
@@ -256,7 +275,7 @@ export class SubastasTcgPageComponent {
     if (this.route.snapshot.queryParamMap.get('crear') !== '1') {
       return;
     }
-    this.formAbierta.set(true);
+    this.abrirFormularioNueva();
     void this.router.navigate([], { queryParams: {}, replaceUrl: true });
   }
 }

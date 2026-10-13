@@ -58,6 +58,16 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
         }
     }
 
+    [HttpPut("{id:guid}")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    public async Task<ActionResult<SubastaTcgResponse>> Actualizar(
+        Guid id,
+        [FromBody] ActualizarSubastaTcgRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await EjecutarAsync(() => subastas.ActualizarAsync(id, request, cancellationToken));
+    }
+
     [HttpPost("{id:guid}/activar")]
     [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Activar(Guid id, CancellationToken cancellationToken)

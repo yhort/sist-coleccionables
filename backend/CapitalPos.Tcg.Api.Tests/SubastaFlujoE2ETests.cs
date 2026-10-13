@@ -29,6 +29,83 @@ public sealed class SubastaFlujoE2ETests
     }
 
     [Fact]
+    public async Task Actualizar_borrador_reemplaza_productos_del_lote()
+    {
+        using var client = _factory.CreateClient();
+        await LoginAsync(client);
+        var sedeId = DevelopmentDataSeeder.SedeId;
+        var productoA = await CrearCartaConStockAsync(client, sedeId, "Edit lote A", 3m);
+        var productoB = await CrearCartaConStockAsync(client, sedeId, "Edit lote B", 3m);
+
+        var ahora = DateTimeOffset.UtcNow;
+        var crear = await client.PostAsJsonAsync(
+            "/api/subastas-tcg",
+            new
+            {
+                sedeId,
+                titulo = "E2E editar borrador",
+                canal = "FACEBOOK_SUBASTA",
+                precioBase = 15m,
+                incrementoMinimo = 5m,
+                fechaInicio = ahora.AddMinutes(-5),
+                fechaCierre = ahora.AddHours(2),
+                detalles = new[] { new { productoId = productoA, cantidad = 1m } }
+            },
+            Json);
+        Assert.True(crear.IsSuccessStatusCode, await crear.Content.ReadAsStringAsync());
+        var borrador = await crear.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var id = borrador.GetGuid("id");
+        Assert.Equal("BORRADOR", borrador.GetString("estado"));
+
+        var actualizar = await client.PutAsJsonAsync(
+            $"/api/subastas-tcg/{id}",
+            new
+            {
+                sedeId,
+                titulo = "E2E editar borrador (actualizado)",
+                canal = "FACEBOOK_SUBASTA",
+                precioBase = 20m,
+                incrementoMinimo = 5m,
+                fechaInicio = ahora.AddMinutes(-5),
+                fechaCierre = ahora.AddHours(3),
+                detalles = new[]
+                {
+                    new { productoId = productoA, cantidad = 2m },
+                    new { productoId = productoB, cantidad = 1m }
+                }
+            },
+            Json);
+        Assert.True(actualizar.IsSuccessStatusCode, await actualizar.Content.ReadAsStringAsync());
+        var actualizada = await actualizar.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("BORRADOR", actualizada.GetString("estado"));
+        Assert.Equal("E2E editar borrador (actualizado)", actualizada.GetString("titulo"));
+        Assert.Equal(2, actualizada.GetProperty("detalles").GetArrayLength());
+        Assert.Equal(20m, actualizada.GetProperty("precioBase").GetDecimal());
+
+        var activar = await client.PostAsync($"/api/subastas-tcg/{id}/activar", null);
+        Assert.True(activar.IsSuccessStatusCode, await activar.Content.ReadAsStringAsync());
+
+        var rechazar = await client.PutAsJsonAsync(
+            $"/api/subastas-tcg/{id}",
+            new
+            {
+                sedeId,
+                titulo = "No debe editarse activa",
+                canal = "FACEBOOK_SUBASTA",
+                precioBase = 20m,
+                incrementoMinimo = 5m,
+                fechaInicio = ahora.AddMinutes(-5),
+                fechaCierre = ahora.AddHours(3),
+                detalles = new[] { new { productoId = productoB, cantidad = 1m } }
+            },
+            Json);
+        Assert.Equal(HttpStatusCode.BadRequest, rechazar.StatusCode);
+        var cuerpo = await rechazar.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var mensaje = cuerpo.GetProperty("message").GetString() ?? string.Empty;
+        Assert.Contains("borrador", mensaje, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Puja_en_subasta_cerrada_devuelve_400_con_mensaje_no_500()
     {
         using var client = _factory.CreateClient();

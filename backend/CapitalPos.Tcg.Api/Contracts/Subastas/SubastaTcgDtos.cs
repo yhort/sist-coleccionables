@@ -59,6 +59,48 @@ public sealed class CrearSubastaTcgRequest
     public string? Observacion { get; set; }
 }
 
+/// <summary>
+/// Actualización de cabecera y lote. Solo permitida mientras la subasta está en BORRADOR.
+/// </summary>
+public sealed class ActualizarSubastaTcgRequest
+{
+    [Required]
+    public Guid SedeId { get; set; }
+
+    /// <summary>
+    /// Compatibilidad Single Hit: si no hay <see cref="Detalles"/>, se usa este producto con cantidad 1.
+    /// </summary>
+    public Guid? ProductoId { get; set; }
+
+    public List<SubastaDetalleInput> Detalles { get; set; } = [];
+
+    [Required]
+    [MinLength(3)]
+    [MaxLength(200)]
+    public string Titulo { get; set; } = string.Empty;
+
+    public CanalSubastaTcg Canal { get; set; }
+
+    public ModoSubastaTcg Modo { get; set; } = ModoSubastaTcg.COMBO;
+
+    [Range(typeof(decimal), "0.01", "999999999")]
+    public decimal PrecioBase { get; set; }
+
+    [Range(typeof(decimal), "0.01", "999999999")]
+    public decimal IncrementoMinimo { get; set; }
+
+    public decimal? PrecioReserva { get; set; }
+
+    [Required]
+    public DateTimeOffset FechaInicio { get; set; }
+
+    [Required]
+    public DateTimeOffset FechaCierre { get; set; }
+
+    [MaxLength(500)]
+    public string? Observacion { get; set; }
+}
+
 public sealed class RegistrarPujaRequest
 {
     [Required]
