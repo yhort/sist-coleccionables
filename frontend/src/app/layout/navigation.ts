@@ -1,3 +1,5 @@
+import { TenantFeatureName } from '../core/tenant/tenant-settings.model';
+
 export type NavIconName =
   | 'dashboard'
   | 'productos'
@@ -12,7 +14,7 @@ export type NavIconName =
   | 'proveedores'
   | 'woocommerce'
   | 'reportes'
-  | 'ecosistema';
+  | 'ecosistema'
 
 export interface AppNavItem {
   label: string;
@@ -20,6 +22,10 @@ export interface AppNavItem {
   exact: boolean;
   icon: NavIconName;
   keywords: readonly string[];
+  /** Si se define, el ítem solo aparece cuando el tenant tiene el feature. */
+  feature?: TenantFeatureName;
+  /** Si se define, el ítem aparece cuando al menos uno de los features está activo. */
+  featuresAny?: readonly TenantFeatureName[];
 }
 
 export const APP_NAV_ITEMS: readonly AppNavItem[] = [
@@ -35,7 +41,8 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/productos-tcg',
     exact: false,
     icon: 'productos',
-    keywords: ['cartas', 'sellados', 'accesorios', 'compuestos', 'catalogo'],
+    keywords: ['cartas', 'sellados', 'accesorios', 'compuestos', 'catalogo', 'cromos', 'sku'],
+    featuresAny: ['PermitirSinglesTcg', 'PermitirCromosSinCodigo'],
   },
   {
     label: 'Inventario',
@@ -50,6 +57,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     exact: false,
     icon: 'aperturas',
     keywords: ['abrir', 'sobres', 'cajas', 'sellado'],
+    feature: 'PermitirSinglesTcg',
   },
   {
     label: 'Subastas TCG',
@@ -106,6 +114,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     exact: false,
     icon: 'woocommerce',
     keywords: ['tienda', 'sync', 'web'],
+    feature: 'PermitirWooCommerceSync',
   },
   {
     label: 'Reportes',

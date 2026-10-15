@@ -2,13 +2,13 @@
   <div class="sidebar__brand">
     <span class="sidebar__mark" aria-hidden="true">T</span>
     <div class="sidebar__brand-text">
-      <span class="sidebar__brand-name">Trunqi TCG</span>
+      <span class="sidebar__brand-name">{{ brandName() }}</span>
       <span class="sidebar__brand-description">CapitalPOS</span>
     </div>
   </div>
 
   <nav class="sidebar__navigation">
-    @for (item of menuItems; track item.route) {
+    @for (item of menuItems(); track item.route) {
       <a
         class="sidebar__link"
         [routerLink]="item.route"

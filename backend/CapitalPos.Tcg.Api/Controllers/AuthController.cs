@@ -1,6 +1,8 @@
+using CapitalPos.Tcg.Api.Application.Tenancy;
 using CapitalPos.Tcg.Api.Contracts.Auth;
 using CapitalPos.Tcg.Api.Domain.Entities;
 using CapitalPos.Tcg.Api.Infrastructure.Auth;
+using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using CapitalPos.Tcg.Api.Infrastructure.Persistence;
 using CapitalPos.Tcg.Api.Infrastructure.Persistence.Tenant;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +17,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 public sealed class AuthController(
     ApplicationDbContext db,
     ITenantProvider tenant,
+    ICurrentUser currentUser,
     IPasswordHasher<Usuario> passwordHasher,
     IJwtTokenService jwt) : ControllerBase
 {
@@ -98,8 +101,32 @@ public sealed class AuthController(
                 Apellidos = usuario.Apellidos,
                 Email = usuario.Email,
                 Rol = usuario.Rol
-            }
+            },
+            TenantSettings = TenantSettingsMapper.ToDto(empresa)
         });
+    }
+
+    [Authorize]
+    [HttpGet("tenant-settings")]
+    public async Task<ActionResult<TenantSettingsDto>> ObtenerTenantSettings(
+        CancellationToken cancellationToken)
+    {
+        // /api/auth omite TenantHeaderMiddleware: usar empresa del JWT.
+        var empresaId = currentUser.EmpresaId
+            ?? (tenant.EmpresaId != Guid.Empty ? tenant.EmpresaId : null);
+        if (empresaId is null || empresaId == Guid.Empty)
+        {
+            return BadRequest(new { title = "Empresa requerida" });
+        }
+
+        var empresa = await db.Empresas.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == empresaId.Value, cancellationToken);
+        if (empresa is null || !empresa.Activa)
+        {
+            return NotFound(new { title = "Empresa no encontrada" });
+        }
+
+        return Ok(TenantSettingsMapper.ToDto(empresa));
     }
 
     private async Task<Guid?> ResolverEmpresaAsync(

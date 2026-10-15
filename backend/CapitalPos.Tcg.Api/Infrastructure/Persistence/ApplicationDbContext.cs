@@ -141,6 +141,12 @@ public sealed class ApplicationDbContext : DbContext
         entity.Property(e => e.RazonSocial).HasMaxLength(200).IsRequired();
         entity.Property(e => e.NombreComercial).HasMaxLength(200).IsRequired();
         entity.HasIndex(e => e.Ruc).IsUnique().HasDatabaseName("ux_empresas_ruc");
+        entity.Property(e => e.PermitirSinglesTcg).HasDefaultValue(true);
+        entity.Property(e => e.PermitirWooCommerceSync).HasDefaultValue(true);
+        entity.Property(e => e.PermitirPosMostrador).HasDefaultValue(false);
+        entity.Property(e => e.PermitirSubastasLoteFB).HasDefaultValue(false);
+        entity.Property(e => e.PermitirCromosSinCodigo).HasDefaultValue(false);
+        entity.Ignore(e => e.Settings);
     }
 
     private static void ConfigureSede(ModelBuilder modelBuilder)

@@ -1,12 +1,14 @@
 import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard } from './core/auth/auth.guards';
+import { featureToggleAnyGuard, featureToggleGuard } from './core/tenant/feature-toggle.guard';
 import { ShellComponent } from './layout/shell/shell.component';
 
 function moduleRoute(
   path: string,
   title: string,
   loadComponent: NonNullable<Routes[number]['loadComponent']>,
+  options?: { canActivate?: Routes[number]['canActivate'] },
 ): Routes[number] {
   return {
     path,
@@ -18,6 +20,7 @@ function moduleRoute(
         { label: title },
       ],
     },
+    canActivate: options?.canActivate,
     loadComponent,
   };
 }
@@ -52,10 +55,18 @@ export const routes: Routes = [
           (m) => m.DashboardPageComponent,
         ),
       ),
-      moduleRoute('productos-tcg', 'Productos TCG', () =>
-        import(
-          './features/productos-tcg/pages/productos-tcg-page/productos-tcg-page.component'
-        ).then((m) => m.ProductosTcgPageComponent),
+      moduleRoute(
+        'productos-tcg',
+        'Productos TCG',
+        () =>
+          import(
+            './features/productos-tcg/pages/productos-tcg-page/productos-tcg-page.component'
+          ).then((m) => m.ProductosTcgPageComponent),
+        {
+          canActivate: [
+            featureToggleAnyGuard('PermitirSinglesTcg', 'PermitirCromosSinCodigo'),
+          ],
+        },
       ),
       {
         path: 'inventario/kardex',
@@ -78,10 +89,14 @@ export const routes: Routes = [
           (m) => m.InventarioPageComponent,
         ),
       ),
-      moduleRoute('aperturas-tcg', 'Aperturas TCG', () =>
-        import(
-          './features/aperturas-tcg/pages/aperturas-tcg-page/aperturas-tcg-page.component'
-        ).then((m) => m.AperturasTcgPageComponent),
+      moduleRoute(
+        'aperturas-tcg',
+        'Aperturas TCG',
+        () =>
+          import(
+            './features/aperturas-tcg/pages/aperturas-tcg-page/aperturas-tcg-page.component'
+          ).then((m) => m.AperturasTcgPageComponent),
+        { canActivate: [featureToggleGuard('PermitirSinglesTcg')] },
       ),
       {
         path: 'subastas-tcg/:id',
@@ -103,6 +118,22 @@ export const routes: Routes = [
         import('./features/subastas-tcg/pages/subastas-tcg-page/subastas-tcg-page.component').then(
           (m) => m.SubastasTcgPageComponent,
         ),
+      ),
+      moduleRoute(
+        'subastas/carga-lote',
+        'Carga lote FB',
+        () =>
+          import(
+            './features/subastas-tcg/pages/carga-lote-subasta-page/carga-lote-subasta-page.component'
+          ).then((m) => m.CargaLoteSubastaPageComponent),
+        { canActivate: [featureToggleGuard('PermitirSubastasLoteFB')] },
+      ),
+      moduleRoute(
+        'pos',
+        'POS Mostrador',
+        () =>
+          import('./features/pos/pages/pos-page/pos-page.component').then((m) => m.PosPageComponent),
+        { canActivate: [featureToggleGuard('PermitirPosMostrador')] },
       ),
       moduleRoute('pedidos-digitales', 'Pedidos Digitales', () =>
         import(
@@ -134,10 +165,14 @@ export const routes: Routes = [
           (m) => m.ProveedoresPageComponent,
         ),
       ),
-      moduleRoute('woocommerce', 'WooCommerce', () =>
-        import('./features/woocommerce/pages/woocommerce-page/woocommerce-page.component').then(
-          (m) => m.WooCommercePageComponent,
-        ),
+      moduleRoute(
+        'woocommerce',
+        'WooCommerce',
+        () =>
+          import('./features/woocommerce/pages/woocommerce-page/woocommerce-page.component').then(
+            (m) => m.WooCommercePageComponent,
+          ),
+        { canActivate: [featureToggleGuard('PermitirWooCommerceSync')] },
       ),
       moduleRoute('reportes', 'Reportes', () =>
         import('./features/reportes/pages/reportes-page/reportes-page.component').then(

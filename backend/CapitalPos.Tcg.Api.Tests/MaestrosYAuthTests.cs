@@ -30,17 +30,28 @@ public sealed class MaestrosYAuthTests
     {
         using var client = _factory.CreateClient();
         var empresas = await client.GetFromJsonAsync<JsonElement>("/api/auth/empresas", Json);
-        Assert.True(empresas.GetProperty("unicoTenant").GetBoolean());
         var lista = empresas.GetProperty("empresas");
         Assert.True(lista.GetArrayLength() >= 1);
-        Assert.Equal("TRUNQI", lista[0].GetProperty("nombreComercial").GetString());
-        Assert.False(string.IsNullOrWhiteSpace(lista[0].GetProperty("razonSocial").GetString()));
+        var trunqi = lista.EnumerateArray()
+            .FirstOrDefault(e => e.GetProperty("nombreComercial").GetString() == "TRUNQI");
+        Assert.Equal(JsonValueKind.Object, trunqi.ValueKind);
+        Assert.False(string.IsNullOrWhiteSpace(trunqi.GetProperty("razonSocial").GetString()));
 
         var login = await client.PostAsJsonAsync(
             "/api/auth/login",
-            new { email = "admin@trunqi.local", password = "Admin123!" },
+            new
+            {
+                email = "admin@trunqi.local",
+                password = "Admin123!",
+                empresaId = DevelopmentDataSeeder.EmpresaId
+            },
             Json);
         Assert.True(login.IsSuccessStatusCode, await login.Content.ReadAsStringAsync());
+        var cuerpo = await login.Content.ReadFromJsonAsync<JsonElement>(Json);
+        var settings = cuerpo.GetProperty("tenantSettings");
+        Assert.True(settings.GetProperty("permitirSinglesTcg").GetBoolean());
+        Assert.True(settings.GetProperty("permitirWooCommerceSync").GetBoolean());
+        Assert.False(settings.GetProperty("permitirPosMostrador").GetBoolean());
     }
 
     [Fact]

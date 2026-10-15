@@ -7,6 +7,7 @@ public sealed class LoginResponse
     public required string AccessToken { get; init; }
     public required DateTimeOffset ExpiresAt { get; init; }
     public required UsuarioAuthDto Usuario { get; init; }
+    public required TenantSettingsDto TenantSettings { get; init; }
 }
 
 public sealed class UsuarioAuthDto

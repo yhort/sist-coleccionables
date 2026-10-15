@@ -2,6 +2,7 @@ using CapitalPos.Tcg.Api.Application.Aperturas;
 using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Contracts.Aperturas;
 using CapitalPos.Tcg.Api.Domain.Enums;
+using CapitalPos.Tcg.Api.Domain.Tenancy;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CapitalPos.Tcg.Api.Controllers;
 
 [Authorize]
+[RequiresFeature(TenantFeature.PermitirSinglesTcg)]
 [ApiController]
 [Route("api/aperturas-tcg")]
 public sealed class AperturasTcgController(AperturasTcgService aperturas) : ControllerBase

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CapitalPos.Tcg.Api.Application.WooCommerce;
 using CapitalPos.Tcg.Api.Contracts.WooCommerce;
+using CapitalPos.Tcg.Api.Domain.Tenancy;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using CapitalPos.Tcg.Api.Infrastructure.WooCommerce;
 using Microsoft.AspNetCore.Authorization;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CapitalPos.Tcg.Api.Controllers;
 
 [Authorize]
+[RequiresFeature(TenantFeature.PermitirWooCommerceSync)]
 [ApiController]
 [Route("api/woocommerce")]
 public sealed class WooCommerceController(

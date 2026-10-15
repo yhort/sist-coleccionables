@@ -1,6 +1,7 @@
 using CapitalPos.Tcg.Api.Application.Comercial;
 using CapitalPos.Tcg.Api.Domain.Entities;
 using CapitalPos.Tcg.Api.Domain.Enums;
+using CapitalPos.Tcg.Api.Domain.Tenancy;
 using CapitalPos.Tcg.Api.Infrastructure.Persistence.Tenant;
 using CapitalPos.Tcg.Api.Infrastructure.WooCommerce;
 using Microsoft.AspNetCore.Identity;
@@ -17,6 +18,10 @@ public static class DevelopmentDataSeeder
     public static readonly Guid EmpresaId = Guid.Parse("c0a1e001-0000-4000-8000-000000000001");
     public static readonly Guid SedeId = Guid.Parse("c0a1e001-0000-4000-8000-000000000010");
     public static readonly Guid UsuarioId = Guid.Parse("c0a1e001-0000-4000-8000-000000000100");
+
+    public static readonly Guid RcpEmpresaId = Guid.Parse("c0a1e001-0000-4000-8000-000000000002");
+    public static readonly Guid RcpSedeId = Guid.Parse("c0a1e001-0000-4000-8000-000000000011");
+    public static readonly Guid RcpUsuarioId = Guid.Parse("c0a1e001-0000-4000-8000-000000000101");
 
     public static async Task EnsureAsync(IServiceProvider services)
     {
@@ -49,6 +54,7 @@ public static class DevelopmentDataSeeder
                 Activa = true,
                 FechaCreacion = ahora
             };
+            empresa.AplicarSettings(TenantSettings.DefaultsTrunqi());
 
             var sede = new Sede
             {
@@ -66,6 +72,9 @@ public static class DevelopmentDataSeeder
             await db.SaveChangesAsync();
         }
 
+        await EnsureTenantSettingsTrunqiAsync(db);
+        await EnsureRcpTenantAsync(db, tenant, hasher, password, ahora);
+
         // Siempre reescribe el hash del admin en Development (evita UPDATE manual / hash inválido).
         await EnsureAdminAsync(db, tenant, hasher, email, password, ahora);
 
@@ -76,6 +85,101 @@ public static class DevelopmentDataSeeder
         await EnsureWooAsync(db, protector, config);
         await EnsureEcosistemaAsync(db);
         await EnsureDemoCatalogoAsync(db);
+    }
+
+    private static async Task EnsureTenantSettingsTrunqiAsync(ApplicationDbContext db)
+    {
+        var empresa = await db.Empresas.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(e => e.Id == EmpresaId);
+        if (empresa is null)
+        {
+            return;
+        }
+
+        empresa.AplicarSettings(TenantSettings.DefaultsTrunqi());
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureRcpTenantAsync(
+        ApplicationDbContext db,
+        ITenantProvider tenant,
+        IPasswordHasher<Usuario> hasher,
+        string password,
+        DateTimeOffset ahora)
+    {
+        var empresa = await db.Empresas.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(e => e.Id == RcpEmpresaId);
+        if (empresa is null)
+        {
+            empresa = new Empresa
+            {
+                Id = RcpEmpresaId,
+                Ruc = "20609999991",
+                RazonSocial = "RCP SUBASTAS SAC",
+                NombreComercial = "RCP Subastas",
+                Activa = true,
+                FechaCreacion = ahora
+            };
+            empresa.AplicarSettings(TenantSettings.DefaultsRcp());
+            db.Empresas.Add(empresa);
+        }
+        else
+        {
+            empresa.Activa = true;
+            empresa.AplicarSettings(TenantSettings.DefaultsRcp());
+        }
+
+        if (!await db.Sedes.IgnoreQueryFilters().AnyAsync(s => s.Id == RcpSedeId))
+        {
+            db.Sedes.Add(new Sede
+            {
+                Id = RcpSedeId,
+                EmpresaId = RcpEmpresaId,
+                Nombre = "Jr. Carabaya #1150",
+                Tipo = TipoSede.TIENDA,
+                Direccion = "Jr. Carabaya #1150",
+                Distrito = "Cercado de Lima",
+                EsAlmacenPrincipal = true,
+                Activa = true,
+                FechaCreacion = ahora
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        tenant.SetEmpresa(RcpEmpresaId);
+        const string rcpEmail = "admin@rcp.local";
+        var usuario = await db.Usuarios.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == RcpUsuarioId || u.Email.ToLower() == rcpEmail);
+        if (usuario is null)
+        {
+            usuario = new Usuario
+            {
+                Id = RcpUsuarioId,
+                EmpresaId = RcpEmpresaId,
+                Dni = "00000002",
+                Nombres = "Admin",
+                Apellidos = "RCP",
+                Nombre = "Admin RCP",
+                Email = rcpEmail,
+                Rol = RolUsuario.ADMIN,
+                Activo = true,
+                FechaCreacion = ahora
+            };
+            usuario.SincronizarNombreCompleto();
+            usuario.PasswordHash = hasher.HashPassword(usuario, password);
+            db.Usuarios.Add(usuario);
+        }
+        else
+        {
+            usuario.EmpresaId = RcpEmpresaId;
+            usuario.Activo = true;
+            usuario.Rol = RolUsuario.ADMIN;
+            usuario.Email = rcpEmail;
+            usuario.PasswordHash = hasher.HashPassword(usuario, password);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task EnsureAdminAsync(

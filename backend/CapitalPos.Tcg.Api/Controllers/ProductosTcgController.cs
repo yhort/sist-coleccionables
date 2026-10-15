@@ -2,6 +2,7 @@ using CapitalPos.Tcg.Api.Application.Productos;
 using CapitalPos.Tcg.Api.Contracts.Common;
 using CapitalPos.Tcg.Api.Contracts.Productos;
 using CapitalPos.Tcg.Api.Domain.Enums;
+using CapitalPos.Tcg.Api.Domain.Tenancy;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,13 @@ using Microsoft.AspNetCore.Mvc;
 namespace CapitalPos.Tcg.Api.Controllers;
 
 [Authorize]
+[RequiresAnyFeature(TenantFeature.PermitirSinglesTcg, TenantFeature.PermitirCromosSinCodigo)]
 [ApiController]
 [Route("api/productos-tcg")]
-public sealed class ProductosTcgController(ProductosTcgService productos) : ControllerBase
+public sealed class ProductosTcgController(
+    ProductosTcgService productos) : ControllerBase
 {
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProductoTcgResponse>>> Listar(
         [FromQuery] TipoProducto? tipoProducto,

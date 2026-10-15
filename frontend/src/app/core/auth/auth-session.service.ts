@@ -3,6 +3,8 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { apiUrl } from '../http/api-url';
+import { TenantSettings } from '../tenant/tenant-settings.model';
+import { TenantService } from '../tenant/tenant.service';
 
 export interface UsuarioSesion {
   id: string;
@@ -22,6 +24,7 @@ interface LoginResponse {
   accessToken: string;
   expiresAt: string;
   usuario: UsuarioSesion;
+  tenantSettings: TenantSettings;
 }
 
 interface EmpresasDisponiblesResponse {
@@ -33,6 +36,7 @@ interface SesionPersistida {
   accessToken: string;
   expiresAt: string;
   usuario: UsuarioSesion;
+  tenantSettings?: TenantSettings | null;
 }
 
 const STORAGE_KEY = 'capitalpos.tcg.session';
@@ -40,7 +44,8 @@ const STORAGE_KEY = 'capitalpos.tcg.session';
 @Injectable({ providedIn: 'root' })
 export class AuthSessionService {
   private readonly http = inject(HttpClient);
-  private readonly sesionSignal = signal<SesionPersistida | null>(leerSesion());
+  private readonly tenant = inject(TenantService);
+  private readonly sesionSignal = signal<SesionPersistida | null>(null);
 
   readonly sesion = this.sesionSignal.asReadonly();
   readonly isAuthenticated = computed(() => {
@@ -52,6 +57,14 @@ export class AuthSessionService {
   );
   readonly empresaId = computed(() => this.sesionSignal()?.usuario.empresaId ?? null);
   readonly usuario = computed(() => this.sesionSignal()?.usuario ?? null);
+
+  constructor() {
+    const inicial = leerSesion();
+    this.sesionSignal.set(inicial);
+    if (inicial?.tenantSettings) {
+      this.tenant.setSettings(inicial.tenantSettings);
+    }
+  }
 
   async listarEmpresas(): Promise<{ empresas: EmpresaLogin[]; unicoTenant: boolean }> {
     const respuesta = await firstValueFrom(
@@ -80,9 +93,11 @@ export class AuthSessionService {
       accessToken: respuesta.accessToken,
       expiresAt: respuesta.expiresAt,
       usuario: respuesta.usuario,
+      tenantSettings: respuesta.tenantSettings,
     };
     escribirSesion(persistida);
     this.sesionSignal.set(persistida);
+    this.tenant.setSettings(respuesta.tenantSettings ?? null);
     return persistida.usuario;
   }
 
@@ -93,6 +108,7 @@ export class AuthSessionService {
   clear(): void {
     sessionStorage.removeItem(STORAGE_KEY);
     this.sesionSignal.set(null);
+    this.tenant.clear();
   }
 }
 

@@ -1,6 +1,7 @@
 using CapitalPos.Tcg.Api.Application.Catalogo;
 using CapitalPos.Tcg.Api.Contracts.Catalogo;
 using CapitalPos.Tcg.Api.Domain.Enums;
+using CapitalPos.Tcg.Api.Domain.Tenancy;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CapitalPos.Tcg.Api.Controllers;
 
 [Authorize]
+[RequiresFeature(TenantFeature.PermitirSinglesTcg)]
 [ApiController]
 [Route("api/tcg")]
 public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : ControllerBase
