@@ -1,7 +1,11 @@
+using System.Globalization;
+using System.Text;
 using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Application.Comercial;
 using CapitalPos.Tcg.Api.Application.Inventario;
 using CapitalPos.Tcg.Api.Application.Pedidos;
+using CapitalPos.Tcg.Api.Application.Productos;
+using CapitalPos.Tcg.Api.Contracts.Inventario;
 using CapitalPos.Tcg.Api.Contracts.Subastas;
 using CapitalPos.Tcg.Api.Domain.Entities;
 using CapitalPos.Tcg.Api.Domain.Enums;
@@ -16,7 +20,8 @@ public sealed class SubastasTcgService(
     ApplicationDbContext db,
     ITenantProvider tenant,
     ICurrentUser currentUser,
-    KardexWriter kardex)
+    KardexWriter kardex,
+    SubastaImagenStorage imagenStorage)
 {
     public async Task<IReadOnlyList<SubastaTcgResponse>> ListarAsync(
         EstadoSubastaTcg? estado,
@@ -113,6 +118,202 @@ public sealed class SubastasTcgService(
         db.SubastasTcg.Add(subasta);
         await db.SaveChangesAsync(cancellationToken);
         return (await ObtenerAsync(subasta.Id, cancellationToken))!;
+    }
+
+    /// <summary>
+    /// Crea hasta 50 borradores FACEBOOK_SUBASTA (1 producto + 1 subasta por foto) con texto FB listo para copiar.
+    /// </summary>
+    public async Task<LoteMasivoSubastaResponse> CrearLoteMasivoAsync(
+        CrearLoteMasivoSubastaRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Items is null || request.Items.Count == 0)
+        {
+            throw new BusinessRuleException("El lote debe incluir al menos un artículo.");
+        }
+
+        if (request.Items.Count > 50)
+        {
+            throw new BusinessRuleException("El lote admite como máximo 50 artículos.");
+        }
+
+        var sedeExiste = await db.Sedes.AsNoTracking()
+            .AnyAsync(s => s.Id == request.SedeId && s.Activa, cancellationToken);
+        if (!sedeExiste)
+        {
+            throw new BusinessRuleException("La sede no existe o está inactiva.", StatusCodes.Status404NotFound);
+        }
+
+        var ahora = DateTimeOffset.UtcNow;
+        var fechaInicio = (request.FechaInicio ?? ahora).ToUniversalTime();
+        var horaFinBase = (request.HoraFinBase ?? fechaInicio.AddHours(2)).ToUniversalTime();
+        if (horaFinBase <= fechaInicio)
+        {
+            throw new BusinessRuleException("La hora de fin base debe ser posterior al inicio del lote.");
+        }
+
+        var intervalo = Math.Clamp(request.IntervaloMinutos, 0, 120);
+        var incremento = Round2(request.IncrementoMinimo <= 0 ? 1m : request.IncrementoMinimo);
+        // Minuto + sufijo corto: evita colisión de SKU LOT-{codigo}-NN entre lotes E2E/concurrentes.
+        var codigoLote = ahora.ToOffset(TimeSpan.FromHours(-5)).ToString("yyMMddHHmm", CultureInfo.InvariantCulture)
+            + Guid.NewGuid().ToString("N")[..4].ToUpperInvariant();
+        var itemsRespuesta = new List<LoteMasivoItemResponse>(request.Items.Count);
+
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        for (var i = 0; i < request.Items.Count; i++)
+        {
+            var item = request.Items[i];
+            var numArt = i + 1;
+            var titulo = item.Titulo.Trim();
+            if (titulo.Length < 3)
+            {
+                throw new BusinessRuleException($"El artículo #{numArt} necesita un título de al menos 3 caracteres.");
+            }
+
+            var precio = Round2(item.PrecioBase);
+            if (precio < 0.01m)
+            {
+                throw new BusinessRuleException($"El artículo #{numArt} necesita un precio base válido.");
+            }
+
+            var fechaCierre = (item.HoraFin ?? horaFinBase.AddMinutes(intervalo * i)).ToUniversalTime();
+            if (fechaCierre <= fechaInicio)
+            {
+                throw new BusinessRuleException($"El artículo #{numArt} tiene hora de fin inválida (debe ser posterior al inicio).");
+            }
+
+            var imagenUrl = await imagenStorage.GuardarAsync(
+                item.ImagenBase64,
+                item.ImagenContentType,
+                item.ImagenNombreArchivo,
+                cancellationToken);
+
+            var sku = $"LOT-{codigoLote}-{numArt:D2}";
+            var producto = new Producto
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = tenant.EmpresaId,
+                TipoProducto = TipoProducto.ACCESORIO,
+                Nombre = titulo,
+                CodigoSku = sku,
+                CodigoBarras = null,
+                PrecioVenta = precio,
+                Costo = null,
+                Imagenes = ProductoImagenes.Serializar(imagenUrl is null ? null : [imagenUrl]),
+                Activo = true,
+                FechaCreacion = ahora
+            };
+            db.Productos.Add(producto);
+
+            await kardex.AplicarAsync(
+                new KardexComando(
+                    request.SedeId,
+                    producto.Id,
+                    TipoMovimientoInventario.AJUSTE,
+                    1m,
+                    $"Ingreso lote FB {codigoLote} art. #{numArt}",
+                    "LOTE_FB",
+                    null,
+                    Sentido: SentidoAjuste.ENTRADA),
+                cancellationToken);
+
+            var subasta = new SubastaTcg
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = tenant.EmpresaId,
+                SedeId = request.SedeId,
+                ProductoId = producto.Id,
+                Titulo = titulo,
+                Canal = CanalSubastaTcg.FACEBOOK_SUBASTA,
+                Modo = ModoSubastaTcg.COMBO,
+                PrecioBase = precio,
+                IncrementoMinimo = incremento,
+                PrecioReserva = null,
+                FechaInicio = fechaInicio,
+                FechaCierre = fechaCierre,
+                Estado = EstadoSubastaTcg.BORRADOR,
+                Observacion = TextoOpcional(item.Observaciones)
+            };
+            subasta.Detalles.Add(new SubastaDetalle
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = tenant.EmpresaId,
+                SubastaTcgId = subasta.Id,
+                ProductoId = producto.Id,
+                Cantidad = 1,
+                Orden = 1,
+                TituloPersonalizado = titulo,
+                Estado = EstadoSubastaDetalle.PENDIENTE
+            });
+            db.SubastasTcg.Add(subasta);
+
+            var textoFb = GenerarTextoFacebook(codigoLote, numArt, titulo, precio, fechaCierre);
+            itemsRespuesta.Add(new LoteMasivoItemResponse
+            {
+                SubastaId = subasta.Id,
+                CodigoSubasta = CodigoAmigable.Subasta(subasta.Id),
+                NumSubasta = codigoLote,
+                NumArticulo = numArt,
+                Titulo = titulo,
+                PrecioBase = precio,
+                FechaCierre = fechaCierre,
+                TextoFacebook = textoFb,
+                ImagenUrl = imagenUrl,
+                ProductoId = producto.Id
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+
+        return new LoteMasivoSubastaResponse
+        {
+            CodigoLote = codigoLote,
+            TotalItems = itemsRespuesta.Count,
+            Items = itemsRespuesta
+        };
+    }
+
+    public static string GenerarTextoFacebook(
+        string numSubasta,
+        int numArt,
+        string titulo,
+        decimal precioBase,
+        DateTimeOffset fechaCierre)
+    {
+        var lima = ResolverZonaLima();
+        var local = TimeZoneInfo.ConvertTime(fechaCierre, lima);
+        var horaFin = local.ToString("dd/MM/yyyy hh:mm tt", CultureInfo.GetCultureInfo("es-PE"));
+        var precio = precioBase.ToString("0.##", CultureInfo.InvariantCulture);
+
+        var sb = new StringBuilder();
+        sb.Append("SUBASTA : #").Append(numSubasta).Append('\n');
+        sb.Append("ARTÍCULO #").Append(numArt).Append('\n');
+        sb.Append("PRODUCTO: ").Append(titulo.Trim()).Append('\n');
+        sb.Append("PRECIO: ").Append(precio).Append(" SOLES\n");
+        sb.Append("FINALIZA: ").Append(horaFin).Append('\n');
+        sb.Append("ENTREGA: Jr. Carabaya #1150");
+        return sb.ToString();
+    }
+
+    private static TimeZoneInfo ResolverZonaLima()
+    {
+        foreach (var id in new[] { "America/Lima", "SA Pacific Standard Time" })
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        return TimeZoneInfo.CreateCustomTimeZone("Lima", TimeSpan.FromHours(-5), "Lima", "Lima");
     }
 
     public async Task<SubastaTcgResponse> ActualizarAsync(

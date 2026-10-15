@@ -1,0 +1,146 @@
+<section class="carga-lote">
+  <header class="carga-lote__header">
+    <div>
+      <p class="carga-lote__eyebrow">Facebook · Jr. Carabaya #1150</p>
+      <h1>Carga masiva de subastas</h1>
+      <p class="carga-lote__lead">
+        Arrastra hasta 50 fotos, completa título/precio/hora y genera el texto listo para pegar en Facebook.
+      </p>
+    </div>
+    <a class="carga-lote__back" routerLink="/app/subastas-tcg">Volver a subastas</a>
+  </header>
+
+  <div class="carga-lote__toolbar">
+    <label>
+      Sede
+      <select [ngModel]="sedeId()" (ngModelChange)="sedeId.set($event)">
+        @for (sede of sedes(); track sede.id) {
+          <option [value]="sede.id">{{ sede.nombre }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Primera hora de cierre
+      <input
+        type="datetime-local"
+        [ngModel]="horaFinBaseLocal()"
+        (ngModelChange)="horaFinBaseLocal.set($event)"
+      />
+    </label>
+    <label>
+      Intervalo (min)
+      <input
+        type="number"
+        min="0"
+        max="120"
+        [ngModel]="intervaloMinutos()"
+        (ngModelChange)="intervaloMinutos.set(+$event || 0)"
+      />
+    </label>
+    <label>
+      Incremento mín. (S/)
+      <input
+        type="number"
+        min="0.01"
+        step="0.5"
+        [ngModel]="incrementoMinimo()"
+        (ngModelChange)="incrementoMinimo.set(+$event || 1)"
+      />
+    </label>
+    <button type="button" class="btn btn--ghost" (click)="reescalonarHoras()">
+      Reescalonar horas
+    </button>
+  </div>
+
+  <div
+    class="carga-lote__drop"
+    [class.carga-lote__drop--active]="arrastrando()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)"
+  >
+    <p>Arrastra fotos aquí o elige archivos</p>
+    <label class="btn btn--primary">
+      Seleccionar imágenes
+      <input type="file" accept="image/*" multiple hidden (change)="onFileInput($event)" />
+    </label>
+    <span>{{ total() }} / 50</span>
+  </div>
+
+  @if (error()) {
+    <p class="carga-lote__msg carga-lote__msg--error" role="alert">{{ error() }}</p>
+  }
+  @if (ok()) {
+    <p class="carga-lote__msg carga-lote__msg--ok">{{ ok() }}</p>
+  }
+
+  @if (filas().length) {
+    <div class="carga-lote__table-wrap">
+      <table class="carga-lote__table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Foto</th>
+            <th>Título</th>
+            <th>Precio base</th>
+            <th>Hora cierre</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of filas(); track fila.id; let i = $index) {
+            <tr>
+              <td>{{ fila.numArticulo || i + 1 }}</td>
+              <td>
+                <img [src]="fila.previewUrl" [alt]="fila.titulo" width="64" height="64" />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  [ngModel]="fila.titulo"
+                  (ngModelChange)="actualizarFila(fila.id, { titulo: $event })"
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.5"
+                  [ngModel]="fila.precioBase"
+                  (ngModelChange)="actualizarFila(fila.id, { precioBase: +$event || 0 })"
+                />
+              </td>
+              <td>
+                <input
+                  type="datetime-local"
+                  [ngModel]="fila.horaFinLocal"
+                  (ngModelChange)="actualizarFila(fila.id, { horaFinLocal: $event })"
+                />
+              </td>
+              <td class="carga-lote__actions">
+                <button type="button" class="btn btn--ghost" (click)="copiarTexto(fila)">
+                  Copiar texto FB
+                </button>
+                <button type="button" class="btn btn--danger" (click)="eliminarFila(fila.id)">
+                  Quitar
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="carga-lote__footer">
+      <button type="button" class="btn btn--ghost" (click)="exportarJson()">Exportar lote a JSON</button>
+      <button
+        type="button"
+        class="btn btn--primary"
+        [disabled]="!puedeEnviar()"
+        (click)="crearLote()"
+      >
+        {{ enviando() ? 'Creando…' : 'Crear lote (borradores)' }}
+      </button>
+    </footer>
+  }
+</section>

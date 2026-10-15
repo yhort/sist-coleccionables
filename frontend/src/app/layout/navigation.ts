@@ -67,6 +67,14 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     keywords: ['pujas', 'facebook', 'lote'],
   },
   {
+    label: 'Carga lote FB',
+    route: '/app/subastas/carga-lote',
+    exact: false,
+    icon: 'subastas',
+    keywords: ['facebook', 'lote', 'masivo', 'fotos', 'panini'],
+    feature: 'PermitirSubastasLoteFB',
+  },
+  {
     label: 'Pedidos Digitales',
     route: '/app/pedidos-digitales',
     exact: false,

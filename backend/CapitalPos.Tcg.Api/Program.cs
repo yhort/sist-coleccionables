@@ -54,6 +54,7 @@ builder.Services.AddScoped<CatalogoTcgService>();
 builder.Services.AddScoped<SedesService>();
 builder.Services.AddScoped<InventarioService>();
 builder.Services.AddScoped<AperturasTcgService>();
+builder.Services.AddScoped<SubastaImagenStorage>();
 builder.Services.AddScoped<SubastasTcgService>();
 builder.Services.AddScoped<PedidosDigitalesService>();
 builder.Services.AddScoped<ClientesService>();
@@ -180,6 +181,14 @@ else
 {
     app.UseHttpsRedirection();
 }
+
+var webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "subastas"));
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRoot)
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<TenantHeaderMiddleware>();

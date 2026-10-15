@@ -12,6 +12,10 @@ import { PedidosDigitalesApiService } from '../../pedidos-digitales/data-access/
 import { ProductosTcgApiService } from '../../productos-tcg/data-access/productos-tcg.service';
 import { TipoProductoTcg } from '../../productos-tcg/models/producto-tcg.model';
 import {
+  CrearLoteMasivoRequest,
+  LoteMasivoResponse,
+} from '../models/lote-masivo.model';
+import {
   ActualizarSubastaRequest,
   AdjudicarSubastaRequest,
   CanalSubastaTcg,
@@ -206,6 +210,16 @@ export class SubastasTcgApiService {
 
   crear(request: CrearSubastaRequest): Promise<SubastaTcg> {
     return this.enviar('POST', apiUrl('subastas-tcg'), cuerpoSubasta(request));
+  }
+
+  async crearLoteMasivo(request: CrearLoteMasivoRequest): Promise<LoteMasivoResponse> {
+    try {
+      return await firstValueFrom(
+        this.http.post<LoteMasivoResponse>(apiUrl('subastas-tcg/lote-masivo'), request),
+      );
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   actualizar(id: string, request: ActualizarSubastaRequest): Promise<SubastaTcg> {

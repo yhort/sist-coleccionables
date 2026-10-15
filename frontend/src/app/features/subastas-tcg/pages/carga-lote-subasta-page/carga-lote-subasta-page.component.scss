@@ -1,0 +1,168 @@
+.carga-lote {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem 2.5rem;
+}
+
+.carga-lote__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.carga-lote__eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5c6570;
+}
+
+.carga-lote__header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.55rem;
+}
+
+.carga-lote__lead {
+  margin: 0;
+  max-width: 40rem;
+  color: #5c6570;
+}
+
+.carga-lote__back {
+  white-space: nowrap;
+  color: inherit;
+}
+
+.carga-lote__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.carga-lote__toolbar label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.carga-lote__toolbar input,
+.carga-lote__toolbar select,
+.carga-lote__table input {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #c9d0d8;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.carga-lote__drop {
+  display: grid;
+  place-items: center;
+  gap: 0.65rem;
+  min-height: 8rem;
+  border: 1.5px dashed #9aa7b5;
+  border-radius: 10px;
+  background: #f7f9fb;
+  text-align: center;
+  padding: 1.25rem;
+}
+
+.carga-lote__drop--active {
+  border-color: #1f6feb;
+  background: color-mix(in srgb, #1f6feb 8%, #fff);
+}
+
+.carga-lote__table-wrap {
+  overflow: auto;
+  border: 1px solid #e2e8ef;
+  border-radius: 10px;
+}
+
+.carga-lote__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.carga-lote__table th,
+.carga-lote__table td {
+  padding: 0.65rem 0.7rem;
+  border-bottom: 1px solid #eef2f6;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.carga-lote__table img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #eee;
+}
+
+.carga-lote__table input[type='text'] {
+  width: min(18rem, 100%);
+}
+
+.carga-lote__table input[type='number'] {
+  width: 6.5rem;
+}
+
+.carga-lote__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.carga-lote__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.carga-lote__msg {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+}
+
+.carga-lote__msg--error {
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.carga-lote__msg--ok {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: #1f6feb;
+  color: #fff;
+}
+
+.btn--ghost {
+  background: #eef2f6;
+  color: #1f2933;
+}
+
+.btn--danger {
+  background: #fee4e2;
+  color: #b42318;
+}

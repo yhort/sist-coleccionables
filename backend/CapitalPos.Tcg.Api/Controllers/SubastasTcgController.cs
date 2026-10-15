@@ -3,6 +3,7 @@ using CapitalPos.Tcg.Api.Application.Common;
 using CapitalPos.Tcg.Api.Application.Subastas;
 using CapitalPos.Tcg.Api.Contracts.Subastas;
 using CapitalPos.Tcg.Api.Domain.Enums;
+using CapitalPos.Tcg.Api.Domain.Tenancy;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,26 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
         catch (BusinessRuleException ex)
         {
             return RespuestaRegla(ex);
+        }
+    }
+
+    [HttpPost("lote-masivo")]
+    [RequiresPermission(Permiso.OperarVentas)]
+    [RequiresFeature(TenantFeature.PermitirSubastasLoteFB)]
+    public async Task<ActionResult<LoteMasivoSubastaResponse>> CrearLoteMasivo(
+        [FromBody] CrearLoteMasivoSubastaRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var lote = await subastas.CrearLoteMasivoAsync(request, cancellationToken);
+            return Ok(lote);
+        }
+        catch (BusinessRuleException ex)
+        {
+            return ex.StatusCode == StatusCodes.Status404NotFound
+                ? NotFound(new { message = ex.Message })
+                : BadRequest(new { message = ex.Message });
         }
     }
 
