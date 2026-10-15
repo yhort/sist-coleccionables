@@ -19,10 +19,12 @@ import {
 
 import {
   AtributoWoo,
+  CategoriaSkuInterno,
   ComponenteCompuesto,
   CondicionTcg,
   ContenidoFijoApertura,
   ETIQUETAS_ACCESORIO,
+  ETIQUETAS_CATEGORIA_SKU,
   ETIQUETAS_CONDICION,
   ETIQUETAS_IDIOMA,
   ETIQUETAS_JUEGO,
@@ -47,6 +49,7 @@ import {
 import { ProductosTcgApiService } from '../../data-access/productos-tcg.service';
 import { esUrlImagenDirecta, urlsImagenesDesde } from '../../data-access/producto-tcg.mapper';
 import { SedesApiService } from '../../../../core/data-access/sedes-api.service';
+import { TenantService } from '../../../../core/tenant/tenant.service';
 import { StockApiService } from '../../../inventario/data-access/stock.service';
 
 type TabFormulario = 'tcg' | 'woo';
@@ -64,6 +67,7 @@ export class ProductoTcgFormDialogComponent implements OnInit {
   private readonly productosApi = inject(ProductosTcgApiService);
   private readonly sedesApi = inject(SedesApiService);
   private readonly stockApi = inject(StockApiService);
+  private readonly tenant = inject(TenantService);
 
   readonly producto = input<ProductoTcg | null>(null);
   readonly catalogo = input<ProductoTcg[]>([]);
@@ -90,7 +94,21 @@ export class ProductoTcgFormDialogComponent implements OnInit {
   readonly condiciones = Object.entries(ETIQUETAS_CONDICION) as [CondicionTcg, string][];
   readonly sellados = Object.entries(ETIQUETAS_SELLADO) as [TipoSellado, string][];
   readonly accesorios = Object.entries(ETIQUETAS_ACCESORIO) as [TipoAccesorio, string][];
+  readonly categoriasSku = Object.entries(ETIQUETAS_CATEGORIA_SKU) as [
+    CategoriaSkuInterno,
+    string,
+  ][];
   readonly etiquetasSync = ETIQUETAS_SYNC;
+  readonly permiteCromosSinCodigo = computed(() =>
+    this.tenant.hasFeature('PermitirCromosSinCodigo'),
+  );
+  readonly soloCromos = computed(
+    () =>
+      this.tenant.hasFeature('PermitirCromosSinCodigo') &&
+      !this.tenant.hasFeature('PermitirSinglesTcg'),
+  );
+  readonly skuPreview = signal('');
+  readonly cargandoSkuPreview = signal(false);
 
   /** Opciones del selector: conocidos + catálogo + recién creados. */
   readonly opcionesJuego = computed(() => {
@@ -119,6 +137,9 @@ export class ProductoTcgFormDialogComponent implements OnInit {
     tipoProducto: this.fb.nonNullable.control<TipoProductoTcg>('CARTA'),
     juego: this.fb.nonNullable.control<string>(''),
     codigoBarras: [''],
+    esColeccionableSinCodigo: [false],
+    codigoCategoriaSku: this.fb.nonNullable.control<CategoriaSkuInterno | ''>('ALB'),
+    ubicacionTienda: [''],
     costo: this.fb.control<number | null>(null),
     stockLocal: [0, [Validators.required, Validators.min(0)]],
     sedeId: [''],
@@ -165,7 +186,73 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       this.cargarProducto(actual);
     } else {
       const sedeId = this.sedes()[0]?.id ?? '';
-      this.form.patchValue({ sedeId });
+      const defaults: Record<string, unknown> = { sedeId };
+      if (this.soloCromos()) {
+        defaults['tipoProducto'] = 'ACCESORIO';
+        defaults['esColeccionableSinCodigo'] = true;
+      }
+      this.form.patchValue(defaults);
+    }
+    this.aplicarModoSinCodigo(Boolean(this.form.controls['esColeccionableSinCodigo'].value));
+    this.form.controls['esColeccionableSinCodigo'].valueChanges.subscribe((valor) => {
+      this.aplicarModoSinCodigo(Boolean(valor));
+    });
+    this.form.controls['codigoCategoriaSku'].valueChanges.subscribe(() => {
+      if (this.form.controls['esColeccionableSinCodigo'].value) {
+        void this.refrescarSkuPreview();
+      }
+    });
+    this.form.controls['tipoProducto'].valueChanges.subscribe(() => {
+      if (this.form.controls['esColeccionableSinCodigo'].value) {
+        void this.refrescarSkuPreview();
+      }
+    });
+  }
+
+  get esSinCodigo(): boolean {
+    return Boolean(this.form.controls['esColeccionableSinCodigo'].value);
+  }
+
+  private aplicarModoSinCodigo(activo: boolean): void {
+    const skuCtrl = this.form.controls['codigoSku'];
+    const eanCtrl = this.form.controls['codigoBarras'];
+    if (activo) {
+      eanCtrl.disable({ emitEvent: false });
+      eanCtrl.setValue('', { emitEvent: false });
+      skuCtrl.disable({ emitEvent: false });
+      if (this.soloCromos() && this.form.controls['tipoProducto'].value !== 'ACCESORIO') {
+        this.form.patchValue({ tipoProducto: 'ACCESORIO' }, { emitEvent: false });
+      }
+      void this.refrescarSkuPreview();
+    } else {
+      eanCtrl.enable({ emitEvent: false });
+      skuCtrl.enable({ emitEvent: false });
+      this.skuPreview.set('');
+    }
+  }
+
+  async refrescarSkuPreview(): Promise<void> {
+    if (!this.esSinCodigo || this.esEdicion()) {
+      const actual = this.producto();
+      if (actual?.skuInterno || actual?.codigoSku) {
+        this.skuPreview.set(actual.skuInterno || actual.codigoSku);
+      }
+      return;
+    }
+    this.cargandoSkuPreview.set(true);
+    try {
+      const preview = await this.productosApi.previewSkuInterno({
+        categoria: String(this.form.controls['codigoCategoriaSku'].value || 'GEN'),
+        tipoProducto: this.tipoProducto,
+        tipoAccesorio: String(this.form.get('atributosTcg')?.get('tipoAccesorio')?.value || ''),
+        tipoSellado: String(this.form.get('atributosTcg')?.get('tipoSellado')?.value || ''),
+      });
+      this.skuPreview.set(preview.skuInterno);
+      this.form.controls['codigoSku'].setValue(preview.skuInterno, { emitEvent: false });
+    } catch {
+      this.skuPreview.set('RCP-… (se genera al guardar)');
+    } finally {
+      this.cargandoSkuPreview.set(false);
     }
   }
 
@@ -407,19 +494,22 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       return;
     }
 
-    const sku = String(this.form.controls['codigoSku'].value).trim();
     const raw = this.form.getRawValue();
+    const sinCodigo = Boolean(raw.esColeccionableSinCodigo);
+    const sku = sinCodigo
+      ? String(this.skuPreview() || raw.codigoSku || '').trim()
+      : String(raw.codigoSku || '').trim();
     const stockLocal = Number(raw.stockLocal) || 0;
     const sedeId = String(raw.sedeId || '').trim();
     const esAlta = this.producto() === null;
 
-    if (!esAlta && !sku) {
+    if (!esAlta && !sinCodigo && !sku) {
       this.errorSku = 'El SKU es obligatorio al editar.';
       this.tabActiva = 'tcg';
       return;
     }
 
-    if (sku && this.productosApi.skuExiste(sku, this.producto()?.id)) {
+    if (!sinCodigo && sku && this.productosApi.skuExiste(sku, this.producto()?.id)) {
       this.errorSku = 'Ese SKU ya existe en el catálogo.';
       this.tabActiva = 'tcg';
       return;
@@ -456,7 +546,11 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       tipoProducto: raw.tipoProducto,
       nombre: String(raw.nombre).trim(),
       codigoSku: sku,
-      codigoBarras: String(raw.codigoBarras || '').trim() || null,
+      codigoBarras: sinCodigo ? null : String(raw.codigoBarras || '').trim() || null,
+      esColeccionableSinCodigo: sinCodigo,
+      skuInterno: sinCodigo ? sku || existentes?.skuInterno || null : null,
+      ubicacionTienda: String(raw.ubicacionTienda || '').trim() || null,
+      codigoCategoriaSku: (raw.codigoCategoriaSku || '') as CategoriaSkuInterno | '',
       precioVenta,
       costo: this.asNumberOrNull(raw.costo),
       juego: normalizarJuego(raw.juego),
@@ -511,6 +605,9 @@ export class ProductoTcgFormDialogComponent implements OnInit {
       tipoProducto: producto.tipoProducto,
       juego,
       codigoBarras: producto.codigoBarras ?? '',
+      esColeccionableSinCodigo: producto.esColeccionableSinCodigo,
+      codigoCategoriaSku: producto.codigoCategoriaSku || 'ALB',
+      ubicacionTienda: producto.ubicacionTienda ?? '',
       costo: producto.costo,
       stockLocal: producto.stockLocal,
       precioVenta: producto.precioVenta || producto.woo.precioNormal || 0,
@@ -526,6 +623,8 @@ export class ProductoTcgFormDialogComponent implements OnInit {
         imagenes: producto.woo.imagenes.join(', '),
       },
     });
+    this.skuPreview.set(producto.skuInterno || producto.codigoSku);
+    this.aplicarModoSinCodigo(producto.esColeccionableSinCodigo);
 
     this.atributosWoo.clear();
     for (const atributo of producto.woo.atributos) {

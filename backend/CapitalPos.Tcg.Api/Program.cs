@@ -49,6 +49,7 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<KardexWriter>();
 builder.Services.AddScoped<WooStockPublishQueue>();
 builder.Services.AddScoped<WooStockPublisher>();
+builder.Services.AddScoped<SkuGeneratorService>();
 builder.Services.AddScoped<ProductosTcgService>();
 builder.Services.AddScoped<CatalogoTcgService>();
 builder.Services.AddScoped<SedesService>();

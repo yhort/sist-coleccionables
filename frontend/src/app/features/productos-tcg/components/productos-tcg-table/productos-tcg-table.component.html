@@ -100,6 +100,15 @@
                 <td>
                   <div class="acciones">
                     <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+                    @if (producto.esColeccionableSinCodigo || producto.skuInterno) {
+                      <button
+                        type="button"
+                        class="link-btn"
+                        (click)="imprimirEtiqueta.emit(producto)"
+                      >
+                        Etiqueta
+                      </button>
+                    }
                     @if (producto.activo && producto.wooVinculado) {
                       <button
                         type="button"
@@ -194,6 +203,11 @@
             </span>
             <div class="acciones acciones--card">
               <button type="button" class="link-btn" (click)="editar.emit(producto)">Editar</button>
+              @if (producto.esColeccionableSinCodigo || producto.skuInterno) {
+                <button type="button" class="link-btn" (click)="imprimirEtiqueta.emit(producto)">
+                  Etiqueta
+                </button>
+              }
               @if (producto.activo && producto.wooVinculado) {
                 <button
                   type="button"

@@ -41,6 +41,7 @@ export class ProductosTcgTableComponent {
   readonly total = input(0);
   readonly accionId = input<string | null>(null);
   readonly editar = output<ProductoTcg>();
+  readonly imprimirEtiqueta = output<ProductoTcg>();
   readonly desvincularWoo = output<ProductoTcg>();
   readonly eliminarODesactivar = output<ProductoTcg>();
   readonly reactivar = output<ProductoTcg>();

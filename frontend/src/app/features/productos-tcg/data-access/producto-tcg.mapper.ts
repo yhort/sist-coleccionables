@@ -49,6 +49,9 @@ export interface ProductoTcgApi {
   nombre: string;
   codigoSku: string;
   codigoBarras?: string | null;
+  esColeccionableSinCodigo?: boolean;
+  skuInterno?: string | null;
+  ubicacionTienda?: string | null;
   precioVenta: number;
   costo?: number | null;
   activo: boolean;
@@ -87,6 +90,10 @@ export interface UpsertProductoTcgRequest {
   /** Vacío/null en alta: el backend genera un SKU automático. */
   codigoSku?: string | null;
   codigoBarras?: string | null;
+  esColeccionableSinCodigo?: boolean;
+  codigoCategoriaSku?: string | null;
+  ubicacionTienda?: string | null;
+  tipoAccesorio?: string | null;
   precioVenta: number;
   costo?: number | null;
   imagenes?: string[];
@@ -179,12 +186,19 @@ export function mapProductoFromApi(dto: ProductoTcgApi, stockLocal = 0): Product
   const wooApi = dto.woo;
   const wooVinculado = dto.wooVinculado ?? wooApi?.wooProductId != null;
 
+  const skuInterno = dto.skuInterno ?? (dto.esColeccionableSinCodigo ? dto.codigoSku : null);
+  const categoriaDesdeSku = extraerCategoriaSku(skuInterno ?? dto.codigoSku);
+
   return {
     id: dto.id,
     tipoProducto: dto.tipoProducto,
     nombre: dto.nombre,
     codigoSku: dto.codigoSku,
     codigoBarras: dto.codigoBarras ?? null,
+    esColeccionableSinCodigo: Boolean(dto.esColeccionableSinCodigo),
+    skuInterno,
+    ubicacionTienda: dto.ubicacionTienda ?? null,
+    codigoCategoriaSku: categoriaDesdeSku,
     precioVenta: dto.precioVenta,
     costo: dto.costo ?? null,
     juego,
@@ -233,6 +247,12 @@ function mapEstadoMapeoWoo(estado?: string | null): EstadoSincronizacionWoo {
   }
 }
 
+function extraerCategoriaSku(sku: string | null | undefined): ProductoTcg['codigoCategoriaSku'] {
+  const match = (sku ?? '').trim().toUpperCase().match(/^RCP-([A-Z0-9]{2,4})-\d+$/);
+  const cat = (match?.[1] ?? '') as ProductoTcg['codigoCategoriaSku'];
+  return cat || '';
+}
+
 export function mapProductoToUpsert(
   producto: ProductoTcg,
   opciones?: { sedeId?: string | null; esAlta?: boolean },
@@ -241,8 +261,12 @@ export function mapProductoToUpsert(
   const request: UpsertProductoTcgRequest = {
     tipoProducto: producto.tipoProducto,
     nombre: producto.nombre.trim(),
-    codigoSku: producto.codigoSku.trim() || null,
-    codigoBarras: producto.codigoBarras,
+    codigoSku: producto.esColeccionableSinCodigo ? null : producto.codigoSku.trim() || null,
+    codigoBarras: producto.esColeccionableSinCodigo ? null : producto.codigoBarras,
+    esColeccionableSinCodigo: producto.esColeccionableSinCodigo,
+    codigoCategoriaSku: producto.codigoCategoriaSku || null,
+    ubicacionTienda: producto.ubicacionTienda,
+    tipoAccesorio: producto.atributosTcg.tipoAccesorio || null,
     precioVenta: producto.precioVenta,
     costo: producto.costo,
     imagenes: urlsImagenesDesde(producto.woo.imagenes),

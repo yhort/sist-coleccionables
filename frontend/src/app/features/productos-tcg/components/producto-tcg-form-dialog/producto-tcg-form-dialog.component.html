@@ -23,18 +23,54 @@
         Nombre
         <input formControlName="nombre" maxlength="200" />
       </label>
+      @if (permiteCromosSinCodigo()) {
+        <label class="checkbox checkbox--wide">
+          <input type="checkbox" formControlName="esColeccionableSinCodigo" />
+          Producto sin código de barras (SKU interno)
+        </label>
+      }
       <label>
-        SKU (opcional)
-        <input formControlName="codigoSku" maxlength="64" placeholder="Se genera si queda vacío" />
+        {{ esSinCodigo ? 'SKU interno' : 'SKU (opcional)' }}
+        <input
+          formControlName="codigoSku"
+          maxlength="64"
+          [readonly]="esSinCodigo"
+          [placeholder]="
+            esSinCodigo
+              ? cargandoSkuPreview()
+                ? 'Generando…'
+                : skuPreview() || 'Se genera al marcar sin código'
+              : 'Se genera si queda vacío'
+          "
+        />
+        @if (esSinCodigo && skuPreview()) {
+          <small class="hint">Autogenerado: {{ skuPreview() }}</small>
+        }
         @if (errorSku) {
           <small class="field-error">{{ errorSku }}</small>
         }
       </label>
+      @if (esSinCodigo) {
+        <label>
+          Categoría SKU
+          <select formControlName="codigoCategoriaSku">
+            @for (cat of categoriasSku; track cat[0]) {
+              <option [value]="cat[0]">{{ cat[0] }} · {{ cat[1] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Ubicación en tienda
+          <input formControlName="ubicacionTienda" maxlength="120" placeholder="Estante A-3" />
+        </label>
+      }
       <label>
         Tipo de producto
         <select formControlName="tipoProducto">
           @for (tipo of tipos; track tipo[0]) {
-            <option [value]="tipo[0]">{{ tipo[1] }}</option>
+            @if (!soloCromos() || tipo[0] === 'ACCESORIO') {
+              <option [value]="tipo[0]">{{ tipo[1] }}</option>
+            }
           }
         </select>
       </label>
@@ -75,8 +111,12 @@
         }
       </label>
       <label>
-        Código de barras
-        <input formControlName="codigoBarras" maxlength="64" />
+        Código de barras (EAN)
+        <input
+          formControlName="codigoBarras"
+          maxlength="64"
+          [placeholder]="esSinCodigo ? 'Deshabilitado: se usa SKU interno' : ''"
+        />
       </label>
       <label>
         Stock local

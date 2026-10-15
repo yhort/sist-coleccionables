@@ -29,7 +29,29 @@ export type CondicionTcg = 'NM' | 'LP' | 'MP' | 'HP' | 'DMG';
 
 export type TipoSellado = 'SOBRE' | 'CAJA' | 'CASE' | 'TIN' | 'COLECCION' | 'OTRO';
 
-export type TipoAccesorio = 'FUNDAS' | 'BINDER' | 'PLAYMAT' | 'DECKBOX' | 'TOALLA' | 'OTRO';
+export type TipoAccesorio =
+  | 'FUNDAS'
+  | 'BINDER'
+  | 'PLAYMAT'
+  | 'DECKBOX'
+  | 'TOALLA'
+  | 'FIGURITA'
+  | 'SOBRE'
+  | 'OTRO';
+
+/** Códigos CAT del SKU interno RCP-{CAT}-{SEQ}. */
+export type CategoriaSkuInterno = 'ALB' | 'SOB' | 'FIG' | 'CRO' | 'GEN' | 'FUN' | 'PLA' | 'DEC';
+
+export const ETIQUETAS_CATEGORIA_SKU: Record<CategoriaSkuInterno, string> = {
+  ALB: 'Álbum / binder',
+  SOB: 'Sobre',
+  FIG: 'Figurita / carta',
+  CRO: 'Cromo / sobrante',
+  GEN: 'General',
+  FUN: 'Fundas',
+  PLA: 'Playmat',
+  DEC: 'Deck box',
+};
 
 export type EstadoStock = 'EN_STOCK' | 'STOCK_BAJO' | 'SIN_STOCK';
 
@@ -125,6 +147,10 @@ export interface ProductoTcg {
   nombre: string;
   codigoSku: string;
   codigoBarras: string | null;
+  esColeccionableSinCodigo: boolean;
+  skuInterno: string | null;
+  ubicacionTienda: string | null;
+  codigoCategoriaSku: CategoriaSkuInterno | '';
   precioVenta: number;
   costo: number | null;
   /** Código conocido (POKEMON/…) o etiqueta libre de juego/categoría. */
@@ -329,6 +355,8 @@ export const ETIQUETAS_SELLADO: Record<TipoSellado, string> = {
 };
 
 export const ETIQUETAS_ACCESORIO: Record<TipoAccesorio, string> = {
+  FIGURITA: 'Figurita / cromo',
+  SOBRE: 'Sobre coleccionable',
   FUNDAS: 'Fundas',
   BINDER: 'Binder',
   PLAYMAT: 'Playmat',

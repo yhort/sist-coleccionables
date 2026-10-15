@@ -5,7 +5,15 @@ import { firstValueFrom } from 'rxjs';
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
 import { ResultadoPaginado } from '../../../shared/ui/tabla-paginacion/paginacion';
-import { etiquetaJuego, EliminarProductoTcgResultado, MetadatosWooCommerce, ProductoTcg, ProductosTcgFiltros, estadoStockDe } from '../models/producto-tcg.model';
+import {
+  etiquetaJuego,
+  EliminarProductoTcgResultado,
+  MetadatosWooCommerce,
+  ProductoTcg,
+  ProductosTcgFiltros,
+  TipoProductoTcg,
+  estadoStockDe,
+} from '../models/producto-tcg.model';
 import { EliminarProductoTcgApi, ProductoTcgApi, mapProductoFromApi, mapProductoToUpsert } from './producto-tcg.mapper';
 import { CrearVarianteProductoCartaRequest } from '../../catalogo-tcg/models/catalogo-tcg.model';
 
@@ -151,6 +159,37 @@ export class ProductosTcgApiService {
         (producto.codigoSku.toLowerCase() === normalizado ||
           producto.woo.sku.toLowerCase() === normalizado),
     );
+  }
+
+  async previewSkuInterno(params: {
+    categoria?: string;
+    tipoProducto?: TipoProductoTcg;
+    tipoSellado?: string;
+    tipoAccesorio?: string;
+  }): Promise<{ skuInterno: string; categoria: string }> {
+    try {
+      let httpParams = new HttpParams();
+      if (params.categoria) {
+        httpParams = httpParams.set('categoria', params.categoria);
+      }
+      if (params.tipoProducto) {
+        httpParams = httpParams.set('tipoProducto', params.tipoProducto);
+      }
+      if (params.tipoSellado) {
+        httpParams = httpParams.set('tipoSellado', params.tipoSellado);
+      }
+      if (params.tipoAccesorio) {
+        httpParams = httpParams.set('tipoAccesorio', params.tipoAccesorio);
+      }
+      return await firstValueFrom(
+        this.http.get<{ skuInterno: string; categoria: string }>(
+          apiUrl('productos-tcg/sku-interno/preview'),
+          { params: httpParams },
+        ),
+      );
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   async crearVariante(request: CrearVarianteProductoCartaRequest): Promise<ProductoTcg> {

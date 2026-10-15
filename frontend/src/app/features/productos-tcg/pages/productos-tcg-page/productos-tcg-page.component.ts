@@ -8,9 +8,11 @@ import {
   VistaCatalogo,
 } from '../../components/productos-tcg-table/productos-tcg-table.component';
 import { ProductoTcgFormDialogComponent } from '../../components/producto-tcg-form-dialog/producto-tcg-form-dialog.component';
+import { EtiquetaTermicaDialogComponent } from '../../components/etiqueta-termica-dialog/etiqueta-termica-dialog.component';
 import { CatalogoTcgPanelComponent } from '../../../catalogo-tcg/components/catalogo-tcg-panel/catalogo-tcg-panel.component';
 import { StockApiService } from '../../../inventario/data-access/stock.service';
 import { SedesApiService } from '../../../../core/data-access/sedes-api.service';
+import { TenantService } from '../../../../core/tenant/tenant.service';
 import { readApiError } from '../../../../core/http/api-error';
 import {
   TAMANO_PAGINA_TABLA_DEFECTO,
@@ -40,6 +42,7 @@ function leerMostrarSkuPreferido(): boolean {
     ProductosTcgFiltersComponent,
     ProductosTcgTableComponent,
     ProductoTcgFormDialogComponent,
+    EtiquetaTermicaDialogComponent,
     CatalogoTcgPanelComponent,
   ],
   templateUrl: './productos-tcg-page.component.html',
@@ -49,6 +52,7 @@ export class ProductosTcgPageComponent {
   private readonly productosApi = inject(ProductosTcgApiService);
   private readonly stockApi = inject(StockApiService);
   private readonly sedesApi = inject(SedesApiService);
+  private readonly tenant = inject(TenantService);
 
   readonly filtros = signal<ProductosTcgFiltros>({ ...FILTROS_PRODUCTOS_VACIOS });
   readonly filtrosConsulta = signal<ProductosTcgFiltros>({ ...FILTROS_PRODUCTOS_VACIOS });
@@ -64,9 +68,11 @@ export class ProductosTcgPageComponent {
   readonly tab = signal<TabProductos>('skus');
   readonly formularioAbierto = signal(false);
   readonly productoEditando = signal<ProductoTcg | null>(null);
+  readonly etiquetaProducto = signal<ProductoTcg | null>(null);
   readonly error = signal('');
   readonly mensaje = signal('');
   readonly accionId = signal<string | null>(null);
+  readonly mostrarCatalogoTcg = computed(() => this.tenant.hasFeature('PermitirSinglesTcg'));
 
   readonly productosFiltrados = computed(() => {
     const filtros = this.filtrosConsulta();
@@ -230,10 +236,21 @@ export class ProductosTcgPageComponent {
   }
 
   abrirCatalogo(): void {
+    if (!this.mostrarCatalogoTcg()) {
+      return;
+    }
     this.tab.set('catalogo');
     if (this.productosApi.productos().length < this.total()) {
       void this.productosApi.refrescar();
     }
+  }
+
+  abrirEtiqueta(producto: ProductoTcg): void {
+    this.etiquetaProducto.set(producto);
+  }
+
+  cerrarEtiqueta(): void {
+    this.etiquetaProducto.set(null);
   }
 
   onVarianteCreada(): void {

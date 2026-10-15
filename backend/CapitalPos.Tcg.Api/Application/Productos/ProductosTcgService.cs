@@ -14,7 +14,8 @@ namespace CapitalPos.Tcg.Api.Application.Productos;
 public sealed class ProductosTcgService(
     ApplicationDbContext db,
     ITenantProvider tenant,
-    KardexWriter kardex)
+    KardexWriter kardex,
+    SkuGeneratorService skuGenerator)
 {
     public async Task<PagedResult<ProductoTcgResponse>> ListarAsync(
         TipoProducto? tipoProducto,
@@ -51,6 +52,8 @@ public sealed class ProductosTcgService(
             query = query.Where(p =>
                 EF.Functions.ILike(p.Nombre, $"%{term}%")
                 || EF.Functions.ILike(p.CodigoSku, $"%{term}%")
+                || (p.SkuInterno != null && EF.Functions.ILike(p.SkuInterno, $"%{term}%"))
+                || (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, $"%{term}%"))
                 || db.Set<ProductoCarta>().Any(c =>
                     c.Id == p.Id && (
                         EF.Functions.ILike(c.NumeroCarta, $"%{term}%")
@@ -108,12 +111,9 @@ public sealed class ProductosTcgService(
         UpsertProductoTcgRequest request,
         CancellationToken cancellationToken)
     {
-        ValidarTipoSoportado(request.TipoProducto);
-        var sku = string.IsNullOrWhiteSpace(request.CodigoSku)
-            ? GenerarSkuProductoLibre(request)
-            : request.CodigoSku.Trim();
-        request.CodigoSku = sku;
-        await AsegurarSkuDisponibleAsync(sku, excluirId: null, cancellationToken);
+        await ValidarAccesoYTipoAsync(request, cancellationToken);
+        await AplicarSkuAltaAsync(request, cancellationToken);
+        await AsegurarSkuDisponibleAsync(request.CodigoSku!, excluirId: null, cancellationToken);
 
         if (request.StockInicial > 0 && (request.SedeId is null || request.SedeId == Guid.Empty))
         {
@@ -132,6 +132,7 @@ public sealed class ProductosTcgService(
         {
             TipoProducto.CARTA => CrearCarta(request, ahora),
             TipoProducto.SELLADO => CrearSellado(request, ahora),
+            TipoProducto.ACCESORIO when request.EsColeccionableSinCodigo => CrearAccesorio(request, ahora),
             _ => throw new BusinessRuleException("Tipo de producto no soportado en este sprint.", StatusCodes.Status501NotImplemented)
         };
 
@@ -297,7 +298,7 @@ public sealed class ProductosTcgService(
         UpsertProductoTcgRequest request,
         CancellationToken cancellationToken)
     {
-        ValidarTipoSoportado(request.TipoProducto);
+        await ValidarAccesoYTipoAsync(request, cancellationToken);
 
         var producto = await db.Productos.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (producto is null)
@@ -310,12 +311,19 @@ public sealed class ProductosTcgService(
             throw new BusinessRuleException("No se puede cambiar el tipo de producto.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.CodigoSku))
+        if (producto.EsColeccionableSinCodigo || request.EsColeccionableSinCodigo)
+        {
+            // Una vez marcado sin código, se conserva el SKU interno generado.
+            request.EsColeccionableSinCodigo = true;
+            request.CodigoSku = producto.SkuInterno ?? producto.CodigoSku;
+            request.CodigoBarras = null;
+        }
+        else if (string.IsNullOrWhiteSpace(request.CodigoSku))
         {
             throw new BusinessRuleException("El SKU es obligatorio al actualizar.");
         }
 
-        var sku = request.CodigoSku.Trim();
+        var sku = request.CodigoSku!.Trim();
         request.CodigoSku = sku;
         await AsegurarSkuDisponibleAsync(sku, id, cancellationToken);
         CopiarComunes(producto, request);
@@ -329,6 +337,8 @@ public sealed class ProductosTcgService(
                 AplicarSellado(sellado, RequerirSellado(request));
                 await db.Entry(sellado).Collection(s => s.ContenidoFijo).LoadAsync(cancellationToken);
                 await AplicarContenidoFijoAsync(sellado, RequerirSellado(request), cancellationToken);
+                break;
+            case Producto when producto.TipoProducto == TipoProducto.ACCESORIO && producto.EsColeccionableSinCodigo:
                 break;
             default:
                 throw new BusinessRuleException("Tipo de producto no soportado en este sprint.", StatusCodes.Status501NotImplemented);
@@ -508,6 +518,13 @@ public sealed class ProductosTcgService(
         return sellado;
     }
 
+    private Producto CrearAccesorio(UpsertProductoTcgRequest request, DateTimeOffset ahora)
+    {
+        var producto = new Producto { TipoProducto = TipoProducto.ACCESORIO };
+        Inicializar(producto, request, ahora);
+        return producto;
+    }
+
     private void Inicializar(Producto producto, UpsertProductoTcgRequest request, DateTimeOffset ahora)
     {
         producto.Id = Guid.NewGuid();
@@ -520,12 +537,90 @@ public sealed class ProductosTcgService(
     {
         producto.Nombre = request.Nombre.Trim();
         producto.CodigoSku = (request.CodigoSku ?? string.Empty).Trim();
-        producto.CodigoBarras = string.IsNullOrWhiteSpace(request.CodigoBarras) ? null : request.CodigoBarras.Trim();
+        producto.EsColeccionableSinCodigo = request.EsColeccionableSinCodigo;
+        if (request.EsColeccionableSinCodigo)
+        {
+            producto.SkuInterno = producto.CodigoSku;
+            producto.CodigoBarras = null;
+        }
+        else
+        {
+            producto.SkuInterno = null;
+            producto.CodigoBarras = string.IsNullOrWhiteSpace(request.CodigoBarras)
+                ? null
+                : request.CodigoBarras.Trim();
+        }
+
+        producto.UbicacionTienda = string.IsNullOrWhiteSpace(request.UbicacionTienda)
+            ? null
+            : request.UbicacionTienda.Trim();
         producto.PrecioVenta = request.PrecioVenta;
         producto.Costo = request.Costo;
         producto.CategoriaId = request.CategoriaId;
         producto.MarcaId = request.MarcaId;
         producto.Imagenes = ProductoImagenes.Serializar(request.Imagenes);
+    }
+
+    private async Task ValidarAccesoYTipoAsync(UpsertProductoTcgRequest request, CancellationToken cancellationToken)
+    {
+        var empresa = await db.Empresas.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == tenant.EmpresaId, cancellationToken)
+            ?? throw new BusinessRuleException("Empresa no encontrada.", StatusCodes.Status404NotFound);
+
+        if (request.EsColeccionableSinCodigo)
+        {
+            if (!empresa.Settings.PermitirCromosSinCodigo)
+            {
+                throw new BusinessRuleException(
+                    "El tenant no tiene habilitado PermitirCromosSinCodigo.",
+                    StatusCodes.Status403Forbidden);
+            }
+
+            if (request.TipoProducto is TipoProducto.COMPUESTO)
+            {
+                throw new BusinessRuleException("COMPUESTO no admite flujo sin código de barras.");
+            }
+
+            if (request.TipoProducto is TipoProducto.CARTA or TipoProducto.SELLADO)
+            {
+                ValidarTipoSoportado(request.TipoProducto);
+            }
+            else if (request.TipoProducto != TipoProducto.ACCESORIO)
+            {
+                throw new BusinessRuleException("tipoProducto inválido para coleccionable sin código.");
+            }
+
+            return;
+        }
+
+        ValidarTipoSoportado(request.TipoProducto);
+        if (!empresa.Settings.PermitirSinglesTcg)
+        {
+            throw new BusinessRuleException(
+                "El tenant no tiene habilitado PermitirSinglesTcg. Use productos sin código de barras.",
+                StatusCodes.Status403Forbidden);
+        }
+    }
+
+    private async Task AplicarSkuAltaAsync(UpsertProductoTcgRequest request, CancellationToken cancellationToken)
+    {
+        if (request.EsColeccionableSinCodigo)
+        {
+            var cat = SkuGeneratorService.ResolverCategoria(
+                request.TipoProducto,
+                request.CodigoCategoriaSku,
+                request.Sellado?.TipoSellado,
+                request.TipoAccesorio);
+            var sku = await skuGenerator.GenerarAsync(cat, cancellationToken);
+            request.CodigoSku = sku;
+            request.CodigoBarras = null;
+            return;
+        }
+
+        var skuLibre = string.IsNullOrWhiteSpace(request.CodigoSku)
+            ? GenerarSkuProductoLibre(request)
+            : request.CodigoSku.Trim();
+        request.CodigoSku = skuLibre;
     }
 
     private static void AplicarCarta(ProductoCarta carta, ProductoCartaRequest request)
@@ -704,7 +799,7 @@ public sealed class ProductosTcgService(
         if (tipo is TipoProducto.ACCESORIO or TipoProducto.COMPUESTO)
         {
             throw new BusinessRuleException(
-                "ACCESORIO y COMPUESTO se implementan en Sprint 1.b (ProductoAccesorio / BOM).",
+                "ACCESORIO y COMPUESTO (sin flujo cromos) se implementan en Sprint 1.b (ProductoAccesorio / BOM).",
                 StatusCodes.Status501NotImplemented);
         }
 
@@ -856,6 +951,9 @@ public sealed class ProductosTcgService(
             Nombre = producto.Nombre,
             CodigoSku = producto.CodigoSku,
             CodigoBarras = producto.CodigoBarras,
+            EsColeccionableSinCodigo = producto.EsColeccionableSinCodigo,
+            SkuInterno = producto.SkuInterno,
+            UbicacionTienda = producto.UbicacionTienda,
             PrecioVenta = producto.PrecioVenta,
             Costo = producto.Costo,
             CategoriaId = producto.CategoriaId,

@@ -211,6 +211,9 @@ public sealed class ApplicationDbContext : DbContext
         entity.Property(e => e.Nombre).HasMaxLength(200).IsRequired();
         entity.Property(e => e.CodigoSku).HasMaxLength(64).IsRequired();
         entity.Property(e => e.CodigoBarras).HasMaxLength(64);
+        entity.Property(e => e.EsColeccionableSinCodigo).HasDefaultValue(false);
+        entity.Property(e => e.SkuInterno).HasMaxLength(64);
+        entity.Property(e => e.UbicacionTienda).HasMaxLength(120);
         entity.Property(e => e.PrecioVenta).HasPrecision(18, 2);
         entity.Property(e => e.Costo).HasPrecision(18, 4);
         entity.Property(e => e.Imagenes);
@@ -226,6 +229,11 @@ public sealed class ApplicationDbContext : DbContext
         entity.HasIndex(e => new { e.EmpresaId, e.CodigoSku })
             .IsUnique()
             .HasDatabaseName("ux_productos_empresa_id_codigo_sku");
+
+        entity.HasIndex(e => new { e.EmpresaId, e.SkuInterno })
+            .IsUnique()
+            .HasFilter("sku_interno IS NOT NULL")
+            .HasDatabaseName("ux_productos_empresa_id_sku_interno");
 
         var carta = modelBuilder.Entity<ProductoCarta>();
         carta.ToTable("producto_cartas");

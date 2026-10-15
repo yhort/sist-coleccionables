@@ -13,6 +13,15 @@ public class Producto : IEmpresaScoped
     public string Nombre { get; set; } = string.Empty;
     public string CodigoSku { get; set; } = string.Empty;
     public string? CodigoBarras { get; set; }
+    /// <summary>
+    /// Coleccionable (álbum, sobre, figurita, etc.) sin EAN de fábrica.
+    /// El SKU se genera con <c>SkuGeneratorService</c> (formato RCP-{CAT}-{SEQ}).
+    /// </summary>
+    public bool EsColeccionableSinCodigo { get; set; }
+    /// <summary>SKU interno generado; se refleja también en <see cref="CodigoSku"/>.</summary>
+    public string? SkuInterno { get; set; }
+    /// <summary>Ubicación física en tienda (estante, caja, etc.).</summary>
+    public string? UbicacionTienda { get; set; }
     public decimal PrecioVenta { get; set; }
     public decimal? Costo { get; set; }
     public Guid? CategoriaId { get; set; }

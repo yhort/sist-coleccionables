@@ -22,15 +22,17 @@
         >
           SKUs
         </button>
-        <button
-          type="button"
-          role="tab"
-          [class.tabs__tab--active]="tab() === 'catalogo'"
-          [attr.aria-selected]="tab() === 'catalogo'"
-          (click)="abrirCatalogo()"
-        >
-          Catálogo TCG
-        </button>
+        @if (mostrarCatalogoTcg()) {
+          <button
+            type="button"
+            role="tab"
+            [class.tabs__tab--active]="tab() === 'catalogo'"
+            [attr.aria-selected]="tab() === 'catalogo'"
+            (click)="abrirCatalogo()"
+          >
+            Catálogo TCG
+          </button>
+        }
       </div>
       @if (tab() === 'skus') {
         <div class="productos__view-tools">
@@ -83,16 +85,21 @@
       [total]="total()"
       [accionId]="accionId()"
       (editar)="abrirEdicion($event)"
+      (imprimirEtiqueta)="abrirEtiqueta($event)"
       (desvincularWoo)="onDesvincularWoo($event)"
       (eliminarODesactivar)="onEliminarODesactivar($event)"
       (reactivar)="onReactivar($event)"
       (pageChange)="cambiarPagina($event)"
       (pageSizeChange)="cambiarTamano($event)"
     />
-  } @else {
+  } @else if (mostrarCatalogoTcg()) {
     <app-catalogo-tcg-panel (varianteCreada)="onVarianteCreada()" />
   }
 </section>
+
+@if (etiquetaProducto(); as etiqueta) {
+  <app-etiqueta-termica-dialog [producto]="etiqueta" (closed)="cerrarEtiqueta()" />
+}
 
 @if (formularioAbierto()) {
   <app-producto-tcg-form-dialog

@@ -121,6 +121,10 @@ textarea {
   min-height: 40px;
   margin-top: 1.2rem;
 
+  &--wide {
+    grid-column: 1 / -1;
+  }
+
   input {
     width: auto;
     min-height: 0;

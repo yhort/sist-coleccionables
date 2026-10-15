@@ -1,0 +1,35 @@
+<div class="dialog-backdrop" (click)="closed.emit()"></div>
+
+<section
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="etiqueta-termica-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="dialog__header">
+    <div>
+      <h2 id="etiqueta-termica-title">Etiqueta térmica 50×25 mm</h2>
+      <p>Vista previa para impresión adhesiva rápida (CODE128).</p>
+    </div>
+    <button type="button" class="dialog__close" aria-label="Cerrar" (click)="closed.emit()">×</button>
+  </header>
+
+  <div class="preview-wrap">
+    <div class="label-preview" aria-label="Vista previa de etiqueta">
+      <div class="label-preview__name">{{ producto().nombre }}</div>
+      <div class="label-preview__barcode">
+        <svg #barcodeSvg></svg>
+      </div>
+      <div class="label-preview__sku">{{ sku }}</div>
+      @if (producto().ubicacionTienda) {
+        <div class="label-preview__meta">{{ producto().ubicacionTienda }}</div>
+      }
+    </div>
+  </div>
+
+  <footer class="dialog__footer">
+    <button type="button" class="ghost" (click)="closed.emit()">Cerrar</button>
+    <button type="button" class="primary" [disabled]="!sku" (click)="imprimir()">Imprimir</button>
+  </footer>
+</section>

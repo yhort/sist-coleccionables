@@ -14,8 +14,27 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [ApiController]
 [Route("api/productos-tcg")]
 public sealed class ProductosTcgController(
-    ProductosTcgService productos) : ControllerBase
+    ProductosTcgService productos,
+    SkuGeneratorService skuGenerator) : ControllerBase
 {
+    [HttpGet("sku-interno/preview")]
+    [RequiresFeature(TenantFeature.PermitirCromosSinCodigo)]
+    [RequiresPermission(Permiso.OperarAlmacen)]
+    public async Task<ActionResult<SkuInternoPreviewResponse>> PreviewSkuInterno(
+        [FromQuery] string? categoria,
+        [FromQuery] TipoProducto? tipoProducto,
+        [FromQuery] TipoSellado? tipoSellado,
+        [FromQuery] string? tipoAccesorio,
+        CancellationToken cancellationToken)
+    {
+        var cat = SkuGeneratorService.ResolverCategoria(
+            tipoProducto ?? TipoProducto.ACCESORIO,
+            categoria,
+            tipoSellado,
+            tipoAccesorio);
+        var sku = await skuGenerator.PrevisualizarAsync(cat, cancellationToken);
+        return Ok(new SkuInternoPreviewResponse { SkuInterno = sku, Categoria = cat });
+    }
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProductoTcgResponse>>> Listar(

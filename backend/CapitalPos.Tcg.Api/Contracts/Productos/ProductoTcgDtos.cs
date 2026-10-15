@@ -19,6 +19,20 @@ public sealed class UpsertProductoTcgRequest
     [MaxLength(64)]
     public string? CodigoBarras { get; set; }
 
+    /// <summary>Producto sin EAN: genera SKU interno RCP-{CAT}-{SEQ}.</summary>
+    public bool EsColeccionableSinCodigo { get; set; }
+
+    /// <summary>Código de categoría para el SKU (ALB, SOB, FIG…). Opcional.</summary>
+    [MaxLength(4)]
+    public string? CodigoCategoriaSku { get; set; }
+
+    [MaxLength(120)]
+    public string? UbicacionTienda { get; set; }
+
+    /// <summary>Tipo de accesorio (BINDER, SOBRE, FIGURITA…) para resolver CAT del SKU.</summary>
+    [MaxLength(32)]
+    public string? TipoAccesorio { get; set; }
+
     [Range(0, double.MaxValue)]
     public decimal PrecioVenta { get; set; }
 
@@ -102,6 +116,12 @@ public sealed class ProductoSelladoContenidoFijoRequest
     public int Cantidad { get; set; } = 1;
 }
 
+public sealed class SkuInternoPreviewResponse
+{
+    public required string SkuInterno { get; init; }
+    public required string Categoria { get; init; }
+}
+
 public sealed class ProductoTcgResponse
 {
     public required Guid Id { get; init; }
@@ -109,6 +129,9 @@ public sealed class ProductoTcgResponse
     public required string Nombre { get; init; }
     public required string CodigoSku { get; init; }
     public string? CodigoBarras { get; init; }
+    public required bool EsColeccionableSinCodigo { get; init; }
+    public string? SkuInterno { get; init; }
+    public string? UbicacionTienda { get; init; }
     public required decimal PrecioVenta { get; init; }
     public decimal? Costo { get; init; }
     public Guid? CategoriaId { get; init; }

@@ -17,6 +17,7 @@
     "@angular/forms": "^22.1.0",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "jsbarcode": "^3.12.3",
     "pdfjs-dist": "^6.3.289",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
@@ -25,6 +26,7 @@
     "@angular/build": "^22.1.5",
     "@angular/cli": "^22.1.5",
     "@angular/compiler-cli": "^22.1.0",
+    "@types/jsbarcode": "^3.11.4",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2"
   }
