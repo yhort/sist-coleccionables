@@ -13,6 +13,7 @@ using CapitalPos.Tcg.Api.Application.Inventario;
 using CapitalPos.Tcg.Api.Application.Izipay;
 using CapitalPos.Tcg.Api.Application.Pagos;
 using CapitalPos.Tcg.Api.Application.Pedidos;
+using CapitalPos.Tcg.Api.Application.Pos;
 using CapitalPos.Tcg.Api.Application.Productos;
 using CapitalPos.Tcg.Api.Application.Proveedores;
 using CapitalPos.Tcg.Api.Application.Reportes;
@@ -88,6 +89,7 @@ builder.Services.AddScoped<UsuariosService>();
 builder.Services.AddScoped<ReportesService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<CajaService>();
+builder.Services.AddScoped<PosService>();
 builder.Services.AddDataProtection();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));

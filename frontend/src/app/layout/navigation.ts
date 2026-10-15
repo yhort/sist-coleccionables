@@ -15,6 +15,7 @@ export type NavIconName =
   | 'woocommerce'
   | 'reportes'
   | 'ecosistema'
+  | 'pos';
 
 export interface AppNavItem {
   label: string;
@@ -73,6 +74,14 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     icon: 'subastas',
     keywords: ['facebook', 'lote', 'masivo', 'fotos', 'panini'],
     feature: 'PermitirSubastasLoteFB',
+  },
+  {
+    label: 'POS Mostrador',
+    route: '/app/pos',
+    exact: false,
+    icon: 'pos',
+    keywords: ['caja', 'mostrador', 'cobrar', 'carabaya'],
+    feature: 'PermitirPosMostrador',
   },
   {
     label: 'Pedidos Digitales',

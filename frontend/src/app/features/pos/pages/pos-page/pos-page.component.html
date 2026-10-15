@@ -1,0 +1,270 @@
+<section class="pos">
+  <header class="pos__top">
+    <div class="pos__brand">
+      <h1>POS Mostrador</h1>
+      <p [class.pos__caja--ok]="cajaAbierta()" [class.pos__caja--warn]="!cajaAbierta()">
+        {{ avisoCaja() }}
+      </p>
+    </div>
+
+    <label class="pos__field pos__field--sede">
+      <span>Sede</span>
+      <select [ngModel]="sedeId()" (ngModelChange)="onSedeChange($event)">
+        @for (sede of sedes(); track sede.id) {
+          <option [value]="sede.id">{{ sede.nombre }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="pos__field pos__field--search">
+      <span>Buscar cliente / pedido FB</span>
+      <input
+        type="search"
+        placeholder="Nombre FB, DNI o código…"
+        [ngModel]="busquedaPedido()"
+        (ngModelChange)="busquedaPedido.set($event)"
+        (keyup.enter)="onBuscarPedido()"
+      />
+    </label>
+
+    <label class="pos__field pos__field--search">
+      <span>Buscar producto</span>
+      <input
+        type="search"
+        placeholder="Nombre, SKU…"
+        [ngModel]="busquedaProducto()"
+        (ngModelChange)="busquedaProducto.set($event)"
+        (keyup.enter)="onBuscarProducto()"
+      />
+    </label>
+  </header>
+
+  @if (error()) {
+    <p class="pos__error" role="alert">{{ error() }}</p>
+  }
+
+  <div class="pos__pendientes">
+    <div class="pos__pendientes-head">
+      <h2>Pedidos / subastas pendientes de cobro</h2>
+      <button type="button" class="pos__link" (click)="onBuscarPedido()" [disabled]="cargandoPedidos()">
+        {{ cargandoPedidos() ? 'Actualizando…' : 'Actualizar' }}
+      </button>
+    </div>
+    <div class="pos__pendientes-track">
+      @if (pedidosPendientes().length === 0) {
+        <p class="pos__empty">No hay pedidos pendientes{{ busquedaPedido() ? ' para esa búsqueda' : '' }}.</p>
+      } @else {
+        @for (pedido of pedidosPendientes(); track pedido.id) {
+          <button
+            type="button"
+            class="pos__pedido-card"
+            [class.pos__pedido-card--active]="pedidoEnCarrito(pedido.id)"
+            (click)="agregarPedido(pedido)"
+          >
+            <span class="pos__pedido-card__code">{{ pedido.codigo }}</span>
+            <strong>{{ pedido.clienteNombre }}</strong>
+            <span class="pos__pedido-card__meta">
+              {{ pedido.detalles.length }} ítem(s)
+              @if (pedido.clienteNumeroDocumento) {
+                · {{ pedido.clienteNumeroDocumento }}
+              }
+            </span>
+            <span class="pos__pedido-card__total">{{ pedido.total | soles }}</span>
+          </button>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="pos__body">
+    <div class="pos__catalog">
+      <div class="pos__catalog-head">
+        <h2>Catálogo</h2>
+        <button type="button" class="pos__icon-btn" title="Vaciar carrito" (click)="vaciarCarrito()">
+          Vaciar carrito
+        </button>
+      </div>
+
+      @if (cargandoProductos()) {
+        <p class="pos__empty">Cargando productos…</p>
+      } @else if (productos().length === 0) {
+        <p class="pos__empty">Sin productos activos.</p>
+      } @else {
+        <div class="pos__grid">
+          @for (producto of productos(); track producto.id) {
+            <button type="button" class="pos__product" (click)="agregarProducto(producto)">
+              <div class="pos__product__media">
+                @if (imagenProducto(producto); as img) {
+                  <img [src]="img" [alt]="producto.nombre" loading="lazy" />
+                } @else {
+                  <span class="pos__product__placeholder">{{ producto.nombre.slice(0, 1) }}</span>
+                }
+              </div>
+              <span class="pos__product__name">{{ producto.nombre }}</span>
+              <span class="pos__product__price">{{ producto.precioVenta | soles }}</span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <aside class="pos__ticket">
+      <header class="pos__ticket-head">
+        <h2>Orden actual</h2>
+        <span>{{ totalItems() }} ítem(s)</span>
+      </header>
+
+      <div class="pos__ticket-lines">
+        @if (carrito().length === 0) {
+          <p class="pos__empty">Toca un producto o un pedido pendiente para empezar.</p>
+        } @else {
+          @for (linea of carrito(); track linea.key) {
+            <article class="pos__line">
+              <div class="pos__line__info">
+                <strong>{{ linea.nombre }}</strong>
+                @if (linea.pedidoCodigo) {
+                  <span class="pos__line__tag">{{ linea.pedidoCodigo }}</span>
+                }
+                <span>{{ linea.precioUnitario | soles }} c/u</span>
+              </div>
+              <div class="pos__line__qty">
+                @if (!linea.pedidoDigitalId) {
+                  <button type="button" (click)="decrementar(linea.key)" aria-label="Menos">−</button>
+                  <span>{{ linea.cantidad }}</span>
+                  <button type="button" (click)="incrementar(linea.key)" aria-label="Más">+</button>
+                } @else {
+                  <span>×{{ linea.cantidad | number: '1.0-0' }}</span>
+                }
+              </div>
+              <div class="pos__line__total">
+                <strong>{{ linea.precioUnitario * linea.cantidad | soles }}</strong>
+                <button type="button" class="pos__line__remove" (click)="quitarLinea(linea.key)">Quitar</button>
+              </div>
+            </article>
+          }
+        }
+      </div>
+
+      <div class="pos__pay">
+        <label class="pos__field">
+          <span>Cliente</span>
+          <input
+            type="text"
+            placeholder="Nombre / FB"
+            [ngModel]="clienteNombre()"
+            (ngModelChange)="clienteNombre.set($event)"
+          />
+        </label>
+        <label class="pos__field">
+          <span>DNI / RUC</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            placeholder="Opcional (RUC si factura)"
+            [ngModel]="numeroDocumento()"
+            (ngModelChange)="numeroDocumento.set($event)"
+          />
+        </label>
+
+        <div class="pos__segment">
+          <span class="pos__segment__label">Medio de pago</span>
+          <div class="pos__segment__options">
+            @for (medio of mediosPago; track medio.id) {
+              <button
+                type="button"
+                [class.is-active]="origenPago() === medio.id"
+                (click)="setOrigen(medio.id)"
+              >
+                {{ medio.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (requiereCodigo()) {
+          <label class="pos__field">
+            <span>Código de operación</span>
+            <input
+              type="text"
+              placeholder="N° operación"
+              [ngModel]="codigoOperacion()"
+              (ngModelChange)="codigoOperacion.set($event)"
+            />
+          </label>
+        }
+
+        @if (origenPago() === 'EFECTIVO') {
+          <label class="pos__field">
+            <span>Monto recibido</span>
+            <input
+              class="input-monto"
+              type="number"
+              min="0"
+              step="0.01"
+              [ngModel]="montoRecibido()"
+              (ngModelChange)="montoRecibido.set($event === '' || $event == null ? null : +$event)"
+            />
+          </label>
+          @if (vuelto() != null) {
+            <p class="pos__vuelto">Vuelto: {{ vuelto() | soles }}</p>
+          }
+        }
+
+        <div class="pos__segment">
+          <span class="pos__segment__label">Comprobante</span>
+          <div class="pos__segment__options">
+            @for (tipo of tiposCpe; track tipo.id) {
+              <button
+                type="button"
+                [class.is-active]="tipoComprobante() === tipo.id"
+                (click)="setTipoCpe(tipo.id)"
+              >
+                {{ tipo.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="pos__totals">
+          <span>Total</span>
+          <strong>{{ subtotal() | soles }}</strong>
+        </div>
+
+        <button
+          type="button"
+          class="pos__cobrar"
+          [disabled]="cobrando() || carrito().length === 0 || !cajaAbierta()"
+          (click)="cobrarYEmitir()"
+        >
+          @if (cobrando()) {
+            Procesando…
+          } @else {
+            Cobrar y Emitir CPE · {{ totalItems() }} ítems · {{ subtotal() | soles }}
+          }
+        </button>
+      </div>
+
+      @if (emisionVista(); as emision) {
+        <div class="pos__result" role="status">
+          <p class="pos__result__title">{{ resultado()?.mensaje }}</p>
+          <p>
+            {{ etiquetasCpe[emision.tipo] }} {{ numeroDe(emision) }} ·
+            {{ etiquetasEstado[emision.estado] }}
+          </p>
+          <div class="pos__result__actions">
+            @if (puedePdf(emision)) {
+              <button type="button" (click)="abrirPdf('ticket')">Ticket</button>
+              <button type="button" (click)="abrirPdf('a4')">PDF A4</button>
+            }
+            @if (puedeXml(emision)) {
+              <button type="button" (click)="descargarXml()">XML</button>
+            }
+            @if (puedeCdr(emision)) {
+              <button type="button" (click)="descargarCdr()">CDR</button>
+            }
+          </div>
+        </div>
+      }
+    </aside>
+  </div>
+</section>
