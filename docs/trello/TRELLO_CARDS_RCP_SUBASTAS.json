@@ -1,0 +1,135 @@
+{
+  "workspace": "Proyecto-SistColeccionables",
+  "boardName": "feature/rcp-subastas-pos",
+  "lists": [
+    {
+      "name": "Sprint 0 — Spike",
+      "cards": [
+        {
+          "name": "[S0] Inventario flujo adjudicar → pedido → pago → CPE",
+          "desc": "Mapear SubastasTcgService.AdjudicarAsync → PedidosDigitales → Pagos → ServicioFiscal/CpeApiClient. Documentar en PLANNING_ROADMAP_RCP_SUBASTAS.md."
+        },
+        {
+          "name": "[S0] Congelar defaults Trunqi (menú/rutas)",
+          "desc": "Listar ítems de navigation.ts y rutas que deben permanecer iguales con toggles Trunqi."
+        },
+        {
+          "name": "[S0] Plan seed RCP vs Trunqi (D6)",
+          "desc": "Definir IDs, RUC demo y toggles por empresa en DevelopmentDataSeeder."
+        }
+      ]
+    },
+    {
+      "name": "Sprint 1 — Feature Toggles",
+      "cards": [
+        {
+          "name": "[S1][BE] TenantSettings en Empresa + migration (D1)",
+          "desc": "Columnas: PermitirSinglesTcg, PermitirWooCommerceSync, PermitirPosMostrador, PermitirSubastasLoteFB, PermitirCromosSinCodigo. Defaults Trunqi."
+        },
+        {
+          "name": "[S1][BE] Seed Trunqi toggles + empresa RCP (D6)",
+          "desc": "DevelopmentDataSeeder: aplicar defaults Trunqi; crear empresa RCP Subastas con toggles RCP."
+        },
+        {
+          "name": "[S1][BE] RequiresFeatureAttribute",
+          "desc": "ActionFilter que lee settings de Empresa activa y responde 403 si el feature está OFF. Aplicar a WooCommerce, Singles/Aperturas y stub POS."
+        },
+        {
+          "name": "[S1][BE] Login retorna TenantSettings",
+          "desc": "Extender LoginResponse con settings; opcional GET /api/auth/tenant-settings para refresh de sesión."
+        },
+        {
+          "name": "[S1][FE] TenantService + persistencia en sesión",
+          "desc": "Estado de toggles post-login; integrar AuthSessionService."
+        },
+        {
+          "name": "[S1][FE] FeatureToggleGuard + rutas",
+          "desc": "Proteger /app/pos, /app/woocommerce, /app/productos-tcg, /app/aperturas-tcg según feature."
+        },
+        {
+          "name": "[S1][FE] Directiva *hasFeature + navigation dinámica",
+          "desc": "Filtrar sidebar; ítem POS solo con PermitirPosMostrador."
+        },
+        {
+          "name": "[S1] Gate: build + Trunqi sin regresión",
+          "desc": "Compilar BE/FE; login Trunqi menú equivalente; API flag OFF → 403."
+        }
+      ]
+    },
+    {
+      "name": "Sprint 2 — Lote FB",
+      "cards": [
+        {
+          "name": "[S2][BE] POST /api/subastas-tcg/lote-masivo (D2)",
+          "desc": "DTOs Titulo, PrecioBase, HoraFin, Observaciones, Imagenes; correlativo artículo; texto FB; RequiresFeature(PermitirSubastasLoteFB)."
+        },
+        {
+          "name": "[S2][FE] CargaLoteSubastaComponent",
+          "desc": "Drag-drop multi-imagen, matriz editable, Copiar Texto Facebook, Exportar JSON (D5)."
+        },
+        {
+          "name": "[S2] Gate: lote 10 + aislamiento Trunqi",
+          "desc": "Crear 10 ítems; texto Carabaya #1150; Trunqi sin UI/endpoint."
+        }
+      ]
+    },
+    {
+      "name": "Sprint 3 — SKU sin EAN",
+      "cards": [
+        {
+          "name": "[S3][BE] Campos producto + SkuGeneratorService (D3)",
+          "desc": "EsColeccionableSinCodigo, UbicacionTienda; formato RCP-{CAT}-{SEQ}; feature PermitirCromosSinCodigo."
+        },
+        {
+          "name": "[S3][FE] Catálogo sin código + impresión térmica 50x25",
+          "desc": "Checkbox; EAN off; SKU readonly; JsBarcode/ngx-barcode."
+        },
+        {
+          "name": "[S3] Gate: SKU único + barcode + Trunqi OK",
+          "desc": "Migration limpia; tests verdes; Trunqi sin flujo cromos."
+        }
+      ]
+    },
+    {
+      "name": "Sprint 4 — POS + CPE",
+      "cards": [
+        {
+          "name": "[S4][BE] GET /api/pos/pedidos-pendientes",
+          "desc": "Buscar por nombre FB/DNI artículos ganados no pagados. Feature PermitirPosMostrador."
+        },
+        {
+          "name": "[S4][BE] POST /api/pos/cobrar-y-emitir (D4)",
+          "desc": "Orquestar Pagos + MarcarPagado + ServicioFiscal; retornar estado SUNAT + refs XML/CDR/PDF."
+        },
+        {
+          "name": "[S4][FE] PosCheckoutComponent",
+          "desc": "Buscador, carrito, medios pago, tipo CPE, ticket/PDF."
+        },
+        {
+          "name": "[S4] Gate: cobro consolidado + CPE",
+          "desc": "Pedidos Pagado; emisión aceptada o error legible; Trunqi sin POS."
+        }
+      ]
+    },
+    {
+      "name": "Sprint 5 — E2E + merge",
+      "cards": [
+        {
+          "name": "[S5] E2E Paola: lote 10 → POS → SUNAT",
+          "desc": "Criterios §7 de la especificación."
+        },
+        {
+          "name": "[S5] Regresión Trunqi",
+          "desc": "Menú + 1 flujo pedido/pago sin cambios perceptibles."
+        },
+        {
+          "name": "[S5] Harden: tests + docs seed + listo para merge main",
+          "desc": "Build limpio; documentar activación tenant RCP local."
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-10-14T16:13:00Z",
+  "boardUrl": "https://trello.com/b/Myh3XBTm/proyecto-sistcoleccionables",
+  "note": "Creado en el tablero Proyecto-SistColeccionables. Cards S0–S5 movidas a ✅ Realizado (Sprint Actual) al cerrar Sprint 5 (2026-10-15)."
+}

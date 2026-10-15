@@ -18,6 +18,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         }
 
         builder.UseSetting("WooCommerce:Modo", "Local");
+        // Evita HttpRequestException a capitalpos-cpe-api en E2E (firma UBL en proceso).
+        builder.UseSetting("CpeApi:Modo", "Local");
+        builder.UseSetting("CpeApi:BaseUrl", "");
         builder.ConfigureServices(services =>
         {
             foreach (var descriptor in services
