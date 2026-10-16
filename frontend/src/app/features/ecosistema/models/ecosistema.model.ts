@@ -43,7 +43,10 @@ export type ModuloPermiso =
   | 'subastas-tcg'
   | 'pedidos-digitales'
   | 'pagos'
+  | 'caja'
   | 'entregas'
+  | 'clientes'
+  | 'proveedores'
   | 'woocommerce'
   | 'reportes'
   | 'ecosistema';
@@ -297,7 +300,10 @@ export const MODULOS_PERMISO: readonly ModuloPermiso[] = [
   'subastas-tcg',
   'pedidos-digitales',
   'pagos',
+  'caja',
   'entregas',
+  'clientes',
+  'proveedores',
   'woocommerce',
   'reportes',
   'ecosistema',
@@ -311,7 +317,10 @@ export const ETIQUETAS_MODULO: Record<ModuloPermiso, string> = {
   'subastas-tcg': 'Subastas TCG',
   'pedidos-digitales': 'Pedidos Digitales',
   pagos: 'Pagos',
+  caja: 'Caja',
   entregas: 'Entregas',
+  clientes: 'Clientes',
+  proveedores: 'Proveedores',
   woocommerce: 'WooCommerce',
   reportes: 'Reportes',
   ecosistema: 'Ecosistema',
@@ -360,10 +369,13 @@ export function matrizPermisosPorDefecto(): MatrizPermisos {
       modulo,
       lectura: true,
       escritura:
+        modulo === 'productos-tcg' ||
         modulo === 'subastas-tcg' ||
         modulo === 'pedidos-digitales' ||
         modulo === 'pagos' ||
+        modulo === 'caja' ||
         modulo === 'entregas' ||
+        modulo === 'clientes' ||
         modulo === 'reportes',
     })),
     ALMACEN: MODULOS_PERMISO.map((modulo) => ({
@@ -373,7 +385,8 @@ export function matrizPermisosPorDefecto(): MatrizPermisos {
         modulo === 'productos-tcg' ||
         modulo === 'inventario' ||
         modulo === 'aperturas-tcg' ||
-        modulo === 'entregas',
+        modulo === 'entregas' ||
+        modulo === 'proveedores',
     })),
   };
 }

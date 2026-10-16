@@ -6,12 +6,17 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Authorization;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
 public sealed class RequiresPermissionAttribute : Attribute, IAsyncAuthorizationFilter
 {
-    public RequiresPermissionAttribute(Permiso permiso)
+    public RequiresPermissionAttribute(params Permiso[] permisos)
     {
-        Permiso = permiso;
+        if (permisos is null || permisos.Length == 0)
+        {
+            throw new ArgumentException("Debe indicar al menos un permiso.", nameof(permisos));
+        }
+
+        Permisos = permisos;
     }
 
-    public Permiso Permiso { get; }
+    public IReadOnlyList<Permiso> Permisos { get; }
 
     public Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
@@ -22,7 +27,8 @@ public sealed class RequiresPermissionAttribute : Attribute, IAsyncAuthorization
             return Task.CompletedTask;
         }
 
-        if (currentUser.Rol is null || !PermisosPorRol.Tiene(currentUser.Rol.Value, Permiso))
+        if (currentUser.Rol is null ||
+            !Permisos.Any(permiso => PermisosPorRol.Tiene(currentUser.Rol.Value, permiso)))
         {
             context.Result = new ForbidResult();
             return Task.CompletedTask;

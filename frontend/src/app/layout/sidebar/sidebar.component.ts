@@ -1,7 +1,7 @@
-import { Component, output } from '@angular/core';
+import { Component, computed, inject, output } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
-import { APP_NAV_ITEMS } from '../navigation';
+import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { NavIconComponent } from '../nav-icon/nav-icon.component';
 
 @Component({
@@ -11,8 +11,9 @@ import { NavIconComponent } from '../nav-icon/nav-icon.component';
   styleUrl: './sidebar.component.scss',
 })
 export class SidebarComponent {
+  private readonly auth = inject(AuthSessionService);
   readonly routeSelected = output<void>();
-  readonly menuItems = APP_NAV_ITEMS;
+  readonly menuItems = computed(() => this.auth.menuItemsPermitidos());
 
   onRouteSelected(): void {
     this.routeSelected.emit();

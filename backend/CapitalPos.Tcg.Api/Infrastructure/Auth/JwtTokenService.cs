@@ -22,12 +22,17 @@ public sealed class JwtTokenService : IJwtTokenService
     {
         var expiresAt = DateTimeOffset.UtcNow.AddHours(_options.ExpiresHours);
         var credentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256);
+        // Claims cortos + ClaimTypes: el frontend no parsea el JWT; el backend (CurrentUser)
+        // debe resolver UserId/Rol/EmpresaId con o sin MapInboundClaims.
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
             new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, usuario.Email),
             new Claim(ClaimTypes.Email, usuario.Email),
+            new Claim(JwtRegisteredClaimNames.UniqueName, usuario.Nombre),
             new Claim(ClaimTypes.Name, usuario.Nombre),
+            new Claim("role", usuario.Rol.ToString()),
             new Claim(ClaimTypes.Role, usuario.Rol.ToString()),
             new Claim(AuthClaims.EmpresaId, usuario.EmpresaId.ToString())
         };

@@ -1,5 +1,6 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 
+import { AuthSessionService } from '../../../../core/auth/auth-session.service';
 import { EmitirCpeDialogComponent } from '../../components/emitir-cpe-dialog/emitir-cpe-dialog.component';
 import { FiscalSunatPanelComponent } from '../../components/fiscal-sunat-panel/fiscal-sunat-panel.component';
 import { IzipayConfigPanelComponent } from '../../components/izipay-config-panel/izipay-config-panel.component';
@@ -24,12 +25,20 @@ type TabEcosistema = 'fiscal' | 'sedes' | 'usuarios' | 'integraciones';
   styleUrl: './ecosistema-page.component.scss',
 })
 export class EcosistemaPageComponent {
+  private readonly auth = inject(AuthSessionService);
   readonly api = inject(EcosistemaApiService);
+  readonly isAdmin = this.auth.isAdmin;
   readonly tab = signal<TabEcosistema>('fiscal');
   readonly dialogAbierto = signal(false);
   readonly error = signal('');
 
   constructor() {
+    effect(() => {
+      if (!this.isAdmin() && this.tab() === 'usuarios') {
+        this.tab.set('fiscal');
+      }
+    });
+
     void this.api.cargar().catch((err) => {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar Ecosistema.');
     });

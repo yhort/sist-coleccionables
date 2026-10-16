@@ -1,3 +1,5 @@
+import { ModuloPermiso } from '../features/ecosistema/models/ecosistema.model';
+
 export type NavIconName =
   | 'dashboard'
   | 'productos'
@@ -19,6 +21,7 @@ export interface AppNavItem {
   route: string;
   exact: boolean;
   icon: NavIconName;
+  modulo: ModuloPermiso;
   keywords: readonly string[];
 }
 
@@ -28,6 +31,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/dashboard',
     exact: true,
     icon: 'dashboard',
+    modulo: 'dashboard',
     keywords: ['inicio', 'kpis', 'resumen'],
   },
   {
@@ -35,6 +39,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/productos-tcg',
     exact: false,
     icon: 'productos',
+    modulo: 'productos-tcg',
     keywords: ['cartas', 'sellados', 'accesorios', 'compuestos', 'catalogo'],
   },
   {
@@ -42,6 +47,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/inventario',
     exact: false,
     icon: 'inventario',
+    modulo: 'inventario',
     keywords: ['stock', 'kardex', 'almacen'],
   },
   {
@@ -49,6 +55,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/aperturas-tcg',
     exact: false,
     icon: 'aperturas',
+    modulo: 'aperturas-tcg',
     keywords: ['abrir', 'sobres', 'cajas', 'sellado'],
   },
   {
@@ -56,6 +63,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/subastas-tcg',
     exact: false,
     icon: 'subastas',
+    modulo: 'subastas-tcg',
     keywords: ['pujas', 'facebook', 'lote'],
   },
   {
@@ -63,6 +71,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/pedidos-digitales',
     exact: false,
     icon: 'pedidos',
+    modulo: 'pedidos-digitales',
     keywords: ['kanban', 'whatsapp', 'tienda'],
   },
   {
@@ -70,6 +79,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/pagos',
     exact: false,
     icon: 'pagos',
+    modulo: 'pagos',
     keywords: ['yape', 'izipay', 'bandeja'],
   },
   {
@@ -77,6 +87,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/caja',
     exact: false,
     icon: 'caja',
+    modulo: 'caja',
     keywords: ['apertura', 'cierre', 'arqueo', 'turno', 'efectivo', 'caja chica'],
   },
   {
@@ -84,6 +95,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/entregas',
     exact: false,
     icon: 'entregas',
+    modulo: 'entregas',
     keywords: ['courier', 'tracking', 'despacho'],
   },
   {
@@ -91,6 +103,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/clientes',
     exact: false,
     icon: 'clientes',
+    modulo: 'clientes',
     keywords: ['dni', 'ruc', 'varios', 'publico', 'maestro'],
   },
   {
@@ -98,6 +111,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/proveedores',
     exact: false,
     icon: 'proveedores',
+    modulo: 'proveedores',
     keywords: ['ruc', 'razon social', 'compra', 'kardex'],
   },
   {
@@ -105,6 +119,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/woocommerce',
     exact: false,
     icon: 'woocommerce',
+    modulo: 'woocommerce',
     keywords: ['tienda', 'sync', 'web'],
   },
   {
@@ -112,6 +127,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/reportes',
     exact: false,
     icon: 'reportes',
+    modulo: 'reportes',
     keywords: ['ventas', 'canales', 'exportar'],
   },
   {
@@ -119,6 +135,15 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
     route: '/app/ecosistema',
     exact: false,
     icon: 'ecosistema',
+    modulo: 'ecosistema',
     keywords: ['cpe', 'sunat', 'conexiones', 'salud', 'sedes', 'usuarios', 'permisos', 'webhook'],
   },
 ];
+
+export function moduloDesdeRuta(url: string): ModuloPermiso | null {
+  const path = url.split('?')[0] ?? url;
+  const match = APP_NAV_ITEMS.find(
+    (item) => path === item.route || path.startsWith(`${item.route}/`),
+  );
+  return match?.modulo ?? null;
+}

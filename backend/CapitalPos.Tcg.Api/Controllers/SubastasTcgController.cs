@@ -13,6 +13,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/subastas-tcg")]
+[RequiresModulePermission(ModulosSistema.SubastasTcg)]
 public sealed class SubastasTcgController(SubastasTcgService subastas) : ControllerBase
 {
     [HttpGet]
@@ -42,7 +43,6 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Crear(
         [FromBody] CrearSubastaTcgRequest request,
         CancellationToken cancellationToken)
@@ -59,7 +59,6 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpPut("{id:guid}")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Actualizar(
         Guid id,
         [FromBody] ActualizarSubastaTcgRequest request,
@@ -69,14 +68,12 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpPost("{id:guid}/activar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Activar(Guid id, CancellationToken cancellationToken)
     {
         return await EjecutarAsync(() => subastas.ActivarAsync(id, cancellationToken));
     }
 
     [HttpPost("{id:guid}/pujas")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> RegistrarPuja(
         Guid id,
         [FromBody] RegistrarPujaRequest request,
@@ -103,14 +100,12 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpPost("{id:guid}/cerrar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Cerrar(Guid id, CancellationToken cancellationToken)
     {
         return await EjecutarAsync(() => subastas.CerrarAsync(id, cancellationToken));
     }
 
     [HttpPost("{id:guid}/declarar-desierta")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> DeclararDesierta(
         Guid id,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DeclararDesiertaRequest? request,
@@ -121,7 +116,6 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpDelete("pujas/{pujaId:guid}")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> EliminarPuja(
         Guid pujaId,
         CancellationToken cancellationToken)
@@ -130,7 +124,6 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpPost("{id:guid}/adjudicar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Adjudicar(
         Guid id,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AdjudicarSubastaRequest? request,
@@ -140,7 +133,6 @@ public sealed class SubastasTcgController(SubastasTcgService subastas) : Control
     }
 
     [HttpPost("{id:guid}/cancelar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<SubastaTcgResponse>> Cancelar(Guid id, CancellationToken cancellationToken)
     {
         return await EjecutarAsync(() => subastas.CancelarAsync(id, cancellationToken));

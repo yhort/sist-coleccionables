@@ -11,6 +11,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/pedidos-digitales")]
+[RequiresModulePermission(ModulosSistema.PedidosDigitales)]
 public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) : ControllerBase
 {
     [HttpGet]
@@ -40,7 +41,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PedidoDigitalResponse>> Crear(
         [FromBody] CrearPedidoDigitalRequest request,
         CancellationToken cancellationToken)
@@ -50,7 +50,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPut("{id:guid}/estado")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PedidoDigitalResponse>> CambiarEstado(
         Guid id,
         [FromBody] CambiarEstadoPedidoRequest request,
@@ -61,7 +60,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost("estado-lote")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<IReadOnlyList<PedidoDigitalResponse>>> CambiarEstadoLote(
         [FromBody] CambiarEstadoLoteRequest request,
         CancellationToken cancellationToken)
@@ -71,7 +69,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost("comprobante-consolidado")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ComprobanteConsolidadoResponse>> EmitirComprobanteConsolidado(
         [FromBody] EmitirComprobanteConsolidadoRequest request,
         CancellationToken cancellationToken)
@@ -81,7 +78,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPut("{id:guid}/notificacion")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PedidoDigitalResponse>> ActualizarNotificacion(
         Guid id,
         [FromBody] ActualizarNotificacionPedidoRequest request,
@@ -92,7 +88,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost("notificacion-lote")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<IReadOnlyList<PedidoDigitalResponse>>> ActualizarNotificacionLote(
         [FromBody] ActualizarNotificacionLoteRequest request,
         CancellationToken cancellationToken)
@@ -102,7 +97,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost("{id:guid}/cancelar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PedidoDigitalResponse>> Cancelar(
         Guid id,
         [FromBody] CambiarEstadoPedidoRequest? request,
@@ -113,7 +107,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost("{id:guid}/detalles/{detalleId:guid}/devolver")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PedidoDigitalResponse>> DevolverDetalle(
         Guid id,
         Guid detalleId,
@@ -129,7 +122,6 @@ public sealed class PedidosDigitalesController(PedidosDigitalesService pedidos) 
     }
 
     [HttpPost("{id:guid}/convertir-venta")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ConversionVentaResponse>> ConvertirVenta(
         Guid id,
         [FromBody] ConvertirVentaRequest? request,

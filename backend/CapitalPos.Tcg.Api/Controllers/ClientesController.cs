@@ -9,6 +9,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/clientes")]
+[RequiresModulePermission(ModulosSistema.Clientes)]
 public sealed class ClientesController(ClientesService clientes) : ControllerBase
 {
     [HttpGet]
@@ -39,7 +40,6 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ClienteResponse>> Crear(
         [FromBody] UpsertClienteRequest request,
         CancellationToken cancellationToken)
@@ -49,7 +49,6 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
     }
 
     [HttpPut("{id:guid}")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ClienteResponse>> Actualizar(
         Guid id,
         [FromBody] UpsertClienteRequest request,
@@ -61,7 +60,6 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
 
     /// <summary>Soft delete: desactiva el cliente sin borrar historial de pedidos/pagos.</summary>
     [HttpPost("{id:guid}/desactivar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ClienteResponse>> Desactivar(Guid id, CancellationToken cancellationToken)
     {
         var desactivado = await clientes.DesactivarAsync(id, cancellationToken);
@@ -69,7 +67,6 @@ public sealed class ClientesController(ClientesService clientes) : ControllerBas
     }
 
     [HttpPost("{id:guid}/reactivar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<ClienteResponse>> Reactivar(Guid id, CancellationToken cancellationToken)
     {
         var reactivado = await clientes.ReactivarAsync(id, cancellationToken);

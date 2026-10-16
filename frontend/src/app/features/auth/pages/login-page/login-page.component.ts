@@ -41,7 +41,7 @@ export class LoginPageComponent {
       const raw = this.form.getRawValue();
       // Tenant multi-tenant se resuelve por subdominio / BD en el backend.
       await this.auth.login(raw.email, raw.password);
-      await this.router.navigateByUrl('/app/dashboard');
+      await this.router.navigateByUrl(this.auth.primeraRutaPermitida());
     } catch (err) {
       this.error.set(readApiError(err));
     } finally {

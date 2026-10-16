@@ -13,6 +13,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/pagos")]
+[RequiresModulePermission(ModulosSistema.Pagos)]
 public sealed class PagosController(PagosService pagos, IzipayIpnService izipay) : ControllerBase
 {
     [HttpGet]
@@ -49,7 +50,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     }
 
     [HttpPut("izipay/config")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<IntegracionIzipayResponse>> GuardarIzipay(
         [FromBody] GuardarIntegracionIzipayRequest request,
         CancellationToken cancellationToken)
@@ -59,7 +59,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PagoResponse>> Registrar(
         [FromBody] RegistrarPagoRequest request,
         CancellationToken cancellationToken)
@@ -69,7 +68,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     }
 
     [HttpPost("lote")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<IReadOnlyList<PagoResponse>>> RegistrarLote(
         [FromBody] RegistrarPagoLoteRequest request,
         CancellationToken cancellationToken)
@@ -93,7 +91,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     }
 
     [HttpPost("{id:guid}/asociar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PagoResponse>> Asociar(
         Guid id,
         [FromBody] AsociarPagoRequest request,
@@ -104,7 +101,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     }
 
     [HttpPost("{id:guid}/confirmar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PagoResponse>> Confirmar(Guid id, CancellationToken cancellationToken)
     {
         var confirmado = await pagos.ConfirmarAsync(id, cancellationToken);
@@ -112,7 +108,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     }
 
     [HttpPost("{id:guid}/rechazar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PagoResponse>> Rechazar(
         Guid id,
         [FromBody] RechazarPagoRequest? request,
@@ -127,7 +122,6 @@ public sealed class PagosController(PagosService pagos, IzipayIpnService izipay)
     /// Si el pedido quedó solo en Pagado y deja de cubrirse, vuelve a Pendiente de pago.
     /// </summary>
     [HttpPost("{id:guid}/anular")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<PagoResponse>> Anular(
         Guid id,
         [FromBody] AnularPagoRequest? request,

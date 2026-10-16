@@ -10,6 +10,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/caja")]
+[RequiresModulePermission(ModulosSistema.Caja)]
 public sealed class CajaController(CajaService caja) : ControllerBase
 {
     [HttpGet]
@@ -76,7 +77,6 @@ public sealed class CajaController(CajaService caja) : ControllerBase
     }
 
     [HttpPost("apertura")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<CajaSesionResponse>> Apertura(
         [FromBody] AbrirCajaRequest request,
         CancellationToken cancellationToken)
@@ -86,7 +86,6 @@ public sealed class CajaController(CajaService caja) : ControllerBase
     }
 
     [HttpPost("cierre")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<CajaResumenResponse>> Cierre(
         [FromBody] CerrarCajaRequest request,
         CancellationToken cancellationToken)
@@ -95,7 +94,6 @@ public sealed class CajaController(CajaService caja) : ControllerBase
     }
 
     [HttpPost("movimientos")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<CajaMovimientoResponse>> Movimiento(
         [FromBody] RegistrarCajaMovimientoRequest request,
         CancellationToken cancellationToken)

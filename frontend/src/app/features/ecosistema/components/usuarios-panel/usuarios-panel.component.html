@@ -4,7 +4,9 @@
       <h3>Usuarios, roles y permisos</h3>
       <p>Admin, cajero/vendedor y encargado de almacén / logística.</p>
     </div>
-    <button type="button" class="primary" (click)="abrir()">Nuevo usuario</button>
+    @if (isAdmin()) {
+      <button type="button" class="primary" (click)="abrir()">Nuevo usuario</button>
+    }
   </header>
 
   <div class="table-wrap">
@@ -29,7 +31,9 @@
             <td>{{ etiquetasRol[usuario.rol] }}</td>
             <td>{{ usuario.activo ? 'Activo' : 'Inactivo' }}</td>
             <td>
-              <button type="button" class="link" (click)="abrir(usuario)">Editar</button>
+              @if (isAdmin()) {
+                <button type="button" class="link" (click)="abrir(usuario)">Editar</button>
+              }
             </td>
           </tr>
         }

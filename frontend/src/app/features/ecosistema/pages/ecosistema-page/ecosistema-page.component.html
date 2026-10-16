@@ -53,14 +53,16 @@
     >
       Sedes
     </button>
-    <button
-      type="button"
-      role="tab"
-      [class.tabs__tab--active]="tab() === 'usuarios'"
-      (click)="tab.set('usuarios')"
-    >
-      Usuarios
-    </button>
+    @if (isAdmin()) {
+      <button
+        type="button"
+        role="tab"
+        [class.tabs__tab--active]="tab() === 'usuarios'"
+        (click)="tab.set('usuarios')"
+      >
+        Usuarios
+      </button>
+    }
     <button
       type="button"
       role="tab"
@@ -79,7 +81,9 @@
       <app-sedes-panel />
     }
     @case ('usuarios') {
-      <app-usuarios-panel />
+      @if (isAdmin()) {
+        <app-usuarios-panel />
+      }
     }
     @case ('integraciones') {
       <div class="integraciones">

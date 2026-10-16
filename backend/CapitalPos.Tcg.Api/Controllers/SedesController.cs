@@ -23,7 +23,7 @@ public sealed class SedesController(SedesService sedes) : ControllerBase
 
     /// <summary>Listado de gestión (incluye inactivas). Usar activa=null vía query explícita.</summary>
     [HttpGet("gestion")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [RequiresModulePermission(ModulosSistema.Ecosistema)]
     public async Task<ActionResult<IReadOnlyList<SedeResponse>>> ListarGestion(
         [FromQuery] bool? activa,
         CancellationToken cancellationToken)
@@ -40,7 +40,7 @@ public sealed class SedesController(SedesService sedes) : ControllerBase
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [RequiresModulePermission(ModulosSistema.Ecosistema)]
     public async Task<ActionResult<SedeResponse>> Crear(
         [FromBody] UpsertSedeRequest request,
         CancellationToken cancellationToken)
@@ -50,7 +50,7 @@ public sealed class SedesController(SedesService sedes) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [RequiresModulePermission(ModulosSistema.Ecosistema)]
     public async Task<ActionResult<SedeResponse>> Actualizar(
         Guid id,
         [FromBody] UpsertSedeRequest request,
@@ -64,7 +64,7 @@ public sealed class SedesController(SedesService sedes) : ControllerBase
     /// Soft delete si hay dependencias; borrado físico si la sede/almacén está limpia.
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [RequiresModulePermission(ModulosSistema.Ecosistema)]
     public async Task<ActionResult<EliminarSedeResponse>> Eliminar(
         Guid id,
         CancellationToken cancellationToken)
@@ -74,7 +74,7 @@ public sealed class SedesController(SedesService sedes) : ControllerBase
     }
 
     [HttpPost("{id:guid}/desactivar")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [RequiresModulePermission(ModulosSistema.Ecosistema)]
     public async Task<ActionResult<EliminarSedeResponse>> Desactivar(
         Guid id,
         CancellationToken cancellationToken)
@@ -84,7 +84,7 @@ public sealed class SedesController(SedesService sedes) : ControllerBase
     }
 
     [HttpPost("{id:guid}/reactivar")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [RequiresModulePermission(ModulosSistema.Ecosistema)]
     public async Task<ActionResult<SedeResponse>> Reactivar(Guid id, CancellationToken cancellationToken)
     {
         var sede = await sedes.ReactivarAsync(id, cancellationToken);

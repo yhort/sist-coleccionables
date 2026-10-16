@@ -11,6 +11,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/productos-tcg")]
+[RequiresModulePermission(ModulosSistema.ProductosTcg)]
 public sealed class ProductosTcgController(ProductosTcgService productos) : ControllerBase
 {
     [HttpGet]
@@ -42,7 +43,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProductoTcgResponse>> Crear(
         [FromBody] UpsertProductoTcgRequest request,
         CancellationToken cancellationToken)
@@ -52,7 +52,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     }
 
     [HttpPost("variantes")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProductoTcgResponse>> CrearVariante(
         [FromBody] CrearVarianteProductoCartaRequest request,
         CancellationToken cancellationToken)
@@ -62,7 +61,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     }
 
     [HttpPut("{id:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProductoTcgResponse>> Actualizar(
         Guid id,
         [FromBody] UpsertProductoTcgRequest request,
@@ -73,7 +71,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     }
 
     [HttpPatch("{id:guid}/activar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProductoTcgResponse>> Activar(Guid id, CancellationToken cancellationToken)
     {
         var producto = await productos.CambiarActivoAsync(id, activo: true, cancellationToken);
@@ -81,7 +78,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     }
 
     [HttpPatch("{id:guid}/desactivar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProductoTcgResponse>> Desactivar(Guid id, CancellationToken cancellationToken)
     {
         var producto = await productos.CambiarActivoAsync(id, activo: false, cancellationToken);
@@ -92,7 +88,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     /// Soft delete si hay historial/kardex; borrado físico solo sin ID Woo ni dependencias.
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<EliminarProductoTcgResponse>> Eliminar(
         Guid id,
         CancellationToken cancellationToken)
@@ -105,7 +100,6 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     /// Limpia el ID externo WooCommerce y deja el mapeo en NO_MAPEADO.
     /// </summary>
     [HttpPost("{id:guid}/desvincular-woocommerce")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProductoTcgResponse>> DesvincularWooCommerce(
         Guid id,
         CancellationToken cancellationToken)
@@ -118,11 +112,9 @@ public sealed class ProductosTcgController(ProductosTcgService productos) : Cont
     public ActionResult ListarComponentes(Guid id) => BomNoImplementado();
 
     [HttpPost("{id:guid}/componentes")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public ActionResult AgregarComponente(Guid id) => BomNoImplementado();
 
     [HttpDelete("{id:guid}/componentes/{componenteId:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public ActionResult QuitarComponente(Guid id, Guid componenteId) => BomNoImplementado();
 
     private ObjectResult BomNoImplementado() => StatusCode(

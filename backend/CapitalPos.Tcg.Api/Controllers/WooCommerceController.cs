@@ -11,6 +11,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/woocommerce")]
+[RequiresModulePermission(ModulosSistema.WooCommerce)]
 public sealed class WooCommerceController(
     WooCommerceSyncService sync,
     WooCommercePedidoImportService pedidosIn) : ControllerBase
@@ -23,7 +24,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPut("config")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooConfigResponse>> GuardarConfig(
         [FromBody] GuardarWooConfigRequest request,
         CancellationToken cancellationToken)
@@ -34,7 +34,6 @@ public sealed class WooCommerceController(
 
     [HttpPost("probar")]
     [HttpPost("config/probar")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooConfigResponse>> Probar(CancellationToken cancellationToken)
     {
         var config = await sync.ProbarConexionAsync(cancellationToken);
@@ -42,7 +41,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPost("sync/catalogo")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooSyncCatalogoResponse>> SyncCatalogo(CancellationToken cancellationToken)
     {
         var resultado = await sync.SincronizarCatalogoAsync(cancellationToken);
@@ -50,7 +48,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPost("sync/stock")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooSyncStockResponse>> SyncStock(CancellationToken cancellationToken)
     {
         var resultado = await sync.SincronizarStockAsync(cancellationToken);
@@ -58,7 +55,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPost("sincronizar-producto/{productoId:guid}")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooSyncProductoResponse>> SincronizarProducto(
         Guid productoId,
         CancellationToken cancellationToken)
@@ -68,7 +64,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPost("sync/pedidos")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooImportPedidosResponse>> SyncPedidos(CancellationToken cancellationToken)
     {
         var resultado = await pedidosIn.ImportarPedidosAsync(cancellationToken);
@@ -83,7 +78,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPut("mapeos")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<IReadOnlyList<WooMapeoResponse>>> GuardarMapeos(
         [FromBody] IReadOnlyList<WooMapeoInput> request,
         CancellationToken cancellationToken)
@@ -190,7 +184,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPost("webhooks/simular")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooImportPedidosResponse>> SimularWebhook(CancellationToken cancellationToken)
     {
         var resultado = await pedidosIn.SimularWebhookPedidoAsync(cancellationToken);
@@ -198,7 +191,6 @@ public sealed class WooCommerceController(
     }
 
     [HttpPost("webhooks/reintentar")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WooImportPedidosResponse>> ReintentarWebhooks(CancellationToken cancellationToken)
     {
         var resultado = await pedidosIn.ReintentarPendientesAsync(cancellationToken);

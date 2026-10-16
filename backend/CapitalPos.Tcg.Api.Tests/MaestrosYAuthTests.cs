@@ -44,6 +44,45 @@ public sealed class MaestrosYAuthTests
     }
 
     [Fact]
+    public async Task Login_luego_auth_me_devuelve_usuario_y_permisos()
+    {
+        using var client = _factory.CreateClient();
+        var login = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = "admin@trunqi.local", password = "Admin123!" },
+            Json);
+        var loginBody = await login.Content.ReadAsStringAsync();
+        Assert.True(login.IsSuccessStatusCode, loginBody);
+
+        var loginJson = JsonSerializer.Deserialize<JsonElement>(loginBody, Json);
+        var token = loginJson.GetProperty("accessToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(token));
+        Assert.True(loginJson.TryGetProperty("permisos", out var permisosLogin));
+        Assert.True(permisosLogin.GetArrayLength() > 0);
+
+        var empresaId = loginJson.GetProperty("usuario").GetProperty("empresaId").GetGuid();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Remove("X-CapitalPos-EmpresaId");
+        client.DefaultRequestHeaders.Add("X-CapitalPos-EmpresaId", empresaId.ToString());
+
+        var me = await client.GetAsync("/api/auth/me");
+        var meBody = await me.Content.ReadAsStringAsync();
+        Assert.True(me.IsSuccessStatusCode, meBody);
+
+        var meJson = JsonSerializer.Deserialize<JsonElement>(meBody, Json);
+        Assert.Equal(
+            loginJson.GetProperty("usuario").GetProperty("id").GetGuid(),
+            meJson.GetProperty("usuario").GetProperty("id").GetGuid());
+        Assert.Equal("ADMIN", meJson.GetProperty("usuario").GetProperty("rol").GetString());
+        Assert.True(meJson.GetProperty("permisos").GetArrayLength() > 0);
+
+        // También debe funcionar resolviendo tenant solo desde el JWT (sin header).
+        client.DefaultRequestHeaders.Remove("X-CapitalPos-EmpresaId");
+        var meJwt = await client.GetAsync("/api/auth/me");
+        Assert.True(meJwt.IsSuccessStatusCode, await meJwt.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Cliente_valida_dni_ruc_y_publico_general()
     {
         using var client = _factory.CreateClient();

@@ -1,8 +1,10 @@
 using CapitalPos.Tcg.Api.Application.Cpe;
 using CapitalPos.Tcg.Api.Application.Ecosistema;
+using CapitalPos.Tcg.Api.Application.Permisos;
 using CapitalPos.Tcg.Api.Application.Usuarios;
 using CapitalPos.Tcg.Api.Contracts.Cpe;
 using CapitalPos.Tcg.Api.Contracts.Ecosistema;
+using CapitalPos.Tcg.Api.Contracts.Permisos;
 using CapitalPos.Tcg.Api.Contracts.Usuarios;
 using CapitalPos.Tcg.Api.Domain.Enums;
 using CapitalPos.Tcg.Api.Infrastructure.Authorization;
@@ -14,9 +16,11 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/ecosistema")]
+[RequiresModulePermission(ModulosSistema.Ecosistema)]
 public sealed class EcosistemaController(
     EcosistemaService ecosistema,
     UsuariosService usuarios,
+    PermisosModuloService permisosModulo,
     IServicioFiscal fiscal) : ControllerBase
 {
     [HttpGet("conexiones")]
@@ -28,7 +32,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPost("conexiones/{id:guid}/ping")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<EcosistemaConexionResponse>> Ping(Guid id, CancellationToken cancellationToken)
     {
         var conexion = await ecosistema.PingAsync(id, cancellationToken);
@@ -43,7 +46,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPut("fiscal")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<ConfiguracionFiscalResponse>> GuardarFiscal(
         [FromBody] GuardarConfiguracionFiscalRequest request,
         CancellationToken cancellationToken)
@@ -68,7 +70,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPut("webhooks")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WebhookSalidaResponse>> GuardarWebhook(
         [FromBody] GuardarWebhookSalidaRequest request,
         CancellationToken cancellationToken)
@@ -77,8 +78,24 @@ public sealed class EcosistemaController(
         return Ok(webhook);
     }
 
+    [HttpGet("permisos")]
+    [Authorize(Roles = nameof(RolUsuario.ADMIN))]
+    public async Task<ActionResult<MatrizPermisosResponse>> ObtenerPermisos(CancellationToken cancellationToken)
+    {
+        return Ok(await permisosModulo.ObtenerMatrizAsync(cancellationToken));
+    }
+
+    [HttpPut("permisos")]
+    [Authorize(Roles = nameof(RolUsuario.ADMIN))]
+    public async Task<ActionResult<MatrizPermisosResponse>> GuardarPermisos(
+        [FromBody] GuardarMatrizPermisosRequest request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await permisosModulo.GuardarMatrizAsync(request, cancellationToken));
+    }
+
     [HttpGet("usuarios")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [Authorize(Roles = nameof(RolUsuario.ADMIN))]
     public async Task<ActionResult<IReadOnlyList<UsuarioResponse>>> ListarUsuarios(
         CancellationToken cancellationToken)
     {
@@ -87,7 +104,7 @@ public sealed class EcosistemaController(
     }
 
     [HttpGet("usuarios/{id:guid}")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [Authorize(Roles = nameof(RolUsuario.ADMIN))]
     public async Task<ActionResult<UsuarioResponse>> ObtenerUsuario(
         Guid id,
         CancellationToken cancellationToken)
@@ -97,7 +114,7 @@ public sealed class EcosistemaController(
     }
 
     [HttpPost("usuarios")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [Authorize(Roles = nameof(RolUsuario.ADMIN))]
     public async Task<ActionResult<UsuarioResponse>> CrearUsuario(
         [FromBody] CrearUsuarioRequest request,
         CancellationToken cancellationToken)
@@ -107,7 +124,7 @@ public sealed class EcosistemaController(
     }
 
     [HttpPut("usuarios/{id:guid}")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
+    [Authorize(Roles = nameof(RolUsuario.ADMIN))]
     public async Task<ActionResult<UsuarioResponse>> ActualizarUsuario(
         Guid id,
         [FromBody] ActualizarUsuarioRequest request,
@@ -118,7 +135,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPost("webhooks/probar")]
-    [RequiresPermission(Permiso.OperarIntegraciones)]
     public async Task<ActionResult<WebhookLogResponse>> ProbarWebhook(
         [FromBody] ProbarWebhookRequest request,
         CancellationToken cancellationToken)
@@ -136,7 +152,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPost("cpe/emitir-desde-venta/{ventaId:guid}")]
-    [RequiresPermission(Permiso.EmitirCpe)]
     public async Task<ActionResult<ComprobanteResponse>> EmitirDesdeVenta(
         Guid ventaId,
         [FromQuery] TipoComprobanteSunat tipo = TipoComprobanteSunat.BOLETA,
@@ -147,7 +162,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPost("cpe/nota-credito/{ventaId:guid}")]
-    [RequiresPermission(Permiso.EmitirCpe)]
     public async Task<ActionResult<ComprobanteResponse>> NotaCredito(
         Guid ventaId,
         [FromBody] EmitirNotaCreditoRequest request,
@@ -222,7 +236,6 @@ public sealed class EcosistemaController(
     }
 
     [HttpPost("cpe/boleta-consolidada")]
-    [RequiresPermission(Permiso.EmitirCpe)]
     public async Task<ActionResult<BoletaConsolidadaResponse>> GenerarBoletaConsolidada(
         [FromBody] GenerarBoletaConsolidadaRequest request,
         CancellationToken cancellationToken)

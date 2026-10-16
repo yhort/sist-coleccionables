@@ -24,7 +24,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Empresa> Empresas => Set<Empresa>();
     public DbSet<Sede> Sedes => Set<Sede>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<RolModuloPermiso> RolModuloPermisos => Set<RolModuloPermiso>();
     public DbSet<Producto> Productos => Set<Producto>();
+
     public DbSet<ProductoCarta> ProductosCarta => Set<ProductoCarta>();
     public DbSet<ProductoSellado> ProductosSellado => Set<ProductoSellado>();
     public DbSet<ProductoSelladoContenidoFijo> ProductoSelladoContenidoFijo => Set<ProductoSelladoContenidoFijo>();
@@ -68,6 +70,7 @@ public sealed class ApplicationDbContext : DbContext
         ConfigureEmpresa(modelBuilder);
         ConfigureSede(modelBuilder);
         ConfigureUsuario(modelBuilder);
+        ConfigureRolModuloPermiso(modelBuilder);
         ConfigureProducto(modelBuilder);
         ConfigureCatalogoTcg(modelBuilder);
         ConfigureStockProducto(modelBuilder);
@@ -88,6 +91,7 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Sede>().HasQueryFilter(e => e.EmpresaId == EmpresaActivaId);
         modelBuilder.Entity<Usuario>().HasQueryFilter(e => e.EmpresaId == EmpresaActivaId);
+        modelBuilder.Entity<RolModuloPermiso>().HasQueryFilter(e => e.EmpresaId == EmpresaActivaId);
         modelBuilder.Entity<Producto>().HasQueryFilter(e => e.EmpresaId == EmpresaActivaId);
         modelBuilder.Entity<ProductoSelladoContenidoFijo>().HasQueryFilter(e => e.EmpresaId == EmpresaActivaId);
         modelBuilder.Entity<TcgSerie>().HasQueryFilter(e => e.EmpresaId == EmpresaActivaId);
@@ -193,6 +197,24 @@ public sealed class ApplicationDbContext : DbContext
         entity.HasIndex(e => new { e.EmpresaId, e.Dni })
             .IsUnique()
             .HasDatabaseName("ux_usuarios_empresa_id_dni");
+    }
+
+    private static void ConfigureRolModuloPermiso(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<RolModuloPermiso>();
+        entity.ToTable("rol_modulo_permisos");
+        entity.HasKey(e => e.Id);
+        EnumAsString(entity.Property(e => e.Rol), 16);
+        entity.Property(e => e.Modulo).HasMaxLength(64).IsRequired();
+
+        entity.HasOne(e => e.Empresa)
+            .WithMany()
+            .HasForeignKey(e => e.EmpresaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasIndex(e => new { e.EmpresaId, e.Rol, e.Modulo })
+            .IsUnique()
+            .HasDatabaseName("ux_rol_modulo_permisos_empresa_rol_modulo");
     }
 
     private static void ConfigureProducto(ModelBuilder modelBuilder)

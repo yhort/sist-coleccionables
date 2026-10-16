@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { AuthSessionService } from '../../../core/auth/auth-session.service';
 import { SedesApiService } from '../../../core/data-access/sedes-api.service';
 import { apiUrl } from '../../../core/http/api-url';
 import { readApiError } from '../../../core/http/api-error';
@@ -155,9 +156,16 @@ interface BoletaConsolidadaApi {
   notas: NotaVentaPendienteApi[];
 }
 
+interface MatrizPermisosApi {
+  admin: { modulo: string; lectura: boolean; escritura: boolean }[];
+  cajero: { modulo: string; lectura: boolean; escritura: boolean }[];
+  almacen: { modulo: string; lectura: boolean; escritura: boolean }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class EcosistemaApiService {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthSessionService);
   private readonly pedidosApi = inject(PedidosDigitalesApiService);
   private readonly entregasApi = inject(EntregasApiService);
   private readonly sedesApi = inject(SedesApiService);
@@ -197,12 +205,13 @@ export class EcosistemaApiService {
 
   async cargar(): Promise<void> {
     try {
-      const [fiscal, series, webhook, comprobantes, usuarios] = await Promise.all([
+      const [fiscal, series, webhook, comprobantes, usuarios, permisos] = await Promise.all([
         firstValueFrom(this.http.get<ConfiguracionFiscalApi>(apiUrl('ecosistema/fiscal'))),
         firstValueFrom(this.http.get<SerieComprobanteApi[]>(apiUrl('ecosistema/series'))),
         firstValueFrom(this.http.get<WebhookApi>(apiUrl('ecosistema/webhooks'))),
         firstValueFrom(this.http.get<ComprobanteApi[]>(apiUrl('ecosistema/cpe'))).catch(() => [] as ComprobanteApi[]),
         firstValueFrom(this.http.get<UsuarioApi[]>(apiUrl('ecosistema/usuarios'))).catch(() => null),
+        firstValueFrom(this.http.get<MatrizPermisosApi>(apiUrl('ecosistema/permisos'))).catch(() => null),
         this.pedidosApi.refrescar().catch(() => []),
         this.refrescarSedes().catch(() => []),
       ]);
@@ -229,6 +238,9 @@ export class EcosistemaApiService {
       this.emisionesSignal.set(comprobantes.map((item) => this.mapEmision(item)));
       if (usuarios) {
         this.usuariosSignal.set(usuarios.map(mapUsuarioApi));
+      }
+      if (permisos) {
+        this.permisosSignal.set(mapMatrizApi(permisos));
       }
       await this.refrescarNotasPendientes().catch(() => undefined);
     } catch (error) {
@@ -486,6 +498,29 @@ export class EcosistemaApiService {
         return { ...permiso, lectura: valor, escritura: valor ? permiso.escritura : false };
       }),
     }));
+    void this.guardarMatrizPermisos().catch(() => undefined);
+  }
+
+  async guardarMatrizPermisos(): Promise<MatrizPermisos> {
+    const matriz = this.permisosSignal();
+    try {
+      const dto = await firstValueFrom(
+        this.http.put<MatrizPermisosApi>(apiUrl('ecosistema/permisos'), {
+          admin: matriz.ADMIN,
+          cajero: matriz.CAJERO,
+          almacen: matriz.ALMACEN,
+        }),
+      );
+      const persistida = mapMatrizApi(dto);
+      this.permisosSignal.set(persistida);
+      const rolActual = this.auth.usuario()?.rol;
+      if (rolActual) {
+        this.auth.aplicarPermisosSesion(persistida[rolActual]);
+      }
+      return clonarMatriz(persistida);
+    } catch (error) {
+      throw new Error(readApiError(error));
+    }
   }
 
   async guardarWebhook(webhook: WebhookSalida): Promise<WebhookSalida> {
@@ -921,6 +956,33 @@ function clonarMatriz(matriz: MatrizPermisos): MatrizPermisos {
     ADMIN: matriz.ADMIN.map((item) => ({ ...item })),
     CAJERO: matriz.CAJERO.map((item) => ({ ...item })),
     ALMACEN: matriz.ALMACEN.map((item) => ({ ...item })),
+  };
+}
+
+function mapMatrizApi(dto: MatrizPermisosApi): MatrizPermisos {
+  const base = matrizPermisosPorDefecto();
+  const mapRol = (
+    rol: keyof MatrizPermisos,
+    items: { modulo: string; lectura: boolean; escritura: boolean }[] | undefined,
+  ) => {
+    const porModulo = new Map((items ?? []).map((item) => [item.modulo, item]));
+    return base[rol].map((item) => {
+      const remoto = porModulo.get(item.modulo);
+      if (!remoto) {
+        return { ...item };
+      }
+      return {
+        modulo: item.modulo,
+        lectura: !!remoto.lectura || !!remoto.escritura,
+        escritura: !!remoto.escritura,
+      };
+    });
+  };
+
+  return {
+    ADMIN: mapRol('ADMIN', dto.admin),
+    CAJERO: mapRol('CAJERO', dto.cajero),
+    ALMACEN: mapRol('ALMACEN', dto.almacen),
   };
 }
 

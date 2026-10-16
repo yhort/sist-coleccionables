@@ -12,6 +12,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/entregas")]
+[RequiresModulePermission(ModulosSistema.Entregas)]
 public sealed class EntregasController(EntregasService entregas) : ControllerBase
 {
     [HttpGet]
@@ -39,7 +40,6 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<EntregaResponse>> Programar(
         [FromBody] ProgramarEntregaRequest request,
         CancellationToken cancellationToken)
@@ -49,7 +49,6 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     }
 
     [HttpPost("empaquetar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<EntregaResponse>> Empaquetar(
         [FromBody] EmpaquetarEntregaRequest request,
         CancellationToken cancellationToken)
@@ -59,7 +58,6 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     }
 
     [HttpPost("{id:guid}/despachar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<EntregaResponse>> Despachar(
         Guid id,
         [FromBody] DespacharEntregaRequest request,
@@ -70,7 +68,6 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     }
 
     [HttpPost("{id:guid}/confirmar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<object>> Confirmar(
         Guid id,
         [FromBody] ConvertirVentaRequest? request,
@@ -81,7 +78,6 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     }
 
     [HttpPost("{id:guid}/fallar")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<EntregaResponse>> Fallar(
         Guid id,
         [FromBody] FallarEntregaRequest? request,
@@ -92,7 +88,6 @@ public sealed class EntregasController(EntregasService entregas) : ControllerBas
     }
 
     [HttpPost("devolver-no-recogido")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<EntregaResponse>> DevolverNoRecogido(
         [FromBody] DevolverNoRecogidoRequest request,
         CancellationToken cancellationToken)

@@ -1,5 +1,6 @@
 using CapitalPos.Tcg.Api.Application.Dashboard;
 using CapitalPos.Tcg.Api.Contracts.Dashboard;
+using CapitalPos.Tcg.Api.Infrastructure.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +9,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/dashboard")]
+[RequiresModulePermission(ModulosSistema.Dashboard)]
 public sealed class DashboardController(DashboardService dashboard) : ControllerBase
 {
     [HttpGet("resumen")]

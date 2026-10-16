@@ -9,6 +9,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/proveedores")]
+[RequiresModulePermission(ModulosSistema.Proveedores)]
 public sealed class ProveedoresController(ProveedoresService proveedores) : ControllerBase
 {
     [HttpGet]
@@ -29,7 +30,6 @@ public sealed class ProveedoresController(ProveedoresService proveedores) : Cont
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProveedorResponse>> Crear(
         [FromBody] UpsertProveedorRequest request,
         CancellationToken cancellationToken)
@@ -39,7 +39,6 @@ public sealed class ProveedoresController(ProveedoresService proveedores) : Cont
     }
 
     [HttpPut("{id:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProveedorResponse>> Actualizar(
         Guid id,
         [FromBody] UpsertProveedorRequest request,
@@ -51,7 +50,6 @@ public sealed class ProveedoresController(ProveedoresService proveedores) : Cont
 
     /// <summary>Soft delete: desactiva el proveedor sin borrar historial de compras/kardex.</summary>
     [HttpPost("{id:guid}/desactivar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProveedorResponse>> Desactivar(Guid id, CancellationToken cancellationToken)
     {
         var desactivado = await proveedores.DesactivarAsync(id, cancellationToken);
@@ -59,7 +57,6 @@ public sealed class ProveedoresController(ProveedoresService proveedores) : Cont
     }
 
     [HttpPost("{id:guid}/reactivar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ProveedorResponse>> Reactivar(Guid id, CancellationToken cancellationToken)
     {
         var reactivado = await proveedores.ReactivarAsync(id, cancellationToken);

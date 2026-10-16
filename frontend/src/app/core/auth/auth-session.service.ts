@@ -3,6 +3,19 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { apiUrl } from '../http/api-url';
+import {
+  ModuloPermiso,
+  matrizPermisosPorDefecto,
+} from '../../features/ecosistema/models/ecosistema.model';
+import { APP_NAV_ITEMS } from '../../layout/navigation';
+
+export type NivelPermiso = 'L' | 'E' | 'lectura' | 'escritura';
+
+export interface PermisoModuloSesion {
+  modulo: ModuloPermiso | string;
+  lectura: boolean;
+  escritura: boolean;
+}
 
 export interface UsuarioSesion {
   id: string;
@@ -22,6 +35,12 @@ interface LoginResponse {
   accessToken: string;
   expiresAt: string;
   usuario: UsuarioSesion;
+  permisos?: PermisoModuloSesion[];
+}
+
+interface SesionActualResponse {
+  usuario: UsuarioSesion;
+  permisos: PermisoModuloSesion[];
 }
 
 interface EmpresasDisponiblesResponse {
@@ -33,6 +52,7 @@ interface SesionPersistida {
   accessToken: string;
   expiresAt: string;
   usuario: UsuarioSesion;
+  permisos: PermisoModuloSesion[];
 }
 
 const STORAGE_KEY = 'capitalpos.tcg.session';
@@ -52,6 +72,17 @@ export class AuthSessionService {
   );
   readonly empresaId = computed(() => this.sesionSignal()?.usuario.empresaId ?? null);
   readonly usuario = computed(() => this.sesionSignal()?.usuario ?? null);
+  readonly isAdmin = computed(() => this.usuario()?.rol === 'ADMIN');
+  readonly permisos = computed(() => this.sesionSignal()?.permisos ?? []);
+
+  readonly menuItemsPermitidos = computed(() =>
+    APP_NAV_ITEMS.filter((item) => this.hasPermission(item.modulo, 'L')),
+  );
+
+  readonly primeraRutaPermitida = computed(() => {
+    const items = this.menuItemsPermitidos();
+    return items[0]?.route ?? '/app/dashboard';
+  });
 
   async listarEmpresas(): Promise<{ empresas: EmpresaLogin[]; unicoTenant: boolean }> {
     const respuesta = await firstValueFrom(
@@ -80,10 +111,74 @@ export class AuthSessionService {
       accessToken: respuesta.accessToken,
       expiresAt: respuesta.expiresAt,
       usuario: respuesta.usuario,
+      permisos: normalizarPermisos(respuesta.permisos, respuesta.usuario.rol),
     };
     escribirSesion(persistida);
     this.sesionSignal.set(persistida);
-    return persistida.usuario;
+    // Login → Bearer → /auth/me (permisos/menú frescos). Si falla, se mantienen los del login.
+    await this.refrescarPermisos();
+    return this.sesionSignal()?.usuario ?? persistida.usuario;
+  }
+
+  async refrescarPermisos(): Promise<void> {
+    if (!this.isAuthenticated()) {
+      return;
+    }
+    try {
+      const respuesta = await firstValueFrom(
+        this.http.get<SesionActualResponse>(apiUrl('auth/me')),
+      );
+      const actual = this.sesionSignal();
+      if (!actual) {
+        return;
+      }
+      const actualizada: SesionPersistida = {
+        ...actual,
+        usuario: respuesta.usuario,
+        permisos: normalizarPermisos(respuesta.permisos, respuesta.usuario.rol),
+      };
+      escribirSesion(actualizada);
+      this.sesionSignal.set(actualizada);
+    } catch {
+      // Si falla el refresh, se mantiene la sesión local.
+    }
+  }
+
+  /** Actualiza la matriz del rol actual en sesión (p.ej. tras guardar en Ecosistema). */
+  aplicarPermisosSesion(permisos: PermisoModuloSesion[]): void {
+    const actual = this.sesionSignal();
+    if (!actual) {
+      return;
+    }
+    const actualizada: SesionPersistida = {
+      ...actual,
+      permisos: normalizarPermisos(permisos, actual.usuario.rol),
+    };
+    escribirSesion(actualizada);
+    this.sesionSignal.set(actualizada);
+  }
+
+  hasPermission(modulo: string | null | undefined, nivel: NivelPermiso = 'L'): boolean {
+    if (!modulo) {
+      return false;
+    }
+    const permiso = this.permisos().find((item) => item.modulo === modulo);
+    if (!permiso) {
+      return false;
+    }
+    const exigeEscritura = nivel === 'E' || nivel === 'escritura';
+    if (exigeEscritura) {
+      return !!permiso.escritura;
+    }
+    return !!permiso.lectura || !!permiso.escritura;
+  }
+
+  canRead(modulo: string): boolean {
+    return this.hasPermission(modulo, 'L');
+  }
+
+  canWrite(modulo: string): boolean {
+    return this.hasPermission(modulo, 'E');
   }
 
   logout(): void {
@@ -94,6 +189,20 @@ export class AuthSessionService {
     sessionStorage.removeItem(STORAGE_KEY);
     this.sesionSignal.set(null);
   }
+}
+
+function normalizarPermisos(
+  permisos: PermisoModuloSesion[] | undefined,
+  rol: UsuarioSesion['rol'],
+): PermisoModuloSesion[] {
+  if (permisos && permisos.length > 0) {
+    return permisos.map((item) => ({
+      modulo: item.modulo,
+      lectura: !!item.lectura || !!item.escritura,
+      escritura: !!item.escritura,
+    }));
+  }
+  return matrizPermisosPorDefecto()[rol].map((item) => ({ ...item }));
 }
 
 function leerSesion(): SesionPersistida | null {
@@ -110,7 +219,10 @@ function leerSesion(): SesionPersistida | null {
       sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    return parsed;
+    return {
+      ...parsed,
+      permisos: normalizarPermisos(parsed.permisos, parsed.usuario.rol),
+    };
   } catch {
     return null;
   }

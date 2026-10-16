@@ -11,6 +11,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/aperturas-tcg")]
+[RequiresModulePermission(ModulosSistema.AperturasTcg)]
 public sealed class AperturasTcgController(AperturasTcgService aperturas) : ControllerBase
 {
     [HttpGet]
@@ -38,7 +39,6 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     }
 
     [HttpPost]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<AperturaTcgResponse>> Crear(
         [FromBody] CrearAperturaTcgRequest request,
         CancellationToken cancellationToken)
@@ -48,7 +48,6 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     }
 
     [HttpPut("{id:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<AperturaTcgResponse>> ActualizarBorrador(
         Guid id,
         [FromBody] CrearAperturaTcgRequest request,
@@ -59,7 +58,6 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     }
 
     [HttpPut("{id:guid}/detalles")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<AperturaTcgResponse>> ReemplazarDetalles(
         Guid id,
         [FromBody] IReadOnlyList<AperturaDetalleInput> detalles,
@@ -70,7 +68,6 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     }
 
     [HttpPost("{id:guid}/confirmar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<AperturaTcgResponse>> Confirmar(Guid id, CancellationToken cancellationToken)
     {
         var confirmada = await aperturas.ConfirmarAsync(id, cancellationToken);
@@ -78,7 +75,6 @@ public sealed class AperturasTcgController(AperturasTcgService aperturas) : Cont
     }
 
     [HttpPost("{id:guid}/anular")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<AperturaTcgResponse>> Anular(Guid id, CancellationToken cancellationToken)
     {
         var anulada = await aperturas.AnularAsync(id, cancellationToken);

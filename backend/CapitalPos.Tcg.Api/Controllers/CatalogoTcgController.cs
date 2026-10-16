@@ -10,6 +10,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/tcg")]
+[RequiresModulePermission(ModulosSistema.ProductosTcg)]
 public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : ControllerBase
 {
     [HttpGet("series")]
@@ -20,7 +21,6 @@ public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : Control
     }
 
     [HttpPost("series")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<TcgSerieResponse>> CrearSerie(
         [FromBody] UpsertTcgSerieRequest request,
         CancellationToken cancellationToken)
@@ -38,7 +38,6 @@ public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : Control
     }
 
     [HttpPost("sets")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<TcgSetResponse>> CrearSet(
         [FromBody] UpsertTcgSetRequest request,
         CancellationToken cancellationToken)
@@ -48,7 +47,6 @@ public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : Control
     }
 
     [HttpPut("sets/{id:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<TcgSetResponse>> ActualizarSet(
         Guid id,
         [FromBody] ActualizarTcgSetRequest request,
@@ -58,7 +56,6 @@ public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : Control
     }
 
     [HttpDelete("sets/{id:guid}")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<IActionResult> EliminarSet(Guid id, CancellationToken cancellationToken)
     {
         await catalogo.EliminarSetAsync(id, cancellationToken);
@@ -76,7 +73,6 @@ public sealed class CatalogoTcgController(CatalogoTcgService catalogo) : Control
     }
 
     [HttpPost("cartas/importar-set")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<ImportarSetTcgResponse>> ImportarSet(
         [FromBody] ImportarSetTcgRequest request,
         CancellationToken cancellationToken)

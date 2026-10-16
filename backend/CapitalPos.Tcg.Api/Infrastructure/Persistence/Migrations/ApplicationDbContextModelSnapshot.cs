@@ -1833,6 +1833,47 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("pujas", (string)null);
                 });
 
+            modelBuilder.Entity("CapitalPos.Tcg.Api.Domain.Entities.RolModuloPermiso", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("empresa_id");
+
+                    b.Property<bool>("Escritura")
+                        .HasColumnType("boolean")
+                        .HasColumnName("escritura");
+
+                    b.Property<bool>("Lectura")
+                        .HasColumnType("boolean")
+                        .HasColumnName("lectura");
+
+                    b.Property<string>("Modulo")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("modulo");
+
+                    b.Property<string>("Rol")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("rol");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Rol", "Modulo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rol_modulo_permisos_empresa_rol_modulo");
+
+                    b.ToTable("rol_modulo_permisos", (string)null);
+                });
+
             modelBuilder.Entity("CapitalPos.Tcg.Api.Domain.Entities.Sede", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3425,6 +3466,17 @@ namespace CapitalPos.Tcg.Api.Infrastructure.Persistence.Migrations
                     b.Navigation("Detalle");
 
                     b.Navigation("Subasta");
+                });
+
+            modelBuilder.Entity("CapitalPos.Tcg.Api.Domain.Entities.RolModuloPermiso", b =>
+                {
+                    b.HasOne("CapitalPos.Tcg.Api.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
                 });
 
             modelBuilder.Entity("CapitalPos.Tcg.Api.Domain.Entities.Sede", b =>

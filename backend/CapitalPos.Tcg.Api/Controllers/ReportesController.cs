@@ -10,10 +10,10 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/reportes")]
+[RequiresModulePermission(ModulosSistema.Reportes)]
 public sealed class ReportesController(ReportesService reportes) : ControllerBase
 {
     [HttpGet("kardex-resumen")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<IReadOnlyList<KardexResumenFila>>> Kardex(
         [FromQuery] Guid? sedeId,
         [FromQuery] TipoProducto? tipoProducto,
@@ -26,7 +26,6 @@ public sealed class ReportesController(ReportesService reportes) : ControllerBas
     }
 
     [HttpGet("ventas-por-sede")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<VentasPorSedeResponse>> VentasPorSede(
         [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta,
@@ -37,7 +36,6 @@ public sealed class ReportesController(ReportesService reportes) : ControllerBas
     }
 
     [HttpGet("aperturas")]
-    [RequiresPermission(Permiso.OperarVentas)]
     public async Task<ActionResult<YieldAperturasResponse>> Aperturas(
         [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta,

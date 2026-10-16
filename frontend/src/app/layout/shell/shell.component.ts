@@ -52,6 +52,8 @@ export class ShellComponent {
   );
 
   constructor() {
+    void this.auth.refrescarPermisos();
+
     const updateMobileViewport = (event?: MediaQueryListEvent): void => {
       const isMobile = event?.matches ?? this.mobileMediaQuery.matches;
       this.isMobileViewport.set(isMobile);

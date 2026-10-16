@@ -11,6 +11,7 @@ namespace CapitalPos.Tcg.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/inventario")]
+[RequiresModulePermission(ModulosSistema.Inventario)]
 public sealed class InventarioController(InventarioService inventario) : ControllerBase
 {
     [HttpGet("stock/{productoId:guid}")]
@@ -56,7 +57,6 @@ public sealed class InventarioController(InventarioService inventario) : Control
     }
 
     [HttpPut("ajustar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<StockProductoResponse>> Ajustar(
         [FromBody] AjustarStockRequest request,
         CancellationToken cancellationToken)
@@ -85,11 +85,9 @@ public sealed class InventarioController(InventarioService inventario) : Control
     }
 
     [HttpPost("compuestos/{id:guid}/armar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public ActionResult Armar(Guid id) => CompuestoNoImplementado();
 
     [HttpPost("compuestos/{id:guid}/desarmar")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public ActionResult Desarmar(Guid id) => CompuestoNoImplementado();
 
     [HttpGet("compras")]
@@ -103,7 +101,6 @@ public sealed class InventarioController(InventarioService inventario) : Control
     }
 
     [HttpPost("compras")]
-    [RequiresPermission(Permiso.OperarAlmacen)]
     public async Task<ActionResult<CompraResponse>> CrearCompra(
         [FromBody] CrearCompraRequest request,
         CancellationToken cancellationToken)

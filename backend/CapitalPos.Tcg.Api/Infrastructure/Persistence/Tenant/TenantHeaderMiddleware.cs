@@ -16,13 +16,21 @@ public sealed class TenantHeaderMiddleware(RequestDelegate next)
 
         if (!TryReadEmpresaId(context, out var empresaId))
         {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new
+            // Endpoints autenticados (p.ej. /api/auth/me) pueden resolver tenant desde el JWT.
+            if (currentUser.IsAuthenticated && currentUser.EmpresaId is { } fromJwt)
             {
-                title = "Tenant requerido",
-                detail = $"Falta o es inválido el header {HeaderName}."
-            });
-            return;
+                empresaId = fromJwt;
+            }
+            else
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    title = "Tenant requerido",
+                    detail = $"Falta o es inválido el header {HeaderName}."
+                });
+                return;
+            }
         }
 
         if (currentUser.IsAuthenticated
@@ -56,7 +64,9 @@ public sealed class TenantHeaderMiddleware(RequestDelegate next)
     private static bool ShouldSkip(PathString path) =>
         path.StartsWithSegments("/health")
         || path.StartsWithSegments("/openapi")
-        || path.StartsWithSegments("/api/auth")
+        // Solo login/empresas son anónimos; /api/auth/me exige tenant (header o JWT).
+        || path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/api/auth/empresas", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/api/pagos/izipay/ipn")
         || path.StartsWithSegments("/api/woocommerce/webhooks/pedidos")
         || path.StartsWithSegments("/api/woocommerce/webhooks/productos");

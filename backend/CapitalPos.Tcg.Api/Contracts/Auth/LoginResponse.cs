@@ -1,3 +1,4 @@
+using CapitalPos.Tcg.Api.Contracts.Permisos;
 using CapitalPos.Tcg.Api.Domain.Enums;
 
 namespace CapitalPos.Tcg.Api.Contracts.Auth;
@@ -7,6 +8,7 @@ public sealed class LoginResponse
     public required string AccessToken { get; init; }
     public required DateTimeOffset ExpiresAt { get; init; }
     public required UsuarioAuthDto Usuario { get; init; }
+    public required IReadOnlyList<PermisoModuloDto> Permisos { get; init; }
 }
 
 public sealed class UsuarioAuthDto
@@ -19,4 +21,10 @@ public sealed class UsuarioAuthDto
     public string? Apellidos { get; init; }
     public required string Email { get; init; }
     public required RolUsuario Rol { get; init; }
+}
+
+public sealed class SesionActualResponse
+{
+    public required UsuarioAuthDto Usuario { get; init; }
+    public required IReadOnlyList<PermisoModuloDto> Permisos { get; init; }
 }

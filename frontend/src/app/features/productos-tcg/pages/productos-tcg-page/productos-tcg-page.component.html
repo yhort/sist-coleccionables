@@ -58,7 +58,9 @@
             />
             Mostrar SKU
           </label>
-          <button type="button" class="productos__add" (click)="abrirAlta()">Nuevo producto</button>
+          @if (puedeEscribir()) {
+            <button type="button" class="productos__add" (click)="abrirAlta()">Nuevo producto</button>
+          }
         </div>
       }
     </div>

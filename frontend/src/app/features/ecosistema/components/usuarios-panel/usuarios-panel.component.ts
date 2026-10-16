@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 
+import { AuthSessionService } from '../../../../core/auth/auth-session.service';
 import { EcosistemaApiService } from '../../data-access/ecosistema.service';
 import {
   ETIQUETAS_MODULO,
@@ -17,7 +18,9 @@ import { UsuarioFormDialogComponent } from '../usuario-form-dialog/usuario-form-
   styleUrl: './usuarios-panel.component.scss',
 })
 export class UsuariosPanelComponent {
+  private readonly auth = inject(AuthSessionService);
   readonly api = inject(EcosistemaApiService);
+  readonly isAdmin = this.auth.isAdmin;
   readonly roles = ROLES_USUARIO;
   readonly modulos = MODULOS_PERMISO;
   readonly etiquetasRol = ETIQUETAS_ROL;
@@ -26,6 +29,9 @@ export class UsuariosPanelComponent {
   readonly usuarioEnCurso = signal<UsuarioEmpresa | null>(null);
 
   abrir(usuario: UsuarioEmpresa | null = null): void {
+    if (!this.isAdmin()) {
+      return;
+    }
     this.usuarioEnCurso.set(usuario);
     this.dialogAbierto.set(true);
   }

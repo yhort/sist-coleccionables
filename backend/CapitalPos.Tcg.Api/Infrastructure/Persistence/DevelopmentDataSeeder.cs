@@ -76,6 +76,9 @@ public static class DevelopmentDataSeeder
         await EnsureWooAsync(db, protector, config);
         await EnsureEcosistemaAsync(db);
         await EnsureDemoCatalogoAsync(db);
+
+        var permisos = scope.ServiceProvider.GetRequiredService<Application.Permisos.PermisosModuloService>();
+        await permisos.AsegurarMatrizEmpresaAsync(CancellationToken.None);
     }
 
     private static async Task EnsureAdminAsync(
@@ -86,11 +89,20 @@ public static class DevelopmentDataSeeder
         string password,
         DateTimeOffset ahora)
     {
+        // Preferir la empresa TRUNQI de desarrollo; si no existe, la primera activa.
         var empresaId = await db.Empresas.IgnoreQueryFilters()
-            .Where(e => e.Activa)
-            .OrderBy(e => e.FechaCreacion)
+            .Where(e => e.Id == EmpresaId && e.Activa)
             .Select(e => e.Id)
             .FirstOrDefaultAsync();
+        if (empresaId == Guid.Empty)
+        {
+            empresaId = await db.Empresas.IgnoreQueryFilters()
+                .Where(e => e.Activa)
+                .OrderBy(e => e.FechaCreacion)
+                .Select(e => e.Id)
+                .FirstOrDefaultAsync();
+        }
+
         if (empresaId == Guid.Empty)
         {
             return;
@@ -98,8 +110,9 @@ public static class DevelopmentDataSeeder
 
         tenant.SetEmpresa(empresaId);
 
+        var emailNorm = email.Trim().ToLowerInvariant();
         var usuario = await db.Usuarios.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
         if (usuario is null)
         {
             usuario = new Usuario
@@ -110,7 +123,7 @@ public static class DevelopmentDataSeeder
                 Nombres = "Admin",
                 Apellidos = "Trunqi",
                 Nombre = "Admin Trunqi",
-                Email = email,
+                Email = email.Trim(),
                 Rol = RolUsuario.ADMIN,
                 Activo = true,
                 FechaCreacion = ahora
@@ -121,9 +134,16 @@ public static class DevelopmentDataSeeder
         }
         else
         {
-            usuario.EmpresaId = empresaId;
+            // No mover de empresa si ya pertenece a otra; solo reparar acceso en Development.
+            if (usuario.EmpresaId == Guid.Empty)
+            {
+                usuario.EmpresaId = empresaId;
+            }
+
             usuario.Activo = true;
             usuario.Rol = RolUsuario.ADMIN;
+            usuario.Email = email.Trim();
+            // Siempre regenera el hash en Development para evitar hashes truncados/manuales.
             usuario.PasswordHash = hasher.HashPassword(usuario, password);
         }
 

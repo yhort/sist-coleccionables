@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 
+import { AuthSessionService } from '../../../../core/auth/auth-session.service';
 import { FILTROS_PRODUCTOS_VACIOS, ProductoTcg, ProductosTcgFiltros, estadoStockDe } from '../../models/producto-tcg.model';
 import { ProductosTcgApiService } from '../../data-access/productos-tcg.service';
 import { ProductosTcgFiltersComponent } from '../../components/productos-tcg-filters/productos-tcg-filters.component';
@@ -49,6 +50,8 @@ export class ProductosTcgPageComponent {
   private readonly productosApi = inject(ProductosTcgApiService);
   private readonly stockApi = inject(StockApiService);
   private readonly sedesApi = inject(SedesApiService);
+  private readonly auth = inject(AuthSessionService);
+  readonly puedeEscribir = computed(() => this.auth.canWrite('productos-tcg'));
 
   readonly filtros = signal<ProductosTcgFiltros>({ ...FILTROS_PRODUCTOS_VACIOS });
   readonly filtrosConsulta = signal<ProductosTcgFiltros>({ ...FILTROS_PRODUCTOS_VACIOS });

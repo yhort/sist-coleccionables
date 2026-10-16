@@ -20,8 +20,10 @@ public sealed class CurrentUser : ICurrentUser
         EmpresaId = ParseGuid(principal, AuthClaims.EmpresaId);
         Email = principal.FindFirstValue(ClaimTypes.Email)
             ?? principal.FindFirstValue(JwtRegisteredClaimNames.Email);
-        Nombre = principal.FindFirstValue(ClaimTypes.Name);
-        if (Enum.TryParse<RolUsuario>(principal.FindFirstValue(ClaimTypes.Role), ignoreCase: true, out var rol))
+        Nombre = principal.FindFirstValue(ClaimTypes.Name)
+            ?? principal.FindFirstValue(JwtRegisteredClaimNames.UniqueName)
+            ?? principal.FindFirstValue("name");
+        if (Enum.TryParse<RolUsuario>(FindRoleValue(principal), ignoreCase: true, out var rol))
         {
             Rol = rol;
         }
@@ -33,6 +35,13 @@ public sealed class CurrentUser : ICurrentUser
     public string? Email { get; }
     public string? Nombre { get; }
     public RolUsuario? Rol { get; }
+
+    private static string? FindRoleValue(ClaimsPrincipal principal) =>
+        principal.FindFirstValue(ClaimTypes.Role)
+        ?? principal.FindFirstValue("role")
+        ?? principal.Claims
+            .FirstOrDefault(c => c.Type.EndsWith("/identity/claims/role", StringComparison.OrdinalIgnoreCase))
+            ?.Value;
 
     private static Guid? ParseGuid(ClaimsPrincipal principal, params string[] claimTypes)
     {
